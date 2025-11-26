@@ -3,414 +3,320 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tenant Project Estimator</title>
-    <!-- Tailwind CSS CDN for modern, responsive styling -->
+    <title>Tenant Project Planner</title>
+    <!-- Load Tailwind CSS for modern styling -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Set default font to Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
         body {
             font-family: 'Inter', sans-serif;
-            background-color: #f7f7f7;
-            min-height: 100vh;
+            background-color: #f3f4f6;
         }
-        /* Custom scrollbar for better aesthetics */
-        ::-webkit-scrollbar { width: 8px; }
-        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
-        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
-        .data-table-container {
-            max-height: 400px;
-            overflow-y: auto;
+        /* Custom scrollbar styling for aesthetics */
+        #projects-list::-webkit-scrollbar {
+            width: 8px;
+        }
+        #projects-list::-webkit-scrollbar-thumb {
+            background-color: #a5b4fc; /* Indigo 300 */
+            border-radius: 4px;
         }
     </style>
 </head>
-<body>
+<body class="min-h-screen p-4 sm:p-8 flex items-start justify-center">
 
-    <!-- Main application container (hidden until authenticated) -->
-    <div id="app-view" class="hidden min-h-screen">
-        
-        <!-- Header: User/Tenant Context & Controls -->
-        <header class="bg-white shadow-lg p-4 sticky top-0 z-10">
-            <div class="max-w-7xl mx-auto flex justify-between items-center">
-                <h1 class="text-2xl font-extrabold text-blue-600">Tenant Project Planner</h1>
-
-                <!-- Context and Admin Controls -->
-                <div class="flex items-center space-x-4">
-                    <!-- Project Selector -->
-                    <select id="project-selector" class="px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 bg-gray-50 text-sm">
-                        <option value="">Select Active Project</option>
-                        <!-- Options populated by JS -->
-                    </select>
-
-                    <!-- User Info & Dropdown -->
-                    <div id="user-info" class="relative group">
-                        <button class="flex items-center bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition duration-150 shadow-md">
-                            <span id="display-email" class="text-sm font-medium">Loading...</span>
-                            <svg class="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
-                        </button>
-                        
-                        <!-- Dropdown Menu -->
-                        <div class="absolute right-0 mt-2 w-48 bg-white border border-gray-200 rounded-lg shadow-xl z-20 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 transform scale-95 group-hover:scale-100 origin-top-right">
-                            <a href="#" id="admin-settings-btn" class="hidden block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-t-lg">Admin Settings</a>
-                            <a href="#" id="sign-out-btn" class="block px-4 py-2 text-sm text-red-600 hover:bg-red-50 rounded-b-lg">Sign Out</a>
-                            <span id="display-tenant-id" class="block px-4 py-2 text-xs text-gray-400 truncate">Tenant ID: </span>
-                        </div>
-                    </div>
-                </div>
-            </div>
+    <div class="w-full max-w-2xl bg-white shadow-2xl rounded-xl p-6 md:p-8 transform hover:shadow-3xl transition duration-300">
+        <!-- Header -->
+        <header class="mb-6 border-b pb-4">
+            <h1 class="text-4xl font-extrabold text-indigo-700">Tenant Project Board</h1>
+            <p class="text-sm text-gray-500 mt-2">Manage your maintenance and upgrade projects in real time.</p>
         </header>
 
-        <!-- Main Content Grid -->
-        <main class="max-w-7xl mx-auto p-4 space-y-8">
-            
-            <!-- Project Priority Table Container -->
-            <section class="bg-white p-6 rounded-xl shadow-lg">
-                <h2 class="text-xl font-semibold mb-4 text-gray-800 border-b pb-2">Tenant Projects & Priority</h2>
-                <div id="priority-project-table-container" class="data-table-container">
-                    <p class="text-gray-500">Loading project list...</p>
-                </div>
-            </section>
+        <!-- New Project Form -->
+        <form id="project-form" class="mb-8 flex flex-col sm:flex-row gap-3">
+            <input type="text" id="project-title" placeholder="Project name (e.g., 'Fix leaky faucet in Unit 3A')" required
+                   class="flex-grow p-3 border border-gray-300 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500 text-base transition duration-150">
+            <button type="submit" id="add-button"
+                    class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-3 px-6 rounded-lg transition duration-150 ease-in-out shadow-lg hover:shadow-xl focus:outline-none focus:ring-4 focus:ring-indigo-500 focus:ring-opacity-50 disabled:opacity-50 sm:w-auto w-full">
+                Add Project
+            </button>
+        </form>
 
-            <!-- Requirements Table (Primary Data View) -->
-            <section class="bg-white p-6 rounded-xl shadow-lg">
-                <div class="flex justify-between items-center mb-4 border-b pb-2">
-                    <h2 class="text-xl font-semibold text-gray-800">Requirements & Estimates</h2>
-                    <button id="add-requirement-btn" class="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 transition duration-150 shadow-md text-sm font-medium">
-                        + Add New Requirement
-                    </button>
-                </div>
-                <div id="requirements-table-container" class="data-table-container">
-                    <p class="text-gray-500">Select a project above to view requirements.</p>
-                </div>
-            </section>
+        <!-- Project List Container -->
+        <div id="projects-list" class="space-y-3 max-h-[60vh] overflow-y-auto p-1">
+            <p class="text-gray-500 text-center py-8" id="loading-indicator">Initializing Supabase connection...</p>
+        </div>
 
-            <!-- Risks and Issues Section -->
-            <section class="bg-white p-6 rounded-xl shadow-lg">
-                <h2 class="text-xl font-semibold mb-4 text-gray-800 border-b pb-2">Risks & Issues Tracker</h2>
-                <div class="flex space-x-2 mb-4">
-                    <button data-filter="all" class="risk-filter-btn px-4 py-2 rounded-lg bg-blue-500 text-white hover:bg-blue-600 transition duration-150">All</button>
-                    <button data-filter="risk" class="risk-filter-btn px-4 py-2 rounded-lg bg-yellow-500 text-white hover:bg-yellow-600 transition duration-150">Risks</button>
-                    <button data-filter="issue" class="risk-filter-btn px-4 py-2 rounded-lg bg-red-500 text-white hover:bg-red-600 transition duration-150">Issues</button>
-                </div>
-                <div id="risks-issues-table-container" class="data-table-container">
-                    <p class="text-gray-500">Loading risks and issues...</p>
-                </div>
-            </section>
-        </main>
-    </div>
-
-    <!-- Authentication View (Visible by default) -->
-    <div id="auth-view" class="flex flex-col items-center justify-center min-h-screen bg-gray-100">
-        <div class="w-full max-w-md p-8 space-y-6 bg-white rounded-xl shadow-2xl">
-            <h2 class="text-3xl font-bold text-center text-blue-600">Welcome Back</h2>
-            <div id="auth-error-message" class="text-red-500 text-sm text-center hidden mb-4 p-2 bg-red-100 rounded-md border border-red-200"></div>
-
-            <!-- Login Form -->
-            <form id="login-form" class="space-y-4">
-                <div>
-                    <label for="login-email" class="block text-sm font-medium text-gray-700">Email Address</label>
-                    <input type="email" id="login-email" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
-                </div>
-                <div>
-                    <label for="login-password" class="block text-sm font-medium text-gray-700">Password</label>
-                    <input type="password" id="login-password" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
-                </div>
-                <button type="submit" class="w-full flex justify-center py-2 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition duration-150">Sign In</button>
-            </form>
-
-            <p class="text-center text-sm text-gray-600">
-                Don't have an account? 
-                <button type="button" id="toggle-signup" class="text-blue-600 hover:text-blue-500 font-medium">Sign Up</button>
-            </p>
-
-            <!-- Signup Form (Hidden by default) -->
-            <form id="signup-form" class="space-y-4 hidden">
-                <h3 class="text-xl font-semibold text-center text-gray-800 pt-4 border-t">New Tenant Registration</h3>
-                <div>
-                    <label for="signup-email" class="block text-sm font-medium text-gray-700">Email (Used for Login)</label>
-                    <input type="email" id="signup-email" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
-                </div>
-                <div>
-                    <label for="signup-password" class="block text-sm font-medium text-gray-700">Password</label>
-                    <input type="password" id="signup-password" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
-                </div>
-                <button type="submit" class="w-full flex justify-center py-2 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition duration-150">Register New Tenant</button>
-                <p class="text-center text-sm text-gray-600">
-                    Already registered? 
-                    <button type="button" id="toggle-login" class="text-blue-600 hover:text-blue-500 font-medium">Sign In</button>
-                </p>
-            </form>
+        <!-- Error Message Box -->
+        <div id="error-message" class="hidden mt-6 p-4 bg-red-100 border border-red-400 text-red-700 rounded-lg shadow-md" role="alert">
+            <strong class="font-bold">Error:</strong>
+            <span id="error-text"></span>
         </div>
     </div>
 
-    <!-- Modals (Hidden) -->
+    <!-- Supabase Client Import -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-    <!-- 1. Requirement Detail / Step Sequencing Modal -->
-    <div id="req-detail-modal" class="hidden fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center p-4 z-50">
-        <div class="bg-white rounded-xl shadow-2xl w-full max-w-4xl p-6 relative max-h-[90vh] overflow-y-auto">
-            <h3 class="text-2xl font-bold mb-4 border-b pb-2 text-blue-600" id="req-modal-title">Requirement Details</h3>
-            
-            <form id="requirement-detail-form" class="space-y-4">
-                <!-- Basic Info -->
-                <div class="grid grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700">Requirement Name</label>
-                        <input type="text" id="req-name" required class="mt-1 block w-full border border-gray-300 p-2 rounded-lg">
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700">Assigned To (User ID)</label>
-                        <select id="req-assigned-to" class="mt-1 block w-full border border-gray-300 p-2 rounded-lg">
-                            <!-- Options populated by JS from Users table -->
-                        </select>
-                    </div>
-                </div>
-                
-                <!-- Sequencing Steps & Costing -->
-                <h4 class="text-lg font-semibold mt-6 border-b pb-1">Sequencing & Estimation Steps</h4>
-                <div id="step-list" class="space-y-3 p-3 border rounded-lg bg-gray-50">
-                    <!-- Dynamic step input fields will be inserted here by JS -->
-                </div>
-                <button type="button" id="add-step-btn" class="text-sm text-blue-600 hover:text-blue-800 font-medium">
-                    + Add Step
-                </button>
-                
-                <!-- Summary -->
-                <div class="text-right pt-4 border-t">
-                    <p class="text-lg font-bold">Total Estimated Cost: <span id="total-cost-display" class="text-green-600">$0.00</span></p>
-                </div>
-
-                <!-- Actions -->
-                <div class="flex justify-end space-x-3 pt-4">
-                    <button type="button" id="close-req-modal" class="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-100 transition duration-150">Cancel</button>
-                    <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition duration-150">Save Requirement</button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <!-- 2. Admin Settings Modal -->
-    <div id="admin-settings-modal" class="hidden fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center p-4 z-50">
-        <div class="bg-white rounded-xl shadow-2xl w-full max-w-3xl p-6 relative max-h-[90vh] overflow-y-auto">
-            <h3 class="text-2xl font-bold mb-4 border-b pb-2 text-indigo-600">Admin Configuration</h3>
-            
-            <!-- Tabs/Navigation -->
-            <div class="flex border-b mb-4">
-                <button data-tab="users" class="admin-tab-btn px-4 py-2 text-sm font-medium border-b-2 border-indigo-600 text-indigo-600">User Management</button>
-                <button data-tab="rates" class="admin-tab-btn px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700 border-b-2 border-transparent">Rate Management</button>
-            </div>
-            
-            <!-- User Management Tab -->
-            <div id="admin-tab-users" class="admin-tab-content space-y-4">
-                <h4 class="text-lg font-semibold">Invite New Tenant User</h4>
-                <form id="invite-user-form" class="space-y-3 p-4 border rounded-lg bg-indigo-50">
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700">New User Email</label>
-                        <input type="email" id="invite-email" required class="mt-1 block w-full border border-gray-300 p-2 rounded-lg">
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700">Role</label>
-                        <select id="invite-role" required class="mt-1 block w-full border border-gray-300 p-2 rounded-lg">
-                            <option value="user">User</option>
-                            <option value="admin">Admin</option>
-                        </select>
-                    </div>
-                    <button type="submit" class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition duration-150 text-sm font-medium">Send Invitation</button>
-                </form>
-                
-                <h4 class="text-lg font-semibold pt-4 border-t">Current Tenant Users</h4>
-                <div id="tenant-users-list" class="data-table-container">
-                    <p class="text-gray-500">Loading user list...</p>
-                </div>
-            </div>
-
-            <!-- Rate Management Tab (Hidden by default) -->
-            <div id="admin-tab-rates" class="admin-tab-content space-y-4 hidden">
-                <h4 class="text-lg font-semibold">Tenant-Wide Blended Rate</h4>
-                <form id="blended-rate-form" class="space-y-3 p-4 border rounded-lg bg-green-50">
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700">Rate ($/Hour)</label>
-                        <input type="number" id="blended-rate" step="0.01" required class="mt-1 block w-full border border-gray-300 p-2 rounded-lg">
-                    </div>
-                    <button type="submit" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition duration-150 text-sm font-medium">Save Blended Rate</button>
-                </form>
-                
-                <h4 class="text-lg font-semibold pt-4 border-t">Individual Resource Rates</h4>
-                <form id="individual-rates-form" class="space-y-3 p-4 border rounded-lg bg-yellow-50">
-                    <div id="individual-rates-list" class="space-y-2">
-                        <!-- Dynamic rate inputs for each user will be inserted here -->
-                        <p class="text-gray-600">No individual rates defined yet.</p>
-                    </div>
-                    <button type="submit" class="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition duration-150 text-sm font-medium">Save Individual Rates</button>
-                </form>
-            </div>
-
-            <!-- Modal Close Button -->
-            <div class="flex justify-end pt-4">
-                <button type="button" id="close-admin-modal" class="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-100 transition duration-150">Close</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Firebase/Supabase/App Logic Imports -->
+    <!-- Application Logic -->
     <script type="module">
-        // --- Firebase/Supabase Initialization ---
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { 
-            getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, signOut
-        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { 
-            getFirestore, doc, getDoc, addDoc, setDoc, updateDoc, deleteDoc, onSnapshot, collection, query, where, getDocs, setLogLevel
-        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        // --- 0. Environment Setup and Globals ---
         
-        // Supabase Client (Note: Supabase auth is primary, but we'll include the client here
-        // for completeness, though full authentication will rely on the Firebase custom token process)
-        // Since Supabase auth is the primary driver, we will use its client for auth operations
-        // and Firebase Firestore for persistent storage (rates, etc.).
-        
-        // Supabase CDN: Note: If using the Supabase client directly, it should be initialized here.
-        // For the current setup relying on the RLS-enabled data, we must focus on the Supabase/PostgreSQL connection.
-        // Since the prompt explicitly mentioned "Integrate the Supabase Auth client", we MUST use the Supabase JS client.
-        // We will switch to using the standard Supabase client for Auth and Data, simplifying the setup.
-        
-        // Removing Firebase setup to focus purely on the requested Supabase integration.
-        // In a typical web app, you would stick to one or the other. We will use Supabase for Auth & RLS-enforced PostgreSQL access.
-
-        // Global configuration variables provided by the environment
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        const SUPABASE_URL = 'YOUR_SUPABASE_PROJECT_URL'; // Placeholder for Supabase URL
-        const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY'; // Placeholder for Supabase Key
-        
-        // --- Supabase Client Setup (Placeholder - replace with actual keys) ---
-        // In a real environment, you'd fetch these from environment variables.
-        let supabase;
-
-        // --- Application State ---
-        const appState = {
-            currentTenantId: null,
-            activeProjectId: null,
-            userRole: 'user', 
-            userId: null,
-            email: null,
-            isAuthReady: false,
-            projectRates: {} // Blended and individual rates
+        // Helper function to try accessing environment variables based on common patterns
+        const getEnvVar = (name) => {
+            // Note: This pattern relies on the build environment (like Vercel with a framework)
+            // successfully injecting these variables into the global scope (e.g., import.meta.env).
+            // For a plain static site, this might need a custom injection script during build.
+            if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env[name]) {
+                return import.meta.env[name];
+            }
+            // Add a fallback for typical Vercel client-side injection if the VITE prefix is used
+            // This relies on the variables being set correctly in Vercel settings.
+            if (typeof window !== 'undefined' && window.process && window.process.env && window.process.env[name]) {
+                return window.process.env[name];
+            }
+            return null; 
         };
 
-        // --- DOM Elements ---
-        const authView = document.getElementById('auth-view');
-        const appView = document.getElementById('app-view');
-        const loginForm = document.getElementById('login-form');
-        const signupForm = document.getElementById('signup-form');
-        const authErrorMessage = document.getElementById('auth-error-message');
-        const toggleSignupBtn = document.getElementById('toggle-signup');
-        const toggleLoginBtn = document.getElementById('toggle-login');
-        const signOutBtn = document.getElementById('sign-out-btn');
-        const adminSettingsBtn = document.getElementById('admin-settings-btn');
-        const adminModal = document.getElementById('admin-settings-modal');
-        const closeAdminModal = document.getElementById('close-admin-modal');
-        const reqDetailModal = document.getElementById('req-detail-modal');
-        const closeReqModal = document.getElementById('close-req-modal');
-        const addRequirementBtn = document.getElementById('add-requirement-btn');
+        // Attempt to read the environment variables
+        const SUPABASE_URL = getEnvVar('VITE_SUPABASE_URL');
+        const SUPABASE_ANON_KEY = getEnvVar('VITE_SUPABASE_ANON_KEY');
 
-        // --- Utility Functions ---
+        let supabase = null;
+        
+        // Element references
+        const projectsList = document.getElementById('projects-list');
+        const projectForm = document.getElementById('project-form');
+        const projectTitleInput = document.getElementById('project-title');
+        const loadingIndicator = document.getElementById('loading-indicator');
+        const addButton = document.getElementById('add-button');
+        const errorBox = document.getElementById('error-message');
+        const errorText = document.getElementById('error-text');
+
+        // Table Name (Must match your Supabase table)
+        const PROJECTS_TABLE = 'projects'; 
+
 
         /**
-         * Switches the view based on the user's authentication status.
-         * @param {boolean} isAuthenticated 
+         * Displays an error message in the UI.
+         * @param {string} message The error message to display.
          */
-        function updateView(isAuthenticated) {
-            if (isAuthenticated) {
-                authView.classList.add('hidden');
-                appView.classList.remove('hidden');
-            } else {
-                appView.classList.add('hidden');
-                authView.classList.remove('hidden');
+        function displayError(message) {
+            console.error(message);
+            errorText.textContent = message;
+            errorBox.classList.remove('hidden');
+        }
+
+        /**
+         * Initializes the Supabase client.
+         */
+        function initializeSupabase() {
+            try {
+                if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+                    throw new Error("Supabase URL or Anon Key is missing. Ensure VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY are set in Vercel environment variables.");
+                }
+                supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+                addButton.disabled = false;
+                loadingIndicator.textContent = "Projects loading...";
+                subscribeToProjects();
+
+            } catch (err) {
+                displayError(`Initialization Error: ${err.message}`);
+                addButton.disabled = true;
+                loadingIndicator.textContent = "Could not connect to the database.";
+            }
+        }
+
+        // --- 1. REAL-TIME LISTENER ---
+
+        /**
+         * Renders the list of projects to the UI.
+         * @param {Array<Object>} projects The array of project objects.
+         */
+        function renderProjects(projects) {
+            projectsList.innerHTML = '';
+            loadingIndicator.classList.add('hidden');
+            
+            // Sort by creation date (id) client-side for better UX consistency
+            projects.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+
+            if (projects.length === 0) {
+                projectsList.innerHTML = '<p class="text-gray-400 text-center py-8 italic">No projects yet. Add your first task above!</p>';
+                return;
+            }
+
+            projects.forEach(project => {
+                const isComplete = project.is_complete;
+                const item = document.createElement('div');
+                item.className = `flex items-center justify-between p-4 rounded-xl shadow-md transition duration-200 ease-in-out cursor-pointer hover:shadow-lg ${isComplete ? 'bg-green-50 border-l-4 border-green-500 line-through text-gray-500 opacity-80' : 'bg-white border-l-4 border-indigo-500 text-gray-800 hover:bg-indigo-50'}`;
+                item.setAttribute('data-id', project.id);
+
+                item.innerHTML = `
+                    <span class="text-base font-medium flex-1 mr-4" id="title-${project.id}">
+                        ${project.title}
+                    </span>
+                    <div class="flex items-center space-x-3">
+                        <!-- Toggle Button -->
+                        <button class="toggle-btn text-xl transition transform hover:scale-110" data-id="${project.id}" data-status="${isComplete}" title="Toggle Complete">
+                            ${isComplete ? '<span class="text-green-600">?</span>' : '<span class="text-gray-400">??</span>'}
+                        </button>
+                        <!-- Delete Button -->
+                        <button class="delete-btn text-xl text-red-500 hover:text-red-700 transition transform hover:scale-110" data-id="${project.id}" title="Delete Project">
+                            &times;
+                        </button>
+                    </div>
+                `;
+                projectsList.appendChild(item);
+            });
+            attachEventListeners();
+        }
+
+        /**
+         * Subscribes to real-time updates from the Supabase table.
+         */
+        async function subscribeToProjects() {
+            try {
+                // Initial fetch to populate the list immediately
+                const initialFetch = await supabase
+                    .from(PROJECTS_TABLE)
+                    .select('*');
+
+                if (initialFetch.error) throw initialFetch.error;
+                renderProjects(initialFetch.data);
+
+                // Setup Realtime Subscription
+                supabase.channel('projects_channel')
+                    .on('postgres_changes', { event: '*', schema: 'public', table: PROJECTS_TABLE }, (payload) => {
+                        // Re-fetch all data to ensure consistent sorting and state
+                        fetchProjects(); 
+                    })
+                    .subscribe();
+
+            } catch (error) {
+                displayError(`Failed to subscribe to projects: ${error.message}`);
             }
         }
         
         /**
-         * Hides or shows the Admin Settings button based on user role.
+         * Fetches all projects from the database.
          */
-        function updateAdminVisibility() {
-            if (appState.userRole === 'admin') {
-                adminSettingsBtn.classList.remove('hidden');
-            } else {
-                adminSettingsBtn.classList.add('hidden');
+        async function fetchProjects() {
+            try {
+                const { data, error } = await supabase
+                    .from(PROJECTS_TABLE)
+                    .select('*');
+                    
+                if (error) throw error;
+                renderProjects(data);
+                
+            } catch (error) {
+                 displayError(`Failed to fetch projects: ${error.message}`);
             }
         }
-        
+
+        // --- 2. CRUD OPERATIONS & EVENT HANDLERS ---
+
         /**
-         * Placeholder function to render the main dashboard content.
+         * Handles the form submission to add a new project.
          */
-        function renderDashboard() {
-            document.getElementById('display-email').textContent = appState.email || 'User';
-            document.getElementById('display-tenant-id').textContent = `Tenant ID: ${appState.currentTenantId}`;
-            // Placeholder: Call functions to load data
-            // loadProjectPriorityTable(); 
-            // loadAllRequirements(appState.activeProjectId);
+        async function handleAddProject(e) {
+            e.preventDefault();
+            const title = projectTitleInput.value.trim();
+
+            if (!title) return;
+
+            addButton.disabled = true;
+            addButton.textContent = 'Saving...';
+            errorBox.classList.add('hidden');
+
+            try {
+                const { error } = await supabase
+                    .from(PROJECTS_TABLE)
+                    .insert([
+                        { title: title, is_complete: false }
+                    ]);
+                
+                if (error) throw error;
+                
+                projectTitleInput.value = ''; // Clear input on success
+
+            } catch (err) {
+                displayError(`Failed to add project: ${err.message}`);
+            } finally {
+                addButton.disabled = false;
+                addButton.textContent = 'Add Project';
+            }
         }
 
-        // --- Initialization and Event Listeners ---
-        document.addEventListener('DOMContentLoaded', () => {
-            // Placeholder: Initialize Supabase client
-            // supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-            // initSupabaseAuth(); 
+        /**
+         * Toggles the completion status of a project.
+         * @param {string} id The document ID (primary key) of the project.
+         * @param {boolean} currentStatus The current completion status.
+         */
+        async function toggleProject(id, currentStatus) {
+            errorBox.classList.add('hidden');
             
-            // --- UI Listeners ---
-            toggleSignupBtn.addEventListener('click', () => {
-                loginForm.classList.add('hidden');
-                signupForm.classList.remove('hidden');
-                authErrorMessage.classList.add('hidden');
-            });
+            try {
+                const { error } = await supabase
+                    .from(PROJECTS_TABLE)
+                    .update({ is_complete: !currentStatus })
+                    .eq('id', id);
 
-            toggleLoginBtn.addEventListener('click', () => {
-                signupForm.classList.add('hidden');
-                loginForm.classList.remove('hidden');
-                authErrorMessage.classList.add('hidden');
+                if (error) throw error;
+                
+            } catch (err) {
+                displayError(`Failed to toggle project status: ${err.message}`);
+            }
+        }
+
+        /**
+         * Deletes a project document.
+         * @param {string} id The document ID (primary key) of the project.
+         */
+        async function deleteProjectHandler(id) {
+            errorBox.classList.add('hidden');
+            
+            try {
+                const { error } = await supabase
+                    .from(PROJECTS_TABLE)
+                    .delete()
+                    .eq('id', id);
+
+                if (error) throw error;
+                
+            } catch (err) {
+                displayError(`Failed to delete project: ${err.message}`);
+            }
+        }
+
+        /**
+         * Attaches event listeners to the dynamically created buttons.
+         */
+        function attachEventListeners() {
+            projectsList.querySelectorAll('.delete-btn').forEach(button => {
+                // Ensure existing listeners are removed to prevent duplicates (common in re-rendering)
+                button.onclick = null; 
+                button.onclick = (e) => {
+                    e.stopPropagation(); // Prevent parent toggle
+                    deleteProjectHandler(button.getAttribute('data-id'));
+                };
             });
             
-            signOutBtn.addEventListener('click', (e) => {
-                e.preventDefault();
-                // Call signOutUser() from app logic (to be implemented in next step)
-                console.log('Sign Out clicked.');
+            projectsList.querySelectorAll('.toggle-btn').forEach(button => {
+                // Ensure existing listeners are removed
+                button.onclick = null;
+                button.onclick = (e) => {
+                    e.stopPropagation(); // Prevent parent toggle
+                    const id = button.getAttribute('data-id');
+                    // Data-status is stored as a string, convert back to boolean
+                    const currentStatus = button.getAttribute('data-status') === 'true'; 
+                    toggleProject(id, currentStatus);
+                };
             });
+        }
 
-            adminSettingsBtn.addEventListener('click', (e) => {
-                e.preventDefault();
-                adminModal.classList.remove('hidden');
-            });
-            closeAdminModal.addEventListener('click', () => adminModal.classList.add('hidden'));
+        // --- 3. STARTUP ---
+        projectForm.addEventListener('submit', handleAddProject);
+        initializeSupabase();
 
-            addRequirementBtn.addEventListener('click', () => {
-                reqDetailModal.classList.remove('hidden');
-            });
-            closeReqModal.addEventListener('click', () => reqDetailModal.classList.add('hidden'));
-
-            // Admin Tab Switching Logic
-            document.querySelectorAll('.admin-tab-btn').forEach(button => {
-                button.addEventListener('click', (e) => {
-                    document.querySelectorAll('.admin-tab-btn').forEach(btn => {
-                        btn.classList.remove('border-indigo-600', 'text-indigo-600');
-                        btn.classList.add('border-transparent', 'text-gray-500', 'hover:text-gray-700');
-                    });
-                    
-                    e.target.classList.add('border-indigo-600', 'text-indigo-600');
-                    e.target.classList.remove('border-transparent', 'text-gray-500', 'hover:text-gray-700');
-                    
-                    document.querySelectorAll('.admin-tab-content').forEach(content => content.classList.add('hidden'));
-                    document.getElementById(`admin-tab-${e.target.dataset.tab}`).classList.remove('hidden');
-                });
-            });
-
-
-            // Initial view update (to ensure auth view is visible until logic runs)
-            updateView(false);
-
-            // TODO: Next step is adding the full Supabase logic here.
-        });
-        
     </script>
-    <!-- Placeholder for Supabase JavaScript -->
-    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
-
 </body>
 </html>

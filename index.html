@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Tenant Project Planner</title>
-    <!-- Load Tailwind CSS for modern styling -->
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
@@ -12,12 +11,11 @@
             font-family: 'Inter', sans-serif;
             background-color: #f3f4f6;
         }
-        /* Custom scrollbar styling for aesthetics */
         #projects-list::-webkit-scrollbar {
             width: 8px;
         }
         #projects-list::-webkit-scrollbar-thumb {
-            background-color: #a5b4fc; /* Indigo 300 */
+            background-color: #a5b4fc;
             border-radius: 4px;
         }
     </style>
@@ -25,13 +23,11 @@
 <body class="min-h-screen p-4 sm:p-8 flex items-start justify-center">
 
     <div class="w-full max-w-2xl bg-white shadow-2xl rounded-xl p-6 md:p-8 transform hover:shadow-3xl transition duration-300">
-        <!-- Header -->
         <header class="mb-6 border-b pb-4">
             <h1 class="text-4xl font-extrabold text-indigo-700">Tenant Project Board</h1>
             <p class="text-sm text-gray-500 mt-2">Manage your maintenance and upgrade projects in real time.</p>
         </header>
 
-        <!-- New Project Form -->
         <form id="project-form" class="mb-8 flex flex-col sm:flex-row gap-3">
             <input type="text" id="project-title" placeholder="Project name (e.g., 'Fix leaky faucet in Unit 3A')" required
                    class="flex-grow p-3 border border-gray-300 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500 text-base transition duration-150">
@@ -41,47 +37,37 @@
             </button>
         </form>
 
-        <!-- Project List Container -->
         <div id="projects-list" class="space-y-3 max-h-[60vh] overflow-y-auto p-1">
             <p class="text-gray-500 text-center py-8" id="loading-indicator">Initializing Supabase connection...</p>
         </div>
 
-        <!-- Error Message Box -->
         <div id="error-message" class="hidden mt-6 p-4 bg-red-100 border border-red-400 text-red-700 rounded-lg shadow-md" role="alert">
             <strong class="font-bold">Error:</strong>
             <span id="error-text"></span>
         </div>
     </div>
 
-    <!-- Supabase Client Import -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-    <!-- Application Logic -->
     <script type="module">
         // --- 0. Environment Setup and Globals ---
         
-        // Helper function to try accessing environment variables based on common patterns
         const getEnvVar = (name) => {
-            // Note: This pattern relies on the build environment (like Vercel with a framework)
-            // successfully injecting these variables into the global scope (e.g., import.meta.env).
-            // For a plain static site, this might need a custom injection script during build.
             if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env[name]) {
                 return import.meta.env[name];
             }
-            // Add a fallback for typical Vercel client-side injection if the VITE prefix is used
-            // This relies on the variables being set correctly in Vercel settings.
             if (typeof window !== 'undefined' && window.process && window.process.env && window.process.env[name]) {
                 return window.process.env[name];
             }
             return null; 
         };
 
-        // Attempt to read the environment variables
         const SUPABASE_URL = getEnvVar('VITE_SUPABASE_URL');
         const SUPABASE_ANON_KEY = getEnvVar('VITE_SUPABASE_ANON_KEY');
 
-        let supabase = null;
-        
+        // IMPORTANT: We use 'let' here for the application's internal use.
+        let supabaseClient = null; // Renamed to avoid shadowing the global 'supabase' from the CDN
+
         // Element references
         const projectsList = document.getElementById('projects-list');
         const projectForm = document.getElementById('project-form');
@@ -91,14 +77,9 @@
         const errorBox = document.getElementById('error-message');
         const errorText = document.getElementById('error-text');
 
-        // Table Name (Must match your Supabase table)
         const PROJECTS_TABLE = 'projects'; 
 
 
-        /**
-         * Displays an error message in the UI.
-         * @param {string} message The error message to display.
-         */
         function displayError(message) {
             console.error(message);
             errorText.textContent = message;
@@ -106,14 +87,23 @@
         }
 
         /**
-         * Initializes the Supabase client.
+         * Initializes the Supabase client and sets the global variable.
          */
         function initializeSupabase() {
             try {
                 if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-                    throw new Error("Supabase URL or Anon Key is missing. Ensure VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY are set in Vercel environment variables.");
+                    throw new Error("Supabase URL or Anon Key is missing. Check Vercel environment variables.");
                 }
-                supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+                
+                // *** THE FIX ***
+                // 1. Create the client instance using a unique local variable name.
+                supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+                
+                // 2. Assign the actual client instance back to the global name 
+                //    'supabase' so it's accessible by the console and the rest of the app.
+                window.supabase = supabaseClient;
+                // *****************
+                
                 addButton.disabled = false;
                 loadingIndicator.textContent = "Projects loading...";
                 subscribeToProjects();
@@ -125,17 +115,12 @@
             }
         }
 
-        // --- 1. REAL-TIME LISTENER ---
+        // --- 1. REAL-TIME LISTENER (Updated to use supabaseClient) ---
 
-        /**
-         * Renders the list of projects to the UI.
-         * @param {Array<Object>} projects The array of project objects.
-         */
         function renderProjects(projects) {
             projectsList.innerHTML = '';
             loadingIndicator.classList.add('hidden');
             
-            // Sort by creation date (id) client-side for better UX consistency
             projects.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
 
             if (projects.length === 0) {
@@ -154,11 +139,9 @@
                         ${project.title}
                     </span>
                     <div class="flex items-center space-x-3">
-                        <!-- Toggle Button -->
                         <button class="toggle-btn text-xl transition transform hover:scale-110" data-id="${project.id}" data-status="${isComplete}" title="Toggle Complete">
                             ${isComplete ? '<span class="text-green-600">?</span>' : '<span class="text-gray-400">??</span>'}
                         </button>
-                        <!-- Delete Button -->
                         <button class="delete-btn text-xl text-red-500 hover:text-red-700 transition transform hover:scale-110" data-id="${project.id}" title="Delete Project">
                             &times;
                         </button>
@@ -169,23 +152,17 @@
             attachEventListeners();
         }
 
-        /**
-         * Subscribes to real-time updates from the Supabase table.
-         */
         async function subscribeToProjects() {
             try {
-                // Initial fetch to populate the list immediately
-                const initialFetch = await supabase
+                const initialFetch = await supabaseClient // Use the internal variable
                     .from(PROJECTS_TABLE)
                     .select('*');
 
                 if (initialFetch.error) throw initialFetch.error;
                 renderProjects(initialFetch.data);
 
-                // Setup Realtime Subscription
-                supabase.channel('projects_channel')
+                supabaseClient.channel('projects_channel') // Use the internal variable
                     .on('postgres_changes', { event: '*', schema: 'public', table: PROJECTS_TABLE }, (payload) => {
-                        // Re-fetch all data to ensure consistent sorting and state
                         fetchProjects(); 
                     })
                     .subscribe();
@@ -195,12 +172,9 @@
             }
         }
         
-        /**
-         * Fetches all projects from the database.
-         */
         async function fetchProjects() {
             try {
-                const { data, error } = await supabase
+                const { data, error } = await supabaseClient // Use the internal variable
                     .from(PROJECTS_TABLE)
                     .select('*');
                     
@@ -212,11 +186,8 @@
             }
         }
 
-        // --- 2. CRUD OPERATIONS & EVENT HANDLERS ---
+        // --- 2. CRUD OPERATIONS & EVENT HANDLERS (Updated to use supabaseClient) ---
 
-        /**
-         * Handles the form submission to add a new project.
-         */
         async function handleAddProject(e) {
             e.preventDefault();
             const title = projectTitleInput.value.trim();
@@ -228,7 +199,7 @@
             errorBox.classList.add('hidden');
 
             try {
-                const { error } = await supabase
+                const { error } = await supabaseClient // Use the internal variable
                     .from(PROJECTS_TABLE)
                     .insert([
                         { title: title, is_complete: false }
@@ -236,7 +207,7 @@
                 
                 if (error) throw error;
                 
-                projectTitleInput.value = ''; // Clear input on success
+                projectTitleInput.value = '';
 
             } catch (err) {
                 displayError(`Failed to add project: ${err.message}`);
@@ -246,16 +217,11 @@
             }
         }
 
-        /**
-         * Toggles the completion status of a project.
-         * @param {string} id The document ID (primary key) of the project.
-         * @param {boolean} currentStatus The current completion status.
-         */
         async function toggleProject(id, currentStatus) {
             errorBox.classList.add('hidden');
             
             try {
-                const { error } = await supabase
+                const { error } = await supabaseClient // Use the internal variable
                     .from(PROJECTS_TABLE)
                     .update({ is_complete: !currentStatus })
                     .eq('id', id);
@@ -267,15 +233,11 @@
             }
         }
 
-        /**
-         * Deletes a project document.
-         * @param {string} id The document ID (primary key) of the project.
-         */
         async function deleteProjectHandler(id) {
             errorBox.classList.add('hidden');
             
             try {
-                const { error } = await supabase
+                const { error } = await supabaseClient // Use the internal variable
                     .from(PROJECTS_TABLE)
                     .delete()
                     .eq('id', id);
@@ -287,26 +249,20 @@
             }
         }
 
-        /**
-         * Attaches event listeners to the dynamically created buttons.
-         */
         function attachEventListeners() {
             projectsList.querySelectorAll('.delete-btn').forEach(button => {
-                // Ensure existing listeners are removed to prevent duplicates (common in re-rendering)
                 button.onclick = null; 
                 button.onclick = (e) => {
-                    e.stopPropagation(); // Prevent parent toggle
+                    e.stopPropagation();
                     deleteProjectHandler(button.getAttribute('data-id'));
                 };
             });
             
             projectsList.querySelectorAll('.toggle-btn').forEach(button => {
-                // Ensure existing listeners are removed
                 button.onclick = null;
                 button.onclick = (e) => {
-                    e.stopPropagation(); // Prevent parent toggle
+                    e.stopPropagation();
                     const id = button.getAttribute('data-id');
-                    // Data-status is stored as a string, convert back to boolean
                     const currentStatus = button.getAttribute('data-status') === 'true'; 
                     toggleProject(id, currentStatus);
                 };

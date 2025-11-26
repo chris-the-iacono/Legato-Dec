@@ -1,8 +1,8 @@
 {
   "build": {
     "env": {
-      "VITE_SUPABASE_URL": "@vite_supabase_url",
-      "VITE_SUPABASE_ANON_KEY": "@vite_supabase_anon_key"
+      "SUPABASE_URL": "@VITE_SUPABASE_URL",
+      "SUPABASE_ANON_KEY": "@VITE_SUPABASE_ANON_KEY"
     }
   },
   "rewrites": [

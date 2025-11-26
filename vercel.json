@@ -1,0 +1,23 @@
+{
+  "build": {
+    "env": {
+      "SUPABASE_URL": "@vite_supabase_url",
+      "SUPABASE_ANON_KEY": "@vite_supabase_anon_key"
+    }
+  },
+  "rewrites": [
+    { "source": "/index.html", "destination": "/" },
+    { "source": "/", "destination": "/index.html" }
+  ],
+  "headers": [
+    {
+      "source": "/index.html",
+      "headers": [
+        {
+          "key": "Content-Security-Policy",
+          "value": "default-src 'self'; style-src 'self' https://cdn.tailwindcss.com 'unsafe-inline'; script-src 'self' https://cdn.tailwindcss.com https://cdn.jsdelivr.net 'unsafe-inline'; connect-src 'self' https://*.supabase.co; font-src 'self' https://fonts.gstatic.com;"
+        }
+      ]
+    }
+  ]
+}

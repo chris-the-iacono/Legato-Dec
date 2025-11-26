@@ -61,9 +61,9 @@
             }
             return null; 
         };
-
-        const SUPABASE_URL = getEnvVar('VITE_SUPABASE_URL');
-        const SUPABASE_ANON_KEY = getEnvVar('VITE_SUPABASE_ANON_KEY');
+		// ** Vercel will replace these placeholders with the actual keys **
+        const SUPABASE_URL = "__SUPABASE_URL__";
+        const SUPABASE_ANON_KEY = "__SUPABASE_ANON_KEY__";
 
         // IMPORTANT: We use 'let' here for the application's internal use.
         let supabaseClient = null; // Renamed to avoid shadowing the global 'supabase' from the CDN

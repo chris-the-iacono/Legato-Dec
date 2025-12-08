@@ -1,2 +1,36 @@
-# THIS IS THE CORRECT PATH. ONLY PASTE THE YAML CODE HERE.
-# We are using this step to force GitHub to recognize the file structure.
+name: Deploy Static Pages
+
+on:
+  push:
+    branches:
+      - develop # Only runs when you push to the 'develop' branch
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Inject Supabase Secrets
+        # This uses the 'sed' utility to replace the placeholders in the index.html file
+        run: |
+          # Use the repository secrets to substitute the placeholders in index.html
+          sed -i 's|__SUPABASE_URL__|${{ secrets.SUPABASE_URL }}|g' index.html
+          sed -i 's|__SUPABASE_ANON_KEY__|${{ secrets.SUPABASE_ANON_KEY }}|g' index.html
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+      
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          # The entire repository folder is uploaded for deployment
+          path: '.' 
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

@@ -6,15 +6,16 @@ on:
       - develop # Only runs when you push to the 'develop' branch
 
 jobs:
-      deploy:
-        permissions: # <-- ADD THIS BLOCK
-          contents: read
-          pages: write
-          id-token: write
-        runs-on: ubuntu-latest
-        steps:
-    runs-on: ubuntu-latest
-    steps:
+  deploy:
+    # --- START OF THE DEPLOY JOB BLOCK ---
+    permissions: # Correctly indented under 'deploy:'
+      contents: read
+      pages: write
+      id-token: write
+    
+    runs-on: ubuntu-latest # Correctly indented under 'deploy:'
+    
+    steps: # Correctly indented under 'deploy:'
       - name: Checkout Code
         uses: actions/checkout@v4
 
@@ -40,3 +41,4 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+    # --- END OF THE DEPLOY JOB BLOCK ---

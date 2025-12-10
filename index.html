@@ -488,12 +488,11 @@
     //      projectSelector.value = data[0].id;
             // Manually trigger the selection handler for the first project
     //      handleProjectSelection({ target: projectSelector });
-    //  } // <-- This brace was missing in the original code, causing parse errors.
+    //  }
     } 
 
     /**
-     * Handles project selection change. THIS FUNCTION WAS MISSING.
-     * It updates the global currentProjectID and fetches requirements.
+     * Handles project selection change.
      */
     async function handleProjectSelection(e) {
         currentProjectID = e.target.value;
@@ -506,6 +505,39 @@
             addRequirementBtn.disabled = true;
         }
     }
+    
+    /**
+     * Inserts a new project row into the Supabase database.
+     * @param {string} title - The title of the new project.
+     */
+    async function createProjectInDatabase(title) {
+        if (!currentTenantId) {
+            console.error("Cannot create project: Tenant ID is unknown.");
+            alert("Error: Cannot create project without a valid Tenant ID.");
+            return { error: { message: "Tenant ID missing" } };
+        }
+
+        const { data, error } = await supabaseClient
+            .from(PROJECTS_TABLE)
+            .insert([
+                {
+                    title: title,
+                    tenant_id: currentTenantId, // Ensure RLS policy compliance
+                    status: 'Active' // Default status
+                }
+            ])
+            .select();
+
+        if (error) {
+            console.error('Supabase Insert Error:', error);
+            alert(`Error creating project: ${error.message}`);
+            return { error };
+        }
+        
+        // Return the newly created project data
+        return { data: data[0] };
+    }
+
 
     /**
      * Updates the UI when no projects are found for the tenant.
@@ -532,28 +564,36 @@
         // 4. Attach a listener to the new button
         document.getElementById('create-first-project-btn').addEventListener('click', () => {
             showProjectModal(); 
-
         });
     }
 
     /**
-     * Handles the display of the Project Creation/Edit Modal (Placeholder).
+     * Handles the display of the Project Creation/Edit Modal.
+     * LOGIC UPDATED TO PERFORM REAL DATABASE INSERT.
      */
-    function showProjectModal(projectId = null) {
-        // IMPORTANT: In a real app, this would open a dedicated modal (like reqDetailModal)
-        // for adding/editing a project, which would then call a supabase INSERT/UPDATE.
-        
-        // For now, use an alert and simulate success:
+    async function showProjectModal(projectId = null) {
+        // For now, use a prompt and actually insert the project:
         const projectTitle = prompt("Enter a title for your new project:");
 
         if (projectTitle && projectTitle.trim() !== '') {
-            // Assume successful creation and refresh the project list
-            // In reality, this would be an async function to insert the row first
-            // await createProjectInDatabase(projectTitle); 
             
-            alert(`Project "${projectTitle}" created (simulated). Refreshing project list.`);
-            // Re-run fetchProjects to load the new project
-            fetchProjects(); 
+            // --- START REAL INSERT LOGIC ---
+            const { data: newProject, error } = await createProjectInDatabase(projectTitle);
+
+            if (!error) {
+                alert(`Project "${projectTitle}" successfully created! Refreshing project list.`);
+                
+                // 1. Re-run fetchProjects to load the new project and update the dropdown
+                await fetchProjects();
+                
+                // 2. Automatically select the newly created project (optional but helpful)
+                if (newProject) {
+                    projectSelector.value = newProject.id;
+                    // Manually trigger the selection handler for the new project
+                    handleProjectSelection({ target: projectSelector });
+                }
+            }
+            // --- END REAL INSERT LOGIC ---
         }
     }
     

@@ -13,7 +13,7 @@
             min-height: 100vh;
         }
         /* Custom scrollbar for better aesthetics */
-        /* Custom scrollbar for better aesthetics */
+        /* Changes to allow creating projects and requirements */
         ::-webkit-scrollbar { width: 8px; }
         ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
         ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
@@ -450,46 +450,97 @@
         /**
          * Fetches and populates the Project Selector in the header.
          */
-        async function fetchProjects() {
-            // In a multi-tenant app, filter by the currentTenantId
-            const { data, error } = await supabaseClient
-                .from(PROJECTS_TABLE)
-                .select('id, title')
-                // Assuming RLS policy filters by tenant_id
-                .order('title', { ascending: true }); 
-
-            if (error) {
-                console.error('Error fetching projects:', error);
-                projectSelector.innerHTML = '<option value="">Error Loading Projects</option>';
-                return;
-            }
-
-            // Clear and repopulate the selector
-            projectSelector.innerHTML = '<option value="">Select Active Project</option>';
-            data.forEach(project => {
-                const option = document.createElement('option');
-                option.value = project.id;
-                option.textContent = project.title;
-                projectSelector.appendChild(option);
-            });
-        }
-        
         /**
-         * Handles project selection change.
-         */
-        async function handleProjectSelection(e) {
-            currentProjectID = e.target.value;
+ * Fetches and populates the Project Selector in the header.
+ * If no projects are found, it triggers the empty state UI.
+ */
+async function fetchProjects() {
+    // In a multi-tenant app, filter by the currentTenantId
+    const { data, error } = await supabaseClient
+        .from(PROJECTS_TABLE)
+        .select('id, title')
+        // Assuming RLS policy filters by tenant_id
+        .order('title', { ascending: true }); 
 
-            if (currentProjectID) {
-                await fetchRequirements(currentProjectID);
-                addRequirementBtn.disabled = false;
-                requirementsContainer.innerHTML = `<p class="text-gray-500">Loading requirements for Project ${currentProjectID}...</p>`;
-            } else {
-                requirementsContainer.innerHTML = '<p class="text-gray-500">Select an active project above to view or add requirements.</p>';
-                addRequirementBtn.disabled = true;
-            }
-        }
+    if (error) {
+        console.error('Error fetching projects:', error);
+        projectSelector.innerHTML = '<option value="">Error Loading Projects</option>';
+        return;
+    }
 
+    // Clear and repopulate the selector
+    projectSelector.innerHTML = '<option value="">Select Active Project</option>';
+
+    // === NEW LOGIC: Handle Empty State ===
+    if (data.length === 0) {
+        handleEmptyProjects(); 
+        return; 
+    }
+    // =====================================
+
+    // Existing logic to populate dropdown if data is found:
+    data.forEach(project => {
+        const option = document.createElement('option');
+        option.value = project.id;
+        option.textContent = project.title;
+        projectSelector.appendChild(option);
+    });
+
+    // Optionally: Automatically select a project if one exists (e.g., the first one)
+  //  if (data.length > 0 && !currentProjectID) {
+  //      projectSelector.value = data[0].id;
+        // Manually trigger the selection handler for the first project
+  //      handleProjectSelection({ target: projectSelector });
+    }
+}
+/**
+ * Updates the UI when no projects are found for the tenant.
+ */
+function handleEmptyProjects() {
+    // 1. Clear project selector
+    projectSelector.innerHTML = '<option value="">No Projects Found</option>';
+    
+    // 2. Update the requirements container to show the creation prompt
+    requirementsContainer.innerHTML = `
+        <div class="text-center py-10 bg-gray-50 rounded-lg border border-dashed border-gray-300">
+            <h3 class="text-lg font-semibold text-gray-700">No Projects Found for your Tenant</h3>
+            <p class="text-sm text-gray-500 mt-2">To get started, please create your first project.</p>
+            <button id="create-first-project-btn" 
+                    class="mt-4 px-4 py-2 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition">
+                + Create New Project
+            </button>
+        </div>
+    `;
+    
+    // 3. Disable the main "Add Requirement" button
+    addRequirementBtn.disabled = true;
+
+    // 4. Attach a listener to the new button
+    document.getElementById('create-first-project-btn').addEventListener('click', () => {
+        showProjectModal(); 
+    });
+}
+
+/**
+ * Handles the display of the Project Creation/Edit Modal (Placeholder).
+ */
+function showProjectModal(projectId = null) {
+    // IMPORTANT: In a real app, this would open a dedicated modal (like reqDetailModal)
+    // for adding/editing a project, which would then call a supabase INSERT/UPDATE.
+    
+    // For now, use an alert and simulate success:
+    const projectTitle = prompt("Enter a title for your new project:");
+
+    if (projectTitle && projectTitle.trim() !== '') {
+        // Assume successful creation and refresh the project list
+        // In reality, this would be an async function to insert the row first
+        // await createProjectInDatabase(projectTitle); 
+        
+        alert(`Project "${projectTitle}" created (simulated). Refreshing project list.`);
+        // Re-run fetchProjects to load the new project
+        fetchProjects(); 
+    }
+}
         /**
          * Fetches and renders requirements for the selected project.
          */

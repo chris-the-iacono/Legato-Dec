@@ -284,8 +284,19 @@
     // ==============================================
     // 2. Utility Functions
     // ==============================================
-
-    function displayAuthError(message) {
+	//Start new client-side UUID block
+/**
+ * Generates a simple, non-cryptographic UUID (v4 format) in the browser.
+ */
+function generateUUID() {
+    // This is a common pattern for generating V4 UUIDs in JS
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+        var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+    });
+}
+    // End of new client-side UUID block
+	function displayAuthError(message) {
         console.error('Auth Error:', message);
         authErrorBox.textContent = message;
         authErrorBox.classList.remove('hidden');
@@ -398,7 +409,9 @@
             email, 
             password,
             // Add a placeholder tenant_id in user_metadata for demonstration
-            options: { data: { tenant_id: `TENANT-${Math.random().toString(36).substring(2, 9)}`, role: 'admin' } } 
+            //options: { data: { tenant_id: `TENANT-${Math.random().toString(36).substring(2, 9)}`, role: 'admin' } } 
+			// NEW: Generate a UUID-like string for the tenant_id
+			options: { data: { tenant_id: generateUUID(), role: 'admin' } }
         });
 
         if (error) {

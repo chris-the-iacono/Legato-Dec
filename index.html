@@ -400,36 +400,41 @@ function displayAuthError(message, type = 'error') {
     loginBtn.textContent = 'Logging in...';
     loginBtn.disabled = true;
 
-    const { data, error } = await supabaseClient.auth.signInWithPassword({
-        email,
-        password,
+    // 1. Attempt Sign-in
+    const { data: signInData, error: signInError } = await supabaseClient.auth.signInWithPassword({
+        email: email,
+        password: password,
     });
-
-    if (error) {
-        displayAuthError(`Login Failed: ${error.message}`);
-    } else {
-        // --- CRITICAL SESSION CHECK AND REDIRECT LOGIC ---
-        if (data.session) {
-            // SUCCESS: Session established. Redirect the user.
-            // NOTE: Replace '/dashboard.html' with your actual target page.
-            window.location.assign("/dashboard.html");
-        } else {
-            // FAILURE: Sign-in was OK, but no session was issued.
-            // This happens if the user is unconfirmed, or a server issue occurs.
-            displayAuthError("Login successful but no session was created. Check if email is confirmed.", 'error');
-            
-            // Clear the password field only
-            document.getElementById('login-password').value = '';
-        }
-
-        // Only clear fields and enable button if redirection didn't happen
-        // (i.e., if there was an error or a session failure)
-    }
-
+    
+    // Reset button state and clear fields immediately
     loginBtn.textContent = 'Log In';
     loginBtn.disabled = false;
-}
+    document.getElementById('login-password').value = ''; 
 
+    if (signInError) {
+        // Handle explicit error from the server
+        displayAuthError(`Login Failed: ${signInError.message}`);
+        return;
+    } 
+    
+    // 2. Check for session data from the result OR force check local storage.
+    let session = signInData.session;
+
+    if (!session) {
+        // If the session wasn't returned, force a check of the browser's local storage.
+        const { data: sessionData } = await supabaseClient.auth.getSession();
+        session = sessionData.session;
+    }
+
+    if (session) {
+        // SUCCESS: Session established. Redirect the user.
+        window.location.assign("/dashboard.html"); // Replace with your target page
+    } else {
+        // FAIL: Session was not created, despite successful credentials.
+        // This MUST display an error, ruling out silent failures.
+        displayAuthError("Login successful but no session was issued. Please check if your email is confirmed.", 'error');
+    }
+}
     async function handleSignup(e) {
     e.preventDefault();
     hideAuthError();

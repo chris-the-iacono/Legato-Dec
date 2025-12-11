@@ -576,7 +576,7 @@ function displayAuthError(message, type = 'error') {
             .from(PROJECTS_TABLE)
             .insert([
                 {
-                    title: title,
+                    name: title,
                     tenant_id: currentTenantId, // Ensure RLS policy compliance
                     status: 'Active' // Default status
                 }

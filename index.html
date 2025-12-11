@@ -565,34 +565,34 @@ function displayAuthError(message, type = 'error') {
      * Inserts a new project row into the Supabase database.
      * @param {string} title - The title of the new project.
      */
-    async function createProjectInDatabase(title) {
-        if (!currentTenantId) {
-            console.error("Cannot create project: Tenant ID is unknown.");
-            alert("Error: Cannot create project without a valid Tenant ID.");
-            return { error: { message: "Tenant ID missing" } };
-        }
-
-        const { data, error } = await supabaseClient
-            .from(PROJECTS_TABLE)
-            .insert([
-                {
-                    name: title,
-                    tenant_id: currentTenantId, // Ensure RLS policy compliance
-                    status: 'Active' // Default status
-                }
-            ])
-            .select();
-
-        if (error) {
-            console.error('Supabase Insert Error:', error);
-            alert(`Error creating project: ${error.message}`);
-            return { error };
-        }
-        
-        // Return the newly created project data
-        return { data: data[0] };
+   async function createProjectInDatabase(title) {
+    if (!currentTenantId) {
+        console.error("Cannot create project: Tenant ID is unknown.");
+        alert("Error: Cannot create project without a valid Tenant ID.");
+        return { error: { message: "Tenant ID missing" } };
     }
 
+    const { data, error } = await supabaseClient
+        .from(PROJECTS_TABLE)
+        .insert([
+            {
+                name: title,
+                tenant_id: currentTenantId, // Ensure RLS policy compliance
+                status: 'Active', // Default status
+                priority_value: 1 // **ADDED: Fixes "null value in column 'priority_value'" error**
+            }
+        ])
+        .select();
+
+    if (error) {
+        console.error('Supabase Insert Error:', error);
+        alert(`Error creating project: ${error.message}`);
+        return { error };
+    }
+    
+    // Return the newly created project data
+    return { data: data[0] };
+}
 
     /**
      * Updates the UI when no projects are found for the tenant.

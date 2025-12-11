@@ -635,19 +635,33 @@ function displayAuthError(message, type = 'error') {
             // --- START REAL INSERT LOGIC ---
             const { data: newProject, error } = await createProjectInDatabase(projectTitle);
 
-            if (!error) {
-                alert(`Project "${projectTitle}" successfully created! Refreshing project list.`);
-                
-                // 1. Re-run fetchProjects to load the new project and update the dropdown
-                await fetchProjects();
-                
-                // 2. Automatically select the newly created project (optional but helpful)
-                if (newProject) {
-                    projectSelector.value = newProject.id;
-                    // Manually trigger the selection handler for the new project
-                    handleProjectSelection({ target: projectSelector });
-                }
-            }
+if (!error) {
+    alert(`Project "${projectTitle}" successfully created! Loading project details.`);
+    
+    // --- START CRITICAL FIX LOGIC ---
+
+    // 1. Re-run fetchProjects to load the new project and update the dropdown
+    await fetchProjects(); // Wait for the dropdown options to be updated
+
+    if (newProject) {
+        // 2. Automatically select the newly created project
+        // This line attempts to set the value. It requires 'fetchProjects' to have updated the options.
+        projectSelector.value = newProject.id; 
+
+        // 3. Manually ensure the global state reflects the selected project
+        // This is the missing link. We must find the new project in the list
+        // and set the global variables (like currentProjectId) that the controls rely on.
+        
+        // Assuming your project list is stored globally as 'allProjects':
+        const selectedProject = allProjects.find(p => p.id === newProject.id);
+
+        if (selectedProject) {
+            currentProjectId = selectedProject.id;
+            // The controls depend on the side effect of handleProjectSelection, which
+            // likely sets the global state variables required by the other page controls.
+            handleProjectSelection({ target: projectSelector }); 
+        }
+    }
             // --- END REAL INSERT LOGIC ---
         }
     }

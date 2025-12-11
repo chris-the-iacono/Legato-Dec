@@ -296,11 +296,30 @@ function generateUUID() {
     });
 }
     // End of new client-side UUID block
-	function displayAuthError(message) {
+	// NOTE: Assuming 'authErrorBox' is your element for displaying messages
+function displayAuthError(message, type = 'error') {
+    // 1. Log to console only if it's a real error
+    if (type === 'error') {
         console.error('Auth Error:', message);
-        authErrorBox.textContent = message;
-        authErrorBox.classList.remove('hidden');
+        // Ensure error box is styled for errors
+        authErrorBox.classList.remove('text-green-600');
+        authErrorBox.classList.add('text-red-500'); 
+    } else {
+        // Style for success
+        authErrorBox.classList.remove('text-red-500');
+        authErrorBox.classList.add('text-green-600'); 
+        console.log('Auth Success:', message); // Log success
     }
+
+    // 2. Set the message content
+    authErrorBox.textContent = message;
+    
+    // 3. Ensure the element is visible
+    authErrorBox.classList.remove('hidden');
+}
+
+// NOTE: You may need to ensure your CSS defines 'text-red-500' and 'text-green-600'
+// (These are common Tailwind CSS classes, adjust if you use standard CSS).
     
     function hideAuthError() {
         authErrorBox.classList.add('hidden');
@@ -394,37 +413,59 @@ function generateUUID() {
     }
 
     async function handleSignup(e) {
-        e.preventDefault();
-        hideAuthError();
-        const email = document.getElementById('signup-email').value;
-        const password = document.getElementById('signup-password').value;
-        const signupBtn = document.getElementById('signup-btn');
+    e.preventDefault();
+    hideAuthError();
+    const email = document.getElementById('signup-email').value;
+    const password = document.getElementById('signup-password').value;
+    const signupBtn = document.getElementById('signup-btn');
 
-        signupBtn.textContent = 'Registering...';
-        signupBtn.disabled = true;
+    signupBtn.textContent = 'Registering...';
+    signupBtn.disabled = true;
 
-        // Note: In a real app, you'd likely use a serverless function to handle tenant/user creation 
-        // for security and to assign the correct `tenant_id` metadata.
-        const { error } = await supabaseClient.auth.signUp({ 
-            email, 
-            password,
-            // Add a placeholder tenant_id in user_metadata for demonstration
-            //options: { data: { tenant_id: `TENANT-${Math.random().toString(36).substring(2, 9)}`, role: 'admin' } } 
-			// NEW: Generate a UUID-like string for the tenant_id
-			options: { data: { tenant_id: generateUUID(), role: 'admin' } }
-        });
+    // 1. Generate the initial tenant_id UUID
+    const newTenantId = generateUUID();
 
-        if (error) {
-            displayAuthError(`Signup Failed: ${error.message}`);
-        } else {
-            // displayAuthError('Registration successful! Please check your email for a confirmation link.');
-            // Switch back to login view
-            toggleSignupForm(false);
+    // 2. Call Supabase signUp with the generated UUID in user_metadata
+    const { data: signUpData, error: signUpError } = await supabaseClient.auth.signUp({ 
+        email, 
+        password,
+        options: { 
+            data: { 
+                tenant_id: newTenantId, 
+                role: 'admin' 
+            } 
         }
+    });
 
-        signupBtn.textContent = 'Register New Tenant';
-        signupBtn.disabled = false;
+    if (signUpError) {
+        displayAuthError(`Signup Failed: ${signUpError.message}`);
+    } else {
+        // --- SUCCESS LOGIC: Display Email Confirmation Message ---
+        let successMessage = `Success! Check your email at **${email}** to confirm your account and log in.`;
+
+        // Hide the signup form and show the login form for the next step (login)
+        // NOTE: We call toggleSignupForm(false) if that's your function for switching, 
+        // otherwise we manually hide/show the elements as shown below.
+        
+        // Assuming toggleSignupForm(false) works to switch back:
+        toggleSignupForm(false); 
+        
+        // OR, if you don't use toggleSignupForm:
+        // loginForm.classList.remove('hidden');
+        // signupForm.classList.add('hidden');
+        // toggleSignupBtn.parentElement.classList.remove('hidden');
+
+        // Display the success message using a 'success' type
+        displayAuthError(successMessage, 'success'); 
+        
+        // Clear the signup form fields
+        document.getElementById('signup-email').value = '';
+        document.getElementById('signup-password').value = '';
     }
+
+    signupBtn.textContent = 'Register New Tenant';
+    signupBtn.disabled = false;
+}
 
     async function handleSignOut() {
         await supabaseClient.auth.signOut();

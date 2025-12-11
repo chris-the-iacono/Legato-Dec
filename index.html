@@ -332,7 +332,7 @@ function displayAuthError(message, type = 'error') {
             appView.classList.remove('hidden');
             currentUserId = user.id;
             // Assuming you have a 'tenant_id' in your users table/metadata
-            currentTenantId = user.user_metadata?.tenant_id || 'T-UNKNOWN'; 
+            currentTenantId = (user.user_metadata && user.user_metadata.tenant_id) || 'T-UNKNOWN';
             isUserAdmin = user.user_metadata?.role === 'admin';
 
             displayEmail.textContent = user.email;

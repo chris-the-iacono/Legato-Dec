@@ -391,26 +391,44 @@ function displayAuthError(message, type = 'error') {
     }
 
     async function handleLogin(e) {
-        e.preventDefault();
-        hideAuthError();
-        const email = document.getElementById('login-email').value;
-        const password = document.getElementById('login-password').value;
-        const loginBtn = document.getElementById('login-btn');
+    e.preventDefault();
+    hideAuthError();
+    const email = document.getElementById('login-email').value;
+    const password = document.getElementById('login-password').value;
+    const loginBtn = document.getElementById('login-btn');
 
-        loginBtn.textContent = 'Authenticating...';
-        loginBtn.disabled = true;
+    loginBtn.textContent = 'Logging in...';
+    loginBtn.disabled = true;
 
-        const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+    const { data, error } = await supabaseClient.auth.signInWithPassword({
+        email,
+        password,
+    });
 
-        if (error) {
-            displayAuthError(`Login Failed: ${error.message}`);
+    if (error) {
+        displayAuthError(`Login Failed: ${error.message}`);
+    } else {
+        // --- CRITICAL SESSION CHECK AND REDIRECT LOGIC ---
+        if (data.session) {
+            // SUCCESS: Session established. Redirect the user.
+            // NOTE: Replace '/dashboard.html' with your actual target page.
+            window.location.assign("/dashboard.html");
         } else {
-            toggleAppView(true, data.user);
+            // FAILURE: Sign-in was OK, but no session was issued.
+            // This happens if the user is unconfirmed, or a server issue occurs.
+            displayAuthError("Login successful but no session was created. Check if email is confirmed.", 'error');
+            
+            // Clear the password field only
+            document.getElementById('login-password').value = '';
         }
-        
-        loginBtn.textContent = 'Sign In';
-        loginBtn.disabled = false;
+
+        // Only clear fields and enable button if redirection didn't happen
+        // (i.e., if there was an error or a session failure)
     }
+
+    loginBtn.textContent = 'Log In';
+    loginBtn.disabled = false;
+}
 
     async function handleSignup(e) {
     e.preventDefault();

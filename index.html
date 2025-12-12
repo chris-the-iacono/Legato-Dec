@@ -840,16 +840,17 @@ if (!error) {
         calculateTotalCost();
     }
     
-   function calculateTotalCost() {
+  function calculateTotalCost() { 
     const stepList = document.getElementById('step-list');
     let totalCost = 0;
+
     stepList.querySelectorAll('input[name^="step-cost-"]').forEach(input => {
         totalCost += parseFloat(input.value) || 0;
-		}
     });
 
     document.getElementById('total-cost').textContent = `$${totalCost.toFixed(2)}`;
 }
+
     // ==============================================
     // 6. Admin Logic (Simplified)
     // ==============================================

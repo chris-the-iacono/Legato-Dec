@@ -249,6 +249,7 @@
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inhrd2N0cmZtdnBxcGNya3NyemdxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM3MTk0MTAsImV4cCI6MjA3OTI5NTQxMH0.i6GMjG1_APaiKc3UcJekxtFtAbPrykEkwSZUnusNvmY'; 
     
     // Supabase client instance
+	let allProjects = [];
     let supabaseClient = null;
     let currentTenantId = null;
     let currentUserId = null;
@@ -280,6 +281,7 @@
     const reqDetailModal = document.getElementById('req-detail-modal');
     const adminSettingsModal = document.getElementById('admin-settings-modal');
     const blendedRateInput = document.getElementById('blended-rate');
+	const risksIssuesContainer = document.getElementById('risks-issues-table-container');
 
     // ==============================================
     // 2. Utility Functions
@@ -532,16 +534,16 @@ function displayAuthError(message, type = 'error') {
         // In a multi-tenant app, filter by the currentTenantId
         const { data, error } = await supabaseClient
             .from(PROJECTS_TABLE)
-            .select('id, title')
+            .select('id, name')
             // Assuming RLS policy filters by tenant_id
-            .order('title', { ascending: true }); 
+            .order('name', { ascending: true }); 
 
         if (error) {
             console.error('Error fetching projects:', error);
             projectSelector.innerHTML = '<option value="">Error Loading Projects</option>';
             return;
         }
-
+			allProjects = data;
         // Clear and repopulate the selector
         projectSelector.innerHTML = '<option value="">Select Active Project</option>';
 
@@ -556,7 +558,7 @@ function displayAuthError(message, type = 'error') {
         data.forEach(project => {
             const option = document.createElement('option');
             option.value = project.id;
-            option.textContent = project.title;
+            option.textContent = project.name;
             projectSelector.appendChild(option);
         });
 
@@ -672,13 +674,13 @@ if (!error) {
 
         // 3. Manually ensure the global state reflects the selected project
         // This is the missing link. We must find the new project in the list
-        // and set the global variables (like currentProjectId) that the controls rely on.
+        // and set the global variables (like currentProjectID) that the controls rely on.
         
         // Assuming your project list is stored globally as 'allProjects':
         const selectedProject = allProjects.find(p => p.id === newProject.id);
 
         if (selectedProject) {
-            currentProjectId = selectedProject.id;
+            currentProjectID = selectedProject.id;
             // The controls depend on the side effect of handleProjectSelection, which
             // likely sets the global state variables required by the other page controls.
             handleProjectSelection({ target: projectSelector }); 
@@ -838,16 +840,16 @@ if (!error) {
         calculateTotalCost();
     }
     
-    function calculateTotalCost() {
-          const stepList = document.getElementById('step-list');
-          let totalCost = 0;
-          stepList.querySelectorAll('input[name^="step-cost-"]').forEach(input => {
-              totalCost += parseFloat(input.value) || 0;
-          });
-          document.getElementById('total-cost-display').textContent = `$${totalCost.toFixed(2)}`;
-    }
+   function calculateTotalCost() {
+    const stepList = document.getElementById('step-list');
+    let totalCost = 0;
+    stepList.querySelectorAll('input[name^="step-cost-"]').forEach(input => {
+        totalCost += parseFloat(input.value) || 0;
+		}
+    });
 
-
+    document.getElementById('total-cost').textContent = `$${totalCost.toFixed(2)}`;
+}
     // ==============================================
     // 6. Admin Logic (Simplified)
     // ==============================================
@@ -929,7 +931,7 @@ if (!error) {
 
     // --- STARTUP ---
     initializeSupabase();
-
+}
 </script>
 </body>
 </html>

@@ -244,13 +244,13 @@
     // ==============================================
     
     // ** FINAL FIX: Vercel will replace these placeholders with the actual keys **
-    const SUPABASE_URL = 'https://xkwctrfmvpqpcrksrzgq.supabase.co';
-    // ...
-    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inhrd2N0cmZtdnBxcGNya3NyemdxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM3MTk0MTAsImV4cCI6MjA3OTI5NTQxMH0.i6GMjG1_APaiKc3UcJekxtFtAbPrykEkwSZUnusNvmY'; 
-    
-    // Supabase client instance
-	let allProjects = [];
-    let supabaseClient = null;
+const SUPABASE_URL = 'https://xkwctrfmvpqpcrksrzgq.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inhrd2N0cmZtdnBxcGNya3NyemdxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM3MTk0MTAsImV4cCI6MjA3OTI5NTQxMH0.i6GMjG1_APaiKc3UcJekxtFtAbPrykEkwSZUnusNvmY';
+
+// Supabase client instance
+let supabaseClient = null;
+let currentTenantId = null; 
+// ... (continue with the rest of your code)
     let currentTenantId = null;
     let currentUserId = null;
     let currentProjectID = null;
@@ -390,6 +390,7 @@ function displayAuthError(message, type = 'error') {
         const { data: { user } } = await supabaseClient.auth.getUser();
         toggleAppView(!!user, user);
     }
+
 
     async function handleLogin(e) {
     e.preventDefault();

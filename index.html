@@ -333,8 +333,7 @@ function displayAuthError(message, type = 'error') {
             currentUserId = user.id;
             // Assuming you have a 'tenant_id' in your users table/metadata
             currentTenantId = (user.user_metadata && user.user_metadata.tenant_id) || 'T-UNKNOWN';
-            isUserAdmin = user.user_metadata?.role === 'admin';
-
+            isUserAdmin = user.user_metadata && user.user_metadata.role === 'admin';
             displayEmail.textContent = user.email;
             displayTenantId.textContent = `Tenant ID: ${currentTenantId}`;
             

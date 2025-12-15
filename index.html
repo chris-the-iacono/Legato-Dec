@@ -299,18 +299,24 @@ function generateUUID() {
     // End of new client-side UUID block
 	// NOTE: Assuming 'authErrorBox' is your element for displaying messages
 function displayAuthError(message, type = 'error') {
-    // 1. Log to console only if it's a real error
-    if (type === 'error') {
-        console.error('Auth Error:', message);
-        // Ensure error box is styled for errors
-        authErrorBox.classList.remove('text-green-600');
-        authErrorBox.classList.add('text-red-500'); 
+    if (authErrorBox) { // CHECK 1: Ensure the element was found
+        authErrorBox.textContent = message;
+        authErrorBox.classList.remove('hidden');
+
+        // Optional: Update styling based on 'type' (e.g., success vs error)
+        if (type === 'error') {
+            authErrorBox.classList.remove('bg-green-100', 'text-green-500');
+            authErrorBox.classList.add('bg-red-100', 'text-red-500');
+        } else if (type === 'success') {
+            authErrorBox.classList.remove('bg-red-100', 'text-red-500');
+            authErrorBox.classList.add('bg-green-100', 'text-green-500');
+        }
     } else {
-        // Style for success
-        authErrorBox.classList.remove('text-red-500');
-        authErrorBox.classList.add('text-green-600'); 
-        console.log('Auth Success:', message); // Log success
+        // Fallback for debugging (since it wasn't showing before)
+        console.error("Auth error display element (auth-error-message) not found in the DOM.");
+        console.error("Error to display: ", message);
     }
+}
 
     // 2. Set the message content
     authErrorBox.textContent = message;
@@ -322,10 +328,12 @@ function displayAuthError(message, type = 'error') {
 // NOTE: You may need to ensure your CSS defines 'text-red-500' and 'text-green-600'
 // (These are common Tailwind CSS classes, adjust if you use standard CSS).
     
-    function hideAuthError() {
+function hideAuthError() {
+    if (authErrorBox) { // CHECK 2: Ensure the element was found
         authErrorBox.classList.add('hidden');
         authErrorBox.textContent = '';
     }
+}
 
     function toggleAppView(isAuthenticated, user) {
         if (isAuthenticated) {

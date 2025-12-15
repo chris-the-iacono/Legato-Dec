@@ -833,16 +833,32 @@
             // ==============================================
 
             // --- Auth Listeners ---
-            if (loginForm) loginForm.addEventListener('submit', handleLogin);
-            if (signupForm) signupForm.addEventListener('submit', handleSignup);
-            if (toggleSignupBtn) toggleSignupBtn.addEventListener('click', () => toggleSignupForm(true));
-            if (toggleLoginBtn) toggleLoginBtn.addEventListener('click', () => toggleSignupForm(false));
-            if (signOutBtn) signOutBtn.addEventListener('click', handleSignOut);
-            
-            // --- App Listeners ---
-            if (projectSelector) projectSelector.addEventListener('change', handleProjectSelection);
-            if (adminSettingsBtn) adminSettingsBtn.addEventListener('click', showAdminModal);
-            
+			// --- Auth Listeners ---
+			// We use delegation on the parent authView to ensure listeners attach immediately
+			// and correctly capture the 'submit' event.
+	authView.addEventListener('submit', (e) => {
+    // Check which form triggered the submit event
+    	if (e.target && e.target.id === 'login-form') {
+        e.preventDefault(); // CRITICAL: Prevent default submit immediately
+        handleLogin(e);
+   		 } else if (e.target && e.target.id === 'signup-form') {
+        e.preventDefault(); // CRITICAL: Prevent default submit immediately
+        handleSignup(e);
+    }
+    // Note: We MUST call e.preventDefault() here or inside handleLogin/handleSignup
+    // to stop the form clearing/reloading.
+});
+
+// toggleSignupBtn.addEventListener('click', () => toggleSignupForm(true)); // Keep this
+// toggleLoginBtn.addEventListener('click', () => toggleSignupForm(false)); // Keep this
+if (toggleSignupBtn) toggleSignupBtn.addEventListener('click', () => toggleSignupForm(true));
+if (toggleLoginBtn) toggleLoginBtn.addEventListener('click', () => toggleSignupForm(false));
+
+if (signOutBtn) signOutBtn.addEventListener('click', handleSignOut);
+ 
+// --- App Listeners ---
+if (projectSelector) projectSelector.addEventListener('change', handleProjectSelection);
+if (adminSettingsBtn) adminSettingsBtn.addEventListener('click', showAdminModal);            
             // --- Modal Listeners: Requirement ---
             if (addRequirementBtn) addRequirementBtn.addEventListener('click', () => showRequirementModal());
             const closeReqModalBtn = document.getElementById('close-req-modal');

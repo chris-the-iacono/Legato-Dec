@@ -1006,16 +1006,9 @@ if (closeReqModalBtn) closeReqModalBtn.addEventListener('click', closeRequiremen
 const addStepBtn = document.getElementById('add-step-btn');
 if (addStepBtn) addStepBtn.addEventListener('click', addStepInput);
 
+// This is the crucial line, now correctly isolated and placed:
 const reqDetailForm = document.getElementById('requirement-detail-form');
-if (reqDetailForm) reqDetailForm.addEventListener('submit', saveRequirement); 
-
-// Note: Ensure there are NO extra closing braces '}' or ')' immediately following this line.
-	
-	
-	
-    alert('Requirement data saved!');
-    closeRequirementModal();
-});
+if (reqDetailForm) reqDetailForm.addEventListener('submit', saveRequirement);
 
             // --- Modal Listeners Here: Admin ---
             const closeAdminModalBtn = document.getElementById('close-admin-modal');

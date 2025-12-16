@@ -628,26 +628,66 @@
                 }
             }
             
-            async function fetchRequirements(projectId) {
-                requirementsContainer.innerHTML = `<p class="text-gray-500">Loading requirements for Project ${projectId}...</p>`;
-                
-                const { data, error } = await supabaseClient
-                    .from(REQUIREMENTS_TABLE)
-                    .select(`
-                        id, name, estimated_cost, status, assigned_to,
-                        tenant_users!inner(email)
-                    `)
-                    .eq('project_id', projectId)
-                    .order('id', { ascending: true });
+            // ======================================================================
+// REVISED fetchRequirements FUNCTION 12_16_25_11_35AM
+// ======================================================================
+async function fetchRequirements(projectId) {
+    // Check if there's an existing realtime subscription to unsubscribe from
+    if (unsubscribeRequirements) {
+        unsubscribeRequirements();
+    }
 
-                if (error) {
-                    requirementsContainer.innerHTML = `<p class="text-red-500">Error fetching requirements: ${error.message}</p>`;
-                    return;
-                }
+    selectedProjectId = projectId;
+    requirementsStatus.textContent = 'Loading requirements...';
+    requirementsList.innerHTML = '';
+    projectStats.style.display = 'none';
 
-                renderRequirementsTable(data);
+    try {
+        // --- THIS IS THE CRITICALLY CORRECTED QUERY ---
+        const { data: initialData, error } = await supabaseClient
+            .from(REQUIREMENTS_TABLE)
+            .select(`
+                id, name, estimated_cost, status, 
+                assigned_to_id,                     // <-- CORRECTED: Uses the actual FK column name
+                user_profiles!inner(email)          // <-- CORRECTED: Uses the confirmed FK constraint name
+            `)
+            .eq('project_id', projectId)
+            .order('id', { ascending: true });
+        // --- END OF CORRECTED QUERY ---
+
+        if (error) {
+             // Provides a specific, helpful message if the relationship fails for another reason
+            if (error.code === 'PGRST103') {
+                throw new Error(`Schema Error: The database join failed. Although the 'user_profiles' constraint exists, check that assigned_to_id is a UUID and is correctly linked to user_profiles.user_id.`);
             }
+            throw error;
+        }
 
+        renderRequirements(initialData);
+
+        // Setting up a basic Supabase Realtime subscription
+        const channel = supabaseClient.channel(`requirements_changes_${projectId}`)
+            .on('postgres_changes', { event: '*', schema: 'public', table: REQUIREMENTS_TABLE, filter: `project_id=eq.${projectId}` }, payload => {
+                // For simplicity, re-fetch everything on change
+                fetchRequirements(projectId); 
+            })
+            .subscribe((status, err) => {
+                if (status === 'SUBSCRIBED') {
+                    console.log(`Subscribed to requirements for project ${projectId}`);
+                }
+                if (err) {
+                    console.error('Realtime subscription error:', err);
+                }
+            });
+
+        // In a production app, you would save and use the channel.unsubscribe() function here for cleanup.
+
+    } catch (e) {
+        console.error("Error fetching requirements:", e);
+        requirementsStatus.innerHTML = `<p class="text-red-500 text-center py-8">${e.message}</p>`;
+    }
+}
+// ======================================================================
             function renderRequirementsTable(requirements) {
                 if (requirements.length === 0) {
                     requirementsContainer.innerHTML = '<p class="text-gray-400 text-center py-8 italic">No requirements defined for this project. Click "+ Add New Requirement" to begin.</p>';

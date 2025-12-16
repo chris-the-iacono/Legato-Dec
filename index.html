@@ -731,6 +731,59 @@ async function fetchRequirements(projectId) {
         // --- END BUTTON FAILURE LOGIC ---
     }
 }
+async function saveRequirement(event) {
+    event.preventDefault();
+
+    if (!selectedProjectId) return console.error("No project selected.");
+
+    // Determine mode based on whether the ID field is populated
+    const mode = document.getElementById('req-id').value ? 'edit' : 'add'; 
+    const id = document.getElementById('req-id').value;
+    
+    // --- Data Collection (Ensure these IDs exist in your modal HTML) ---
+    const name = document.getElementById('req-name').value;
+    const cost = parseFloat(document.getElementById('req-cost').value);
+    const status = document.getElementById('req-status').value;
+    const assignedToId = document.getElementById('req-assigned-to').value || null;
+
+    const payload = {
+        name: name,
+        estimated_cost: cost,
+        status: status,
+        assigned_to_id: assignedToId, 
+        project_id: selectedProjectId,
+    };
+
+    try {
+        if (mode === 'add') {
+            const { error } = await supabaseClient
+                .from(REQUIREMENTS_TABLE)
+                .insert([payload]);
+
+            if (error) throw error;
+            console.log('Requirement added successfully.');
+
+        } else if (mode === 'edit') {
+            const { error } = await supabaseClient
+                .from(REQUIREMENTS_TABLE)
+                .update(payload)
+                .eq('id', id);
+
+            if (error) throw error;
+            console.log(`Requirement ${id} updated successfully.`);
+        }
+        
+        closeRequirementModal();
+        // Re-fetch to update the stats and list with the new data
+        fetchRequirements(selectedProjectId); 
+
+    } catch (e) {
+        console.error(`Error ${mode}ing requirement:`, e);
+        alert(`Error saving requirement: ${e.message}`);
+    }
+}
+
+
 // ======================================================================
             function renderRequirementsTable(requirements) {
                 if (requirements.length === 0) {
@@ -942,17 +995,29 @@ if (signOutBtn) signOutBtn.addEventListener('click', handleSignOut);
 if (projectSelector) projectSelector.addEventListener('change', handleProjectSelection);
 if (adminSettingsBtn) adminSettingsBtn.addEventListener('click', showAdminModal);            
             // --- Modal Listeners: Requirement ---
-            if (addRequirementBtn) addRequirementBtn.addEventListener('click', () => showRequirementModal());
-            const closeReqModalBtn = document.getElementById('close-req-modal');
-            if (closeReqModalBtn) closeReqModalBtn.addEventListener('click', closeRequirementModal);
-            const addStepBtn = document.getElementById('add-step-btn');
-            if (addStepBtn) addStepBtn.addEventListener('click', addStepInput);
-            const reqDetailForm = document.getElementById('requirement-detail-form');
-            if (reqDetailForm) reqDetailForm.addEventListener('submit', (e) => {
-                  e.preventDefault();
-                  alert('Requirement data simulated to be saved!');
-                  closeRequirementModal();
-            });
+if (adminSettingsBtn) adminSettingsBtn.addEventListener('click', showAdminModal);        
+if (addRequirementBtn) addRequirementBtn.addEventListener('click', () => showRequirementModal());
+const closeReqModalBtn = document.getElementById('close-req-modal');
+if (closeReqModalBtn) closeReqModalBtn.addEventListener('click', closeRequirementModal);
+const addStepBtn = document.getElementById('add-step-btn');
+if (addStepBtn) addStepBtn.addEventListener('click', addStepInput);
+
+// Replace the placeholder listener with the call to the real save function
+const reqDetailForm = document.getElementById('requirement-detail-form');
+if (reqDetailForm) reqDetailForm.addEventListener('submit', saveRequirement); // <--- THIS IS THE CRUCIAL CHANGE
+
+//if (adminSettingsBtn) adminSettingsBtn.addEventListener('click', showAdminModal);        
+//if (addRequirementBtn) addRequirementBtn.addEventListener('click', () => showRequirementModal());
+//const closeReqModalBtn = document.getElementById('close-req-modal');
+//if (closeReqModalBtn) closeReqModalBtn.addEventListener('click', closeRequirementModal);
+//const addStepBtn = document.getElementById('add-step-btn');
+//if (addStepBtn) addStepBtn.addEventListener('click', addStepInput);
+//const reqDetailForm = document.getElementById('requirement-detail-form');
+//if (reqDetailForm) reqDetailForm.addEventListener('submit', (e) => { // <-- START REPLACEMENT HERE
+//    e.preventDefault();
+//    alert('Requirement data simulated to be saved!');
+//    closeRequirementModal();
+});
 
             // --- Modal Listeners Here: Admin ---
             const closeAdminModalBtn = document.getElementById('close-admin-modal');

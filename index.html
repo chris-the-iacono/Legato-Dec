@@ -995,6 +995,10 @@ if (signOutBtn) signOutBtn.addEventListener('click', handleSignOut);
 if (projectSelector) projectSelector.addEventListener('change', handleProjectSelection);
 if (adminSettingsBtn) adminSettingsBtn.addEventListener('click', showAdminModal);            
             // --- Modal Listeners: Requirement ---
+
+
+
+// --- Modal Listeners: Requirement ---
 if (adminSettingsBtn) adminSettingsBtn.addEventListener('click', showAdminModal);        
 if (addRequirementBtn) addRequirementBtn.addEventListener('click', () => showRequirementModal());
 const closeReqModalBtn = document.getElementById('close-req-modal');
@@ -1002,21 +1006,15 @@ if (closeReqModalBtn) closeReqModalBtn.addEventListener('click', closeRequiremen
 const addStepBtn = document.getElementById('add-step-btn');
 if (addStepBtn) addStepBtn.addEventListener('click', addStepInput);
 
-// Replace the placeholder listener with the call to the real save function
 const reqDetailForm = document.getElementById('requirement-detail-form');
-if (reqDetailForm) reqDetailForm.addEventListener('submit', saveRequirement); // <--- THIS IS THE CRUCIAL CHANGE
+if (reqDetailForm) reqDetailForm.addEventListener('submit', saveRequirement); 
 
-//if (adminSettingsBtn) adminSettingsBtn.addEventListener('click', showAdminModal);        
-//if (addRequirementBtn) addRequirementBtn.addEventListener('click', () => showRequirementModal());
-//const closeReqModalBtn = document.getElementById('close-req-modal');
-//if (closeReqModalBtn) closeReqModalBtn.addEventListener('click', closeRequirementModal);
-//const addStepBtn = document.getElementById('add-step-btn');
-//if (addStepBtn) addStepBtn.addEventListener('click', addStepInput);
-//const reqDetailForm = document.getElementById('requirement-detail-form');
-//if (reqDetailForm) reqDetailForm.addEventListener('submit', (e) => { // <-- START REPLACEMENT HERE
-//    e.preventDefault();
-//    alert('Requirement data simulated to be saved!');
-//    closeRequirementModal();
+// Note: Ensure there are NO extra closing braces '}' or ')' immediately following this line.
+	
+	
+	
+    alert('Requirement data saved!');
+    closeRequirementModal();
 });
 
             // --- Modal Listeners Here: Admin ---

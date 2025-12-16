@@ -72,11 +72,16 @@
             </section>
 
             <section class="bg-white p-6 rounded-xl shadow-lg">
-                <div class="flex justify-between items-center mb-4 border-b pb-2">
-                    <h2 class="text-xl font-semibold text-gray-800">Requirements & Estimates</h2>
-                    <button id="add-requirement-btn" class="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 transition duration-150 shadow-md text-sm font-medium" disabled>
-                        + Add New Requirement
-                    </button>
+<div class="bg-white p-6 rounded-xl shadow-lg">
+    <h2 class="text-xl font-semibold text-gray-700 mb-4 flex justify-between items-center">
+        Requirements
+        <button id="add-requirement-btn" 
+                class="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition duration-150 shadow-md text-sm font-medium" 
+                onclick="openRequirementModal('add')">
+            + Add New Requirement
+        </button>
+    </h2>
+    </div>
                 </div>
                 <div id="requirements-table-container" class="data-table-container">
                     <p class="text-gray-500">Select an active project above to view or add requirements.</p>
@@ -240,6 +245,35 @@
         // CRITICAL: The entire application logic is wrapped in DOMContentLoaded
         document.addEventListener('DOMContentLoaded', () => {
 
+// --- Event Listeners and Initialization ---
+
+document.addEventListener('DOMContentLoaded', () => {
+    initAuth();
+    reqForm.addEventListener('submit', saveRequirement);
+
+    // A. Initial State: Disable the button before any project is loaded
+    addRequirementBtn.disabled = true; 
+
+    // B. Project Selector Change Listener (C. is placed inside this function)
+    projectSelect.addEventListener('change', (event) => {
+        const projectId = event.target.value;
+        if (projectId) {
+            fetchRequirements(projectId);
+        } else {
+            // C. Disable on No Selection: If the user selects the blank option
+            requirementsStatus.textContent = 'Select a project to view requirements.';
+            requirementsList.innerHTML = '';
+            projectStats.style.display = 'none';
+            addRequirementBtn.disabled = true; // <--- C. Add this line
+        }
+    });
+
+    // Expose global functions for button clicks
+    window.openRequirementModal = openRequirementModal;
+    window.closeRequirementModal = closeRequirementModal;
+    window.deleteRequirement = deleteRequirement;
+});
+
             // ==============================================
             // 1. CONFIGURATION & GLOBAL STATE
             // ==============================================
@@ -282,7 +316,7 @@
             const blendedRateInput = document.getElementById('blended-rate');
             const risksIssuesContainer = document.getElementById('risks-issues-table-container');
             const loginBtn = document.getElementById('login-btn'); // Needed for the handleLogin function
-
+			
             // ==============================================
             // 2. Utility Functions
             // ==============================================
@@ -658,12 +692,19 @@ async function fetchRequirements(projectId) {
         if (error) {
              // Provides a specific, helpful message if the relationship fails for another reason
             if (error.code === 'PGRST103') {
+                // Keep the button disabled on schema error
+                addRequirementBtn.disabled = true; 
                 throw new Error(`Schema Error: The database join failed. Although the 'user_profiles' constraint exists, check that assigned_to_id is a UUID and is correctly linked to user_profiles.user_id.`);
             }
+            // Disable the button on any other fetch error
+            addRequirementBtn.disabled = true;
             throw error;
         }
 
+        // --- BUTTON SUCCESS LOGIC INSERTED HERE ---
         renderRequirements(initialData);
+        addRequirementBtn.disabled = false; // <<< ENABLE THE BUTTON ON SUCCESS!
+        // --- END BUTTON SUCCESS LOGIC ---
 
         // Setting up a basic Supabase Realtime subscription
         const channel = supabaseClient.channel(`requirements_changes_${projectId}`)
@@ -685,6 +726,9 @@ async function fetchRequirements(projectId) {
     } catch (e) {
         console.error("Error fetching requirements:", e);
         requirementsStatus.innerHTML = `<p class="text-red-500 text-center py-8">${e.message}</p>`;
+        // --- BUTTON FAILURE LOGIC INSERTED HERE ---
+        addRequirementBtn.disabled = true; // <<< DISABLE THE BUTTON ON CATCH ERROR
+        // --- END BUTTON FAILURE LOGIC ---
     }
 }
 // ======================================================================

@@ -264,7 +264,8 @@ document.addEventListener('DOMContentLoaded', () => {
             requirementsStatus.textContent = 'Select a project to view requirements.';
             requirementsList.innerHTML = '';
             projectStats.style.display = 'none';
-            addRequirementBtn.disabled = true; // <--- C. Add this line
+			// addRequirementBtn.disabled = false; // <--- C. Add this line
+            addRequirementBtn.disabled = false; // changed to false 12/17 10:38 AM
         }
     });
 

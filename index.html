@@ -3,662 +3,129 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Project Requirement Tracker</title>
+    <title>Dashboard | Project Manager</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 </head>
-<body class="bg-gray-100 min-h-screen font-sans">
+<body class="bg-gray-50 min-h-screen">
 
-    <div id="auth-view" class="flex flex-col items-center justify-center min-h-screen p-4">
-        <div class="bg-white p-8 rounded-xl shadow-lg w-full max-w-md">
-            <h1 class="text-2xl font-bold mb-6 text-center text-gray-800">Project Manager</h1>
-            
-            <div id="auth-error-message" class="hidden text-sm p-3 rounded mb-4"></div>
+    <div id="main-header"></div>
 
-            <form id="login-form" class="space-y-4">
-                <div>
-                    <label class="block text-sm font-medium text-gray-700">Email</label>
-                    <input type="email" id="login-email" required class="w-full border border-gray-300 p-2 rounded mt-1">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700">Password</label>
-                    <input type="password" id="login-password" required class="w-full border border-gray-300 p-2 rounded mt-1">
-                </div>
-                <button type="submit" id="login-btn" class="w-full bg-indigo-600 text-white py-2 rounded hover:bg-indigo-700 transition">Sign In</button>
-                <p class="text-center text-sm text-gray-600 mt-4">
-                    New tenant? <button type="button" id="toggle-signup" class="text-indigo-600 hover:underline">Register here</button>
-                </p>
-            </form>
-
-            <form id="signup-form" class="hidden space-y-4">
-                <h2 class="text-lg font-semibold border-b pb-2">Create New Tenant</h2>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700">Email</label>
-                    <input type="email" id="signup-email" required class="w-full border border-gray-300 p-2 rounded mt-1">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700">Password</label>
-                    <input type="password" id="signup-password" required class="w-full border border-gray-300 p-2 rounded mt-1">
-                </div>
-                <button type="submit" id="signup-btn" class="w-full bg-green-600 text-white py-2 rounded hover:bg-green-700 transition">Register New Tenant</button>
-                <p class="text-center text-sm text-gray-600 mt-4">
-                    Already have an account? <button type="button" id="toggle-login" class="text-indigo-600 hover:underline">Back to login</button>
-                </p>
-            </form>
+    <main class="max-w-7xl mx-auto py-10 px-4 sm:px-6 lg:px-8">
+        <div class="md:flex md:items-center md:justify-between mb-8">
+            <div class="flex-1 min-w-0">
+                <h2 class="text-2xl font-bold leading-7 text-gray-900 sm:text-3xl sm:truncate">
+                    Project Dashboard
+                </h2>
+                <p class="mt-1 text-sm text-gray-500">Overview of all active projects for your team.</p>
+            </div>
         </div>
-    </div>
 
-    <div id="app-view" class="hidden">
-        <header class="bg-white shadow-sm px-6 py-4 flex justify-between items-center">
-            <div>
-                <h1 class="text-xl font-bold text-indigo-600">Project Workspace</h1>
-                <p id="display-tenant-id" class="text-xs text-gray-500 uppercase tracking-wider"></p>
-            </div>
-            <div class="flex items-center space-x-4">
-                <span id="display-email" class="text-sm text-gray-700 font-medium"></span>
-                <button id="admin-settings-btn" class="hidden bg-gray-100 p-2 rounded-full hover:bg-gray-200" title="Admin Settings">??</button>
-                <button id="sign-out-btn" class="text-sm bg-red-50 text-red-600 px-3 py-1 rounded border border-red-200 hover:bg-red-100 transition">Sign Out</button>
-            </div>
-        </header>
-
-        <main class="max-w-7xl mx-auto p-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div class="lg:col-span-1 space-y-6">
-                <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-                    <h2 class="font-bold text-gray-800 mb-4">Project Controls</h2>
-                    <label class="text-xs font-bold text-gray-500 uppercase">Active Project</label>
-                    <select id="project-selector" class="w-full border border-gray-300 p-2 rounded mt-1 mb-4">
-                        <option value="">Loading Projects...</option>
-                    </select>
-                    <button id="add-requirement-btn" disabled class="w-full bg-indigo-600 text-white py-2 rounded hover:bg-indigo-700 disabled:opacity-50">
-                        + Add New Requirement
-                    </button>
-                </div>
-
-                <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-                    <h2 class="font-bold text-gray-800 mb-4">Priority Summary</h2>
-                    <div id="priority-project-table-container"></div>
-                </div>
-
-                <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-                    <h2 class="font-bold text-gray-800 mb-4">Risks & Issues</h2>
-                    <div id="risks-issues-table-container"></div>
-                </div>
-            </div>
-
-            <div class="lg:col-span-2">
-                <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-                    <div class="px-6 py-4 border-b border-gray-100 flex justify-between items-center">
-                        <h2 class="font-bold text-gray-800">Requirements Detail</h2>
-                    </div>
-                    <div id="requirements-table-container" class="p-6 overflow-x-auto">
-                        <p class="text-gray-500 italic text-center py-10">Select a project to see data...</p>
+        <div id="project-list" class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            <div class="animate-pulse flex space-x-4">
+                <div class="flex-1 space-y-4 py-1">
+                    <div class="h-4 bg-gray-200 rounded w-3/4"></div>
+                    <div class="space-y-2">
+                        <div class="h-4 bg-gray-200 rounded"></div>
+                        <div class="h-4 bg-gray-200 rounded w-5/6"></div>
                     </div>
                 </div>
             </div>
-        </main>
-    </div>
-
-    <div id="req-detail-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-        <div class="bg-white rounded-xl shadow-2xl w-full max-w-2xl overflow-hidden">
-            <div class="bg-gray-50 px-6 py-4 border-b flex justify-between items-center">
-                <h3 id="req-modal-title" class="font-bold text-gray-800 text-lg">Add Requirement</h3>
-                <button id="close-req-modal" class="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
-            </div>
-            <form id="requirement-detail-form" class="p-6 space-y-4">
-                <input type="hidden" id="req-id">
-                
-                <div class="grid grid-cols-2 gap-4">
-                    <div class="col-span-2">
-                        <label class="block text-sm font-medium text-gray-700">Requirement Name</label>
-                        <input type="text" id="req-name" required class="w-full border border-gray-300 p-2 rounded mt-1">
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700">Status</label>
-                        <select id="req-status" class="w-full border border-gray-300 p-2 rounded mt-1">
-                            <option value="Planned">Planned</option>
-                            <option value="In Progress">In Progress</option>
-                            <option value="Complete">Complete</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700">Assigned To</label>
-                        <select id="req-assigned-to" class="w-full border border-gray-300 p-2 rounded mt-1"></select>
-                    </div>
-                </div>
-
-                <div class="border-t pt-4">
-                    <div class="flex justify-between items-center mb-2">
-                        <label class="font-bold text-sm text-gray-700 uppercase">Cost Breakdown (Steps)</label>
-                        <button type="button" id="add-step-btn" class="text-indigo-600 text-sm font-bold hover:underline">+ Add Step</button>
-                    </div>
-                    <div id="step-list" class="space-y-2 max-h-48 overflow-y-auto"></div>
-                </div>
-
-                <div class="flex justify-between items-center bg-indigo-50 p-4 rounded-lg mt-4">
-                    <span class="text-sm font-bold text-indigo-900">Total Estimated Cost:</span>
-                    <input type="hidden" id="req-cost"> <span id="total-cost-display" class="text-xl font-bold text-indigo-600">$0.00</span>
-                </div>
-
-                <div class="pt-4 flex justify-end space-x-3">
-                    <button type="button" onclick="closeRequirementModal()" class="px-4 py-2 text-gray-600 hover:text-gray-800">Cancel</button>
-                    <button type="submit" id="save-req-btn" class="px-6 py-2 bg-indigo-600 text-white rounded shadow hover:bg-indigo-700">Save Requirement</button>
-                </div>
-            </form>
         </div>
-    </div>
+    </main>
 
-    <div id="admin-settings-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-        <div class="bg-white rounded-xl shadow-2xl w-full max-w-3xl overflow-hidden h-[600px] flex flex-col">
-            <div class="bg-gray-50 px-6 py-4 border-b flex justify-between items-center">
-                <h3 class="font-bold text-gray-800 text-lg">Tenant Administration</h3>
-                <button id="close-admin-modal" class="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
-            </div>
+    <script type="module">
+        import { supabase } from './js/config.js';
+        import { checkAccess } from './js/auth.js';
+        import { renderProjectHeader } from './js/components.js';
+
+        let sessionData = null;
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            // 1. Authenticate and check tenant subscription
+            sessionData = await checkAccess();
+            if (!sessionData) return;
+
+            // 2. Render Header (Using 'dashboard' as active ID)
+            // Note: Since no project is selected yet, we pass a generic label
+            renderProjectHeader(sessionData, 'dashboard', 'Project Selection');
+
+            // 3. Load Project Data
+            await loadProjects();
+        });
+
+        async function loadProjects() {
+            const projectContainer = document.getElementById('project-list');
+
+            // Complex Query: Get projects and the sum of their requirement steps
+            // Note: We filter by tenant_id (though RLS would handle this automatically)
+            const { data: projects, error } = await supabase
+                .from('projects')
+                .select(`
+                    tenant_id,
+                    name,
+                    status,
+                    requirements (
+                        steps (cost, is_active)
+                    )
+                `)
+                .eq('tenant_id', sessionData.tenantId);
+
+            if (error) {
+                projectContainer.innerHTML = `<p class="text-red-500">Error loading projects: ${error.message}</p>`;
+                return;
+            }
+
+            if (projects.length === 0) {
+                projectContainer.innerHTML = `<p class="text-gray-500 italic">No projects found. Create your first project to get started.</p>`;
+                return;
+            }
+
+            renderProjectCards(projects);
+        }
+
+        function renderProjectCards(projects) {
+            const projectContainer = document.getElementById('project-list');
             
-            <div class="flex flex-1 overflow-hidden">
-                <div class="w-48 bg-gray-50 border-r p-4 space-y-2">
-                    <button class="admin-tab-btn w-full text-left px-3 py-2 rounded text-sm font-medium border-l-4 border-indigo-600 text-indigo-600 active" data-tab="general">General</button>
-                    <button class="admin-tab-btn w-full text-left px-3 py-2 rounded text-sm font-medium text-gray-500 border-l-4 border-transparent hover:bg-gray-100" data-tab="users">Team Members</button>
-                </div>
-                
-                <div class="flex-1 p-6 overflow-y-auto">
-                    <div id="admin-tab-general" class="admin-tab-content space-y-6">
-                        <h4 class="font-bold border-b pb-2">Financial Settings</h4>
-                        <form id="blended-rate-form" class="space-y-4">
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700">Standard Blended Rate ($/hr)</label>
-                                <input type="number" id="blended-rate" value="150" class="border border-gray-300 p-2 rounded mt-1">
+            projectContainer.innerHTML = projects.map(project => {
+                // Calculate "Rolled-up" cost estimate
+                const totalCost = project.requirements?.reduce((acc, req) => {
+                    const stepSum = req.steps
+                        ?.filter(s => s.is_active)
+                        .reduce((sum, s) => sum + (s.cost || 0), 0);
+                    return acc + stepSum;
+                }, 0) || 0;
+
+                return `
+                    <div class="bg-white overflow-hidden shadow rounded-lg border border-gray-200 hover:shadow-md transition cursor-pointer" 
+                         onclick="openProject('${project.id}', '${project.name}')">
+                        <div class="px-4 py-5 sm:p-6">
+                            <div class="flex items-center justify-between mb-4">
+                                <h3 class="text-lg font-medium text-gray-900 truncate">${project.name}</h3>
+                                <span class="px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
+                                    ${project.status}
+                                </span>
                             </div>
-                            <button type="submit" class="bg-indigo-600 text-white px-4 py-2 rounded text-sm">Update Rate</button>
-                        </form>
+                            <dl>
+                                <dt class="text-sm font-medium text-gray-500">Rolled-up Cost Estimate</dt>
+                                <dd class="mt-1 text-2xl font-semibold text-indigo-600">$${totalCost.toLocaleString()}</dd>
+                            </dl>
+                        </div>
+                        <div class="bg-gray-50 px-4 py-4 sm:px-6">
+                            <div class="text-sm">
+                                <span class="text-indigo-600 font-medium hover:text-indigo-500">Open Project Details &rarr;</span>
+                            </div>
+                        </div>
                     </div>
-                    
-                    <div id="admin-tab-users" class="admin-tab-content hidden">
-                        <h4 class="font-bold border-b pb-2 mb-4">User Directory</h4>
-                        <div id="tenant-users-list" class="space-y-2"></div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
+                `;
+            }).join('');
+        }
 
-    </body>
+        // Handle project selection and store state
+        window.openProject = (id, name) => {
+            localStorage.setItem('selected_project_id', id);
+            localStorage.setItem('selected_project_name', name);
+            window.location.href = 'requirements.html'; // Go to first tab by default
+        };
+    </script>
+</body>
 </html>
-
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.43.0/dist/umd/supabase.min.js"></script>
-<script>
-    // ==============================================
-	// Temporary file
-    // 1. CONFIGURATION & GLOBAL STATE
-    // ==============================================
-    let selectedProjectId = null; // Unified project ID variable
-    let supabaseClient = null;
-    let currentTenantId = null;
-    let currentUserId = null;
-    let isUserAdmin = false;
-    let allProjects = []; 
-    let unsubscribeRequirements = null;
-
-    const SUPABASE_URL = 'https://xkwctrfmvpqpcrksrzgq.supabase.co';
-    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inhrd2N0cmZtdnBxcGNya3NyemdxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM3MTk0MTAsImV4cCI6MjA3OTI5NTQxMH0.i6GMjG1_APaiKc3UcJekxtFtAbPrykEkwSZUnusNvmY';
-    
-    // Table/View names
-    const PROJECTS_TABLE = 'projects';
-    const REQUIREMENTS_TABLE = 'requirements';
-    const USERS_TABLE = 'tenant_users';
-    const RATES_TABLE = 'rates';
-
-    // --- CRITICAL: Main Application Initialization ---
-    document.addEventListener('DOMContentLoaded', () => {
-        initializeSupabase();
-
-        // Element References
-        const authView = document.getElementById('auth-view');
-        const appView = document.getElementById('app-view');
-        const loginForm = document.getElementById('login-form');
-        const signupForm = document.getElementById('signup-form');
-        const toggleSignupBtn = document.getElementById('toggle-signup');
-        const toggleLoginBtn = document.getElementById('toggle-login');
-        const signOutBtn = document.getElementById('sign-out-btn');
-        const adminSettingsBtn = document.getElementById('admin-settings-btn');
-        const projectSelector = document.getElementById('project-selector');
-        const addRequirementBtn = document.getElementById('add-requirement-btn');
-        const reqDetailModal = document.getElementById('req-detail-modal');
-        const adminSettingsModal = document.getElementById('admin-settings-modal');
-        const reqDetailForm = document.getElementById('requirement-detail-form');
-
-        // --- Auth Listeners (Delegated) ---
-        if (authView) {
-            authView.addEventListener('submit', (e) => {
-                if (e.target && e.target.id === 'login-form') {
-                    e.preventDefault();
-                    handleLogin(e);
-                } else if (e.target && e.target.id === 'signup-form') {
-                    e.preventDefault();
-                    handleSignup(e);
-                }
-            });
-        }
-
-        if (toggleSignupBtn) toggleSignupBtn.addEventListener('click', () => toggleSignupForm(true));
-        if (toggleLoginBtn) toggleLoginBtn.addEventListener('click', () => toggleSignupForm(false));
-        if (signOutBtn) signOutBtn.addEventListener('click', handleSignOut);
-
-        // --- App Listeners ---
-        if (projectSelector) projectSelector.addEventListener('change', handleProjectSelection);
-        if (adminSettingsBtn) adminSettingsBtn.addEventListener('click', showAdminModal);
-        if (addRequirementBtn) addRequirementBtn.addEventListener('click', () => openRequirementModal());
-        
-        const closeReqModalBtn = document.getElementById('close-req-modal');
-        if (closeReqModalBtn) closeReqModalBtn.addEventListener('click', closeRequirementModal);
-        
-        const addStepBtn = document.getElementById('add-step-btn');
-        if (addStepBtn) addStepBtn.addEventListener('click', addStepInput);
-
-        if (reqDetailForm) reqDetailForm.addEventListener('submit', saveRequirement);
-
-        const closeAdminModalBtn = document.getElementById('close-admin-modal');
-        if (closeAdminModalBtn) closeAdminModalBtn.addEventListener('click', closeAdminModal);
-        
-        document.querySelectorAll('.admin-tab-btn').forEach(btn => {
-            btn.addEventListener('click', handleAdminTabClick);
-        });
-
-        const blendedRateForm = document.getElementById('blended-rate-form');
-        if (blendedRateForm) {
-            blendedRateForm.addEventListener('submit', (e) => {
-                e.preventDefault();
-                const blendedRateInput = document.getElementById('blended-rate');
-                alert(`New Blended Rate: $${blendedRateInput.value} saved.`);
-            });
-        }
-
-        // Global function exposure for HTML onclicks
-        window.openRequirementModal = openRequirementModal;
-        window.closeRequirementModal = closeRequirementModal;
-        window.deleteRequirement = deleteRequirement;
-    });
-
-    // ==============================================
-    // 2. UTILITY FUNCTIONS
-    // ==============================================
-    function generateUUID() {
-        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-            var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
-            return v.toString(16);
-        });
-    }
-    
-    function displayAuthError(message, type = 'error') {
-        const authErrorBox = document.getElementById('auth-error-message');
-        if (authErrorBox) { 
-            authErrorBox.textContent = message;
-            authErrorBox.classList.remove('hidden');
-            authErrorBox.className = type === 'error' ? 'bg-red-100 text-red-500 p-3 rounded mb-4' : 'bg-green-100 text-green-500 p-3 rounded mb-4';
-        }
-    }
-    
-    function hideAuthError() {
-        const authErrorBox = document.getElementById('auth-error-message');
-        if (authErrorBox) authErrorBox.classList.add('hidden');
-    }
-
-    function toggleAppView(isAuthenticated, user) {
-        const authView = document.getElementById('auth-view');
-        const appView = document.getElementById('app-view');
-        const displayEmail = document.getElementById('display-email');
-        const displayTenantId = document.getElementById('display-tenant-id');
-        const adminSettingsBtn = document.getElementById('admin-settings-btn');
-
-        if (isAuthenticated) {
-            authView.classList.add('hidden');
-            appView.classList.remove('hidden');
-            currentUserId = user.id;
-            currentTenantId = user.user_metadata?.tenant_id || 'T-UNKNOWN';
-            isUserAdmin = user.user_metadata?.role === 'admin';
-            displayEmail.textContent = user.email;
-            displayTenantId.textContent = `Tenant ID: ${currentTenantId}`;
-            
-            if (isUserAdmin) adminSettingsBtn.classList.remove('hidden');
-            else adminSettingsBtn.classList.add('hidden');
-
-            loadApplicationData();
-        } else {
-            authView.classList.remove('hidden');
-            appView.classList.add('hidden');
-            currentUserId = null;
-            currentTenantId = null;
-            isUserAdmin = false;
-        }
-    }
-
-    function toggleSignupForm(showSignup) {
-        document.getElementById('login-form').classList.toggle('hidden', showSignup);
-        document.getElementById('signup-form').classList.toggle('hidden', !showSignup);
-        document.getElementById('toggle-signup').parentElement.classList.toggle('hidden', showSignup);
-    }
-
-    // ==============================================
-    // 3. SUPABASE & AUTH HANDLERS
-    // ==============================================
-    function initializeSupabase() {
-        try {
-            if (typeof window.supabase === 'undefined') throw new Error("Supabase library not loaded.");
-            supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-            supabaseClient.auth.onAuthStateChange((event, session) => {
-                toggleAppView(!!session, session ? session.user : null);
-            });
-        } catch (err) {
-            displayAuthError(`Initialization Error: ${err.message}`);
-        }
-    }
-
-    async function handleLogin(e) {
-        const loginBtn = document.getElementById('login-btn');
-        hideAuthError();
-        const email = document.getElementById('login-email').value;
-        const password = document.getElementById('login-password').value;
-        
-        loginBtn.textContent = 'Logging in...';
-        loginBtn.disabled = true;
-
-        const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
-        
-        loginBtn.textContent = 'Sign In';
-        loginBtn.disabled = false;
-        document.getElementById('login-password').value = ''; 
-
-        if (error) displayAuthError(`Login Failed: ${error.message}`);
-        else displayAuthError("Login Successful!", 'success');
-    }
-
-    async function handleSignup(e) {
-        const signupBtn = document.getElementById('signup-btn');
-        hideAuthError();
-        const email = document.getElementById('signup-email').value;
-        const password = document.getElementById('signup-password').value;
-        const newTenantId = generateUUID();
-
-        signupBtn.textContent = 'Registering...';
-        signupBtn.disabled = true;
-
-        const { error } = await supabaseClient.auth.signUp({ 
-            email, 
-            password,
-            options: { data: { tenant_id: newTenantId, role: 'admin' } }
-        });
-
-        if (error) displayAuthError(`Signup Failed: ${error.message}`);
-        else displayAuthError(`Success! Check ${email} to confirm.`, 'success');
-
-        signupBtn.textContent = 'Register New Tenant';
-        signupBtn.disabled = false;
-    }
-
-    async function handleSignOut() {
-        await supabaseClient.auth.signOut();
-        hideAuthError();
-    }
-
-    // ==============================================
-    // 4. APPLICATION DATA LOGIC
-    // ==============================================
-    async function loadApplicationData() {
-        await fetchProjects();
-        await fetchTenantUsers();
-        renderPriorityTablePlaceholder();
-        renderRisksIssuesPlaceholder();
-    }
-
-    async function fetchProjects() {
-        const projectSelector = document.getElementById('project-selector');
-        const { data, error } = await supabaseClient.from(PROJECTS_TABLE).select('id, name').order('name', { ascending: true }); 
-
-        if (error) {
-            projectSelector.innerHTML = '<option value="">Error Loading Projects</option>';
-            return;
-        }
-        
-        allProjects = data;
-        projectSelector.innerHTML = '<option value="">Select Active Project</option>';
-
-        if (data.length === 0) {
-            handleEmptyProjects();
-            return; 
-        }
-
-        data.forEach(project => {
-            const option = document.createElement('option');
-            option.value = project.id;
-            option.textContent = project.name;
-            projectSelector.appendChild(option);
-        });
-    } 
-
-    async function handleProjectSelection(e) {
-        selectedProjectId = e.target.value;
-        const addRequirementBtn = document.getElementById('add-requirement-btn');
-        const requirementsContainer = document.getElementById('requirements-table-container');
-
-        if (selectedProjectId) {
-            await fetchRequirements(selectedProjectId); 
-            addRequirementBtn.disabled = false;
-        } else {
-            requirementsContainer.innerHTML = '<p class="text-gray-500">Select an active project above to view requirements.</p>';
-            addRequirementBtn.disabled = true;
-        }
-    }
-
-    async function fetchRequirements(projectId) {
-        const requirementsContainer = document.getElementById('requirements-table-container');
-        const addRequirementBtn = document.getElementById('add-requirement-btn');
-
-        try {
-            const { data, error } = await supabaseClient
-                .from(REQUIREMENTS_TABLE)
-                .select(`id, name, estimated_cost, status, assigned_to_id`)
-                .eq('project_id', projectId)
-                .order('id', { ascending: true });
-
-            if (error) throw error;
-
-            renderRequirementsTable(data);
-            addRequirementBtn.disabled = false;
-        } catch (e) {
-            console.error("Error fetching requirements:", e);
-            requirementsContainer.innerHTML = `<p class="text-red-500 text-center py-8">${e.message}</p>`;
-            addRequirementBtn.disabled = true;
-        }
-    }
-
-    async function saveRequirement(event) {
-        event.preventDefault();
-        if (!selectedProjectId) return;
-
-        const id = document.getElementById('req-id').value;
-        const mode = id ? 'edit' : 'add'; 
-        
-        const payload = {
-            name: document.getElementById('req-name').value,
-            estimated_cost: parseFloat(document.getElementById('req-cost').value) || 0,
-            status: document.getElementById('req-status').value,
-            assigned_to_id: document.getElementById('req-assigned-to').value || null,
-            project_id: selectedProjectId,
-        };
-
-        try {
-            const { error } = mode === 'add' 
-                ? await supabaseClient.from(REQUIREMENTS_TABLE).insert([payload])
-                : await supabaseClient.from(REQUIREMENTS_TABLE).update(payload).eq('id', id);
-
-            if (error) throw error;
-            closeRequirementModal();
-            fetchRequirements(selectedProjectId); 
-        } catch (e) {
-            alert(`Error saving requirement: ${e.message}`);
-        }
-    }
-
-    async function deleteRequirement(id) {
-        if (!confirm("Are you sure?")) return;
-        const { error } = await supabaseClient.from(REQUIREMENTS_TABLE).delete().eq('id', id);
-        if (!error) fetchRequirements(selectedProjectId);
-    }
-
-    // ==============================================
-    // 5. RENDERING & UI LOGIC
-    // ==============================================
-    function renderRequirementsTable(requirements) {
-        const container = document.getElementById('requirements-table-container');
-        if (requirements.length === 0) {
-            container.innerHTML = '<p class="text-gray-400 text-center py-8 italic">No requirements defined. Click "+ Add New Requirement" to begin.</p>';
-            return;
-        }
-
-        let html = `
-            <table class="min-w-full divide-y divide-gray-200">
-                <thead class="bg-gray-50">
-                    <tr>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                        <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Est. Cost</th>
-                        <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
-                    </tr>
-                </thead>
-                <tbody class="bg-white divide-y divide-gray-200">
-        `;
-
-        requirements.forEach(req => {
-            const statusColor = { 'Planned': 'text-blue-500', 'In Progress': 'text-yellow-600', 'Complete': 'text-green-600' }[req.status] || 'text-gray-500';
-            html += `
-                <tr class="hover:bg-gray-50">
-                    <td class="px-6 py-4 text-sm font-medium text-gray-900">${req.name}</td>
-                    <td class="px-6 py-4 text-sm ${statusColor}">${req.status}</td>
-                    <td class="px-6 py-4 text-sm text-right font-bold text-green-700">$${(req.estimated_cost || 0).toFixed(2)}</td>
-                    <td class="px-6 py-4 text-right text-sm font-medium">
-                        <button class="text-indigo-600 hover:text-indigo-900 mr-2" onclick="openRequirementModal('edit', ${JSON.stringify(req).replace(/"/g, '&quot;')})">Edit</button>
-                        <button class="text-red-600 hover:text-red-900" onclick="deleteRequirement('${req.id}')">Delete</button>
-                    </td>
-                </tr>
-            `;
-        });
-
-        html += '</tbody></table>';
-        container.innerHTML = html;
-    }
-
-    function renderPriorityTablePlaceholder() {
-        document.getElementById('priority-project-table-container').innerHTML = `
-            <table class="min-w-full divide-y divide-gray-200">
-                <tbody>
-                    <tr><td class="px-6 py-2 text-sm text-gray-500">Project Alpha: High Priority - $50,000</td></tr>
-                    <tr><td class="px-6 py-2 text-sm text-gray-500">Project Beta: Medium Priority - $20,000</td></tr>
-                </tbody>
-            </table>
-        `;
-    }
-    
-    function renderRisksIssuesPlaceholder() {
-        document.getElementById('risks-issues-table-container').innerHTML = `
-            <ul class="space-y-2">
-                <li class="p-3 bg-yellow-100 border border-yellow-200 rounded-md text-sm">Risk: Scope Creep</li>
-                <li class="p-3 bg-red-100 border border-red-200 rounded-md text-sm">Issue: Resource Unavailable</li>
-            </ul>
-        `;
-    }
-
-    // ==============================================
-    // 6. MODAL & STEP LOGIC
-    // ==============================================
-    function openRequirementModal(mode = 'add', data = {}) {
-        const modal = document.getElementById('req-detail-modal');
-        const form = document.getElementById('requirement-detail-form');
-        form.reset();
-
-        document.getElementById('req-modal-title').textContent = mode === 'edit' ? 'Edit Requirement' : 'Add New Requirement';
-        document.getElementById('save-req-btn').textContent = mode === 'edit' ? 'Update Requirement' : 'Save Requirement';
-        
-        if (mode === 'edit') {
-            document.getElementById('req-id').value = data.id;
-            document.getElementById('req-name').value = data.name || '';
-            document.getElementById('req-cost').value = data.estimated_cost || 0;
-            document.getElementById('req-status').value = data.status || 'Planned';
-            document.getElementById('req-assigned-to').value = data.assigned_to_id || '';
-        } else {
-            document.getElementById('req-id').value = '';
-            document.getElementById('step-list').innerHTML = '';
-            addStepInput();
-        }
-
-        modal.classList.remove('hidden');
-    }
-
-    function closeRequirementModal() {
-        document.getElementById('req-detail-modal').classList.add('hidden');
-    }
-
-    function addStepInput() {
-        const stepList = document.getElementById('step-list');
-        const stepIndex = stepList.children.length;
-        const stepDiv = document.createElement('div');
-        stepDiv.className = 'flex space-x-2 items-center mt-2';
-        stepDiv.innerHTML = `
-            <input type="text" placeholder="Step Description" required class="flex-1 border border-gray-300 p-2 rounded-lg text-sm" name="step-desc-${stepIndex}">
-            <input type="number" step="0.01" placeholder="Cost ($)" required class="w-24 border border-gray-300 p-2 rounded-lg text-sm" name="step-cost-${stepIndex}" value="0.00">
-            <button type="button" class="remove-step-btn text-red-500 hover:text-red-700 transition">×</button>
-        `;
-        
-        stepDiv.querySelector('.remove-step-btn').onclick = () => {
-            stepList.removeChild(stepDiv);
-            calculateTotalCost();
-        };
-        
-        stepDiv.querySelectorAll('input').forEach(input => {
-            input.addEventListener('input', calculateTotalCost);
-        });
-
-        stepList.appendChild(stepDiv);
-        calculateTotalCost();
-    }
-    
-    function calculateTotalCost() { 
-        const stepList = document.getElementById('step-list');
-        let totalCost = 0;
-        stepList.querySelectorAll('input[name^="step-cost-"]').forEach(input => {
-            totalCost += parseFloat(input.value) || 0;
-        });
-
-        const totalCostDisplay = document.getElementById('total-cost-display');
-        if (totalCostDisplay) totalCostDisplay.textContent = `$${totalCost.toFixed(2)}`;
-    }
-
-    // ==============================================
-    // 7. ADMIN LOGIC
-    // ==============================================
-    function showAdminModal() {
-        document.getElementById('admin-settings-modal').classList.remove('hidden');
-    }
-
-
-    function closeAdminModal() {
-        document.getElementById('admin-settings-modal').classList.add('hidden');
-    }
-
-    function handleAdminTabClick(e) {
-        document.querySelectorAll('.admin-tab-btn').forEach(btn => {
-            btn.classList.replace('active', 'text-gray-500');
-            btn.classList.remove('border-indigo-600', 'text-indigo-600');
-        });
-        e.target.classList.add('active', 'border-indigo-600', 'text-indigo-600');
-        
-        document.querySelectorAll('.admin-tab-content').forEach(content => content.classList.add('hidden'));
-        document.getElementById(`admin-tab-${e.target.dataset.tab}`).classList.remove('hidden');
-    }
-
-    async function fetchTenantUsers() {
-         const assignedSelect = document.getElementById('req-assigned-to');
-         if (assignedSelect) {
-             assignedSelect.innerHTML = '<option value="">Unassigned</option>';
-             // Dynamic population would happen here via Supabase
-         }
-    }
-</script>

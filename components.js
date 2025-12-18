@@ -17,13 +17,13 @@ export function renderProjectHeader(session, activeTab, projectName = "Select Pr
     // 1. DYNAMIC TAB TITLE: Updates the browser tab name automatically
     document.title = `${projectName} | ${activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}`;
 
-    // 2. ENVIRONMENT BADGE: Shows if we are in Dev or Test based on URL
+   // 2. ENVIRONMENT BADGE: Shows if we are in Dev or Test based on URL
     const currentPath = window.location.pathname;
     let envBadge = '';
     if (currentPath.includes('/develop/')) {
-        envBadge = '<span class="bg-yellow-500 text-black px-2 py-0.5 text-[10px] font-bold rounded ml-2 shadow-sm">DEV</span>';
+        envBadge = '<span class="bg-yellow-500 text-black px-2 py-0.5 text-[10px] font-bold rounded ml-2 shadow-sm env-badge-pulse">DEV</span>';
     } else if (currentPath.includes('/test/')) {
-        envBadge = '<span class="bg-blue-500 text-white px-2 py-0.5 text-[10px] font-bold rounded ml-2 shadow-sm">STAGE</span>';
+        envBadge = '<span class="bg-blue-500 text-white px-2 py-0.5 text-[10px] font-bold rounded ml-2 shadow-sm env-badge-pulse">STAGE</span>';
     }
 
     // 3. DEFINE TABS: Filtered by what the Tenant has actually purchased

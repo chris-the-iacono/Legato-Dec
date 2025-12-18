@@ -2,6 +2,7 @@
 import { handleSignOut } from './auth.js';
 
 /**
+* Updated file
  * Renders the Tabbed UI Header for a selected project.
  * @param {Object} session - The session object from checkAccess()
  * @param {string} activeTab - The ID of the currently active tab

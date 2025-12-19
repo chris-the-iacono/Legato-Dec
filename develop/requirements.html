@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <title>Requirements | Project Manager</title>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="icon" type="image/png" href="assets/favicon.png">
+</head>
+<body class="bg-gray-50 min-h-screen pb-20">
+
+    <div id="main-header"></div>
+
+    <main class="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            
+            <section class="bg-white shadow rounded-lg overflow-hidden flex flex-col h-[700px]">
+                <div class="px-4 py-5 border-b border-gray-200 sm:px-6 flex justify-between items-center bg-gray-50">
+                    <h3 class="text-lg font-bold text-gray-900">1. Requirements (Drag to Sort)</h3>
+                    <button id="add-req-btn" class="bg-indigo-600 text-white px-3 py-1 rounded text-sm hover:bg-indigo-700">+ Add</button>
+                </div>
+                
+                <ul id="req-list" class="divide-y divide-gray-200 overflow-y-auto flex-grow">
+                    </ul>
+            </section>
+
+            <section id="steps-section" class="bg-white shadow rounded-lg overflow-hidden flex flex-col h-[700px] hidden">
+                <div class="px-4 py-5 border-b border-gray-200 sm:px-6 bg-indigo-50">
+                    <h3 id="selected-req-title" class="text-lg font-bold text-indigo-900">2. Steps for [Requirement]</h3>
+                    <p class="text-xs text-indigo-700">All active steps roll up to total cost.</p>
+                </div>
+                
+                <div class="p-4 border-b bg-white">
+                    <div class="flex justify-between items-center">
+                        <span class="text-sm font-medium text-gray-500">Requirement Total:</span>
+                        <span id="req-rollup-total" class="text-xl font-bold text-indigo-600">$0.00</span>
+                    </div>
+                </div>
+
+                <ul id="step-list" class="divide-y divide-gray-200 overflow-y-auto flex-grow">
+                    </ul>
+
+                <div class="p-4 bg-gray-50 border-t">
+                    <button id="add-step-btn" class="w-full bg-white border border-gray-300 py-2 rounded text-sm font-medium hover:bg-gray-100">+ Add Step</button>
+                </div>
+            </section>
+
+            <section id="empty-steps" class="border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center h-[700px]">
+                <p class="text-gray-400 italic text-center px-10">Select a requirement on the left to manage steps and costs.</p>
+            </section>
+
+        </div>
+    </main>
+
+    <script type="module">
+        import { supabase, MODULES } from './js/config.js';
+        import { checkAccess } from './js/auth.js';
+        import { renderProjectHeader } from './js/components.js';
+
+        let session, projectId, selectedReqId;
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            session = await checkAccess(MODULES.REQUIREMENTS);
+            projectId = localStorage.getItem('selected_project_id');
+            const projectName = localStorage.getItem('selected_project_name');
+
+            if (!session || !projectId) { window.location.href = 'index.html'; return; }
+
+            renderProjectHeader(session, 'requirements', projectName);
+            loadRequirements();
+            initSortable();
+        });
+
+        // --- LOAD REQUIREMENTS ---
+        async function loadRequirements() {
+            const { data: reqs, error } = await supabase
+                .from('requirements')
+                .select(`*, steps(cost, is_active)`)
+                .eq('project_id', projectId)
+                .order('priority_order', { ascending: true });
+
+            const list = document.getElementById('req-list');
+            list.innerHTML = reqs.map(req => {
+                const total = req.steps?.filter(s => s.is_active).reduce((sum, s) => sum + (s.cost || 0), 0) || 0;
+                return `
+                    <li class="p-4 hover:bg-gray-50 cursor-pointer transition flex justify-between items-center group" 
+                        data-id="${req.id}" onclick="selectRequirement('${req.id}', '${req.name.replace(/'/g, "\\'")}', ${total})">
+                        <div class="flex items-center space-x-3">
+                            <span class="cursor-move text-gray-300 group-hover:text-gray-500">?</span>
+                            <div>
+                                <p class="text-sm font-bold text-gray-900">${req.name}</p>
+                                <span class="text-xs px-2 py-0.5 rounded-full ${getStatusStyle(req.status)}">${req.status}</span>
+                            </div>
+                        </div>
+                        <p class="text-sm font-mono font-bold text-indigo-600">$${total.toLocaleString()}</p>
+                    </li>
+                `;
+            }).join('');
+        }
+
+        // --- LOAD STEPS ---
+        window.selectRequirement = async (reqId, name, total) => {
+            selectedReqId = reqId;
+            document.getElementById('empty-steps').classList.add('hidden');
+            document.getElementById('steps-section').classList.remove('hidden');
+            document.getElementById('selected-req-title').innerText = `2. Steps for ${name}`;
+            document.getElementById('req-rollup-total').innerText = `$${total.toLocaleString()}`;
+
+            const { data: steps } = await supabase
+                .from('steps')
+                .select('*')
+                .eq('requirement_id', reqId);
+
+            const list = document.getElementById('step-list');
+            list.innerHTML = steps.map(step => `
+                <li class="p-4 flex justify-between items-center ${step.is_active ? '' : 'opacity-50 bg-gray-50'}">
+                    <div class="flex flex-col">
+                        <p class="text-sm text-gray-700">${step.description}</p>
+                        <button onclick="toggleStep('${step.id}', ${step.is_active})" class="text-[10px] uppercase font-bold mt-1 ${step.is_active ? 'text-red-500' : 'text-green-500'}">
+                            ${step.is_active ? 'Deactivate' : 'Activate'}
+                        </button>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <span class="text-xs text-gray-400">$</span>
+                        <input type="number" value="${step.cost}" onchange="updateStepCost('${step.id}', this.value)" 
+                               class="w-20 text-right border-gray-200 rounded text-sm focus:ring-indigo-500">
+                    </div>
+                </li>
+            `).join('');
+        };
+
+        // --- SORTING LOGIC ---
+        function initSortable() {
+            const el = document.getElementById('req-list');
+            Sortable.create(el, {
+                handle: '.cursor-move',
+                onEnd: async () => {
+                    const items = Array.from(el.children);
+                    const updates = items.map((li, index) => ({
+                        id: li.getAttribute('data-id'),
+                        priority_order: index
+                    }));
+                    
+                    // Upsert updates priority in Supabase
+                    for(const item of updates) {
+                        await supabase.from('requirements').update({ priority_order: item.priority_order }).eq('id', item.id);
+                    }
+                }
+            });
+        }
+
+        // --- HELPERS ---
+        function getStatusStyle(status) {
+            if (status === 'active') return 'bg-green-100 text-green-800';
+            if (status === 'removed') return 'bg-red-100 text-red-800';
+            return 'bg-blue-100 text-blue-800'; // completed
+        }
+
+        window.updateStepCost = async (id, val) => {
+            await supabase.from('steps').update({ cost: parseFloat(val) }).eq('id', id);
+            loadRequirements(); // Refresh roll-up
+            selectRequirement(selectedReqId, '...', 0); // Refresh current view
+        };
+
+        window.toggleStep = async (id, currentStatus) => {
+            await supabase.from('steps').update({ is_active: !currentStatus }).eq('id', id);
+            loadRequirements();
+            selectRequirement(selectedReqId, '...', 0);
+        };
+    </script>
+</body>
+</html>

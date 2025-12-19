@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <title>Risks | Project Manager</title>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="icon" type="image/png" href="assets/favicon.png">
+</head>
+<body class="bg-gray-50 min-h-screen">
+
+    <div id="main-header"></div>
+
+    <main class="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
+        <div class="md:flex md:items-center md:justify-between mb-6">
+            <div class="flex-1 min-w-0">
+                <h2 class="text-xl font-bold text-gray-900">Project Risks</h2>
+                <p class="text-sm text-gray-500 text-sm">Identify and track potential project threats.</p>
+            </div>
+            <div class="mt-4 flex md:mt-0 md:ml-4">
+                <button id="add-risk-btn" class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700">
+                    + Log New Risk
+                </button>
+            </div>
+        </div>
+
+        <div class="bg-white shadow rounded-lg overflow-hidden">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Risk Description</th>
+                        <th class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Category</th>
+                        <th class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Impact</th>
+                        <th class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Status</th>
+                        <th class="px-6 py-3.5 text-right"></th>
+                    </tr>
+                </thead>
+                <tbody id="risk-table-body" class="bg-white divide-y divide-gray-200">
+                    </tbody>
+            </table>
+        </div>
+    </main>
+
+    <script type="module">
+        import { supabase, MODULES } from './js/config.js';
+        import { checkAccess } from './js/auth.js';
+        import { renderProjectHeader } from './js/components.js';
+
+        let session, projectId;
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            // 1. Gated Access
+            session = await checkAccess(MODULES.RISKS);
+            projectId = localStorage.getItem('selected_project_id');
+            const projectName = localStorage.getItem('selected_project_name');
+
+            if (!session || !projectId) { window.location.href = 'index.html'; return; }
+
+            // 2. Render Shared UI
+            renderProjectHeader(session, 'risks', projectName);
+
+            // 3. Load Data
+            loadRisks();
+        });
+
+        async function loadRisks() {
+            const { data: risks, error } = await supabase
+                .from('risks')
+                .select(`
+                    id, 
+                    description, 
+                    impact_score, 
+                    status,
+                    risk_types (type_name)
+                `)
+                .eq('project_id', projectId);
+
+            const container = document.getElementById('risk-table-body');
+            
+            if (risks.length === 0) {
+                container.innerHTML = `<tr><td colspan="5" class="px-6 py-10 text-center text-gray-400 italic">No risks logged for this project.</td></tr>`;
+                return;
+            }
+
+            container.innerHTML = risks.map(risk => `
+                <tr class="hover:bg-gray-50">
+                    <td class="px-6 py-4 text-sm text-gray-900 font-medium">${risk.description}</td>
+                    <td class="px-6 py-4 text-sm text-gray-500">${risk.risk_types?.type_name || 'Uncategorized'}</td>
+                    <td class="px-6 py-4">
+                        <span class="px-2 py-1 text-xs font-bold rounded ${getImpactColor(risk.impact_score)}">
+                            Score: ${risk.impact_score}
+                        </span>
+                    </td>
+                    <td class="px-6 py-4">
+                        <select onchange="updateRiskStatus('${risk.id}', this.value)" class="text-xs border-gray-300 rounded focus:ring-indigo-500">
+                            <option value="identified" ${risk.status === 'identified' ? 'selected' : ''}>Identified</option>
+                            <option value="mitigated" ${risk.status === 'mitigated' ? 'selected' : ''}>Mitigated</option>
+                            <option value="occurred" ${risk.status === 'occurred' ? 'selected' : ''}>Occurred</option>
+                        </select>
+                    </td>
+                    <td class="px-6 py-4 text-right text-sm">
+                        <button onclick="deleteRisk('${risk.id}')" class="text-red-400 hover:text-red-600">Delete</button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        // --- HELPER FUNCTIONS ---
+        function getImpactColor(score) {
+            if (score >= 8) return 'bg-red-100 text-red-700';
+            if (score >= 4) return 'bg-yellow-100 text-yellow-700';
+            return 'bg-green-100 text-green-700';
+        }
+
+        window.updateRiskStatus = async (id, status) => {
+            await supabase.from('risks').update({ status }).eq('id', id);
+        };
+
+        window.deleteRisk = async (id) => {
+            if (confirm('Are you sure?')) {
+                await supabase.from('risks').delete().eq('id', id);
+                loadRisks();
+            }
+        };
+    </script>
+</body>
+</html>

@@ -97,22 +97,77 @@
     let sessionData = null;
 
     document.addEventListener('DOMContentLoaded', async () => {
-        // 1. Authenticate and check tenant subscription
+        // 1. Authenticate and check session
         sessionData = await checkAccess();
         if (!sessionData) return;
 
-        // 2. Update the Dashboard Title with the Tenant Name
+        // 2. EXPOSE TO CONSOLE: This allows you to type 'window.sessionData' in F12
+        window.sessionData = sessionData;
+
+        // 3. Update the Dashboard Title with the Tenant Name
         const dashboardTitle = document.querySelector('h1');
         if (dashboardTitle && sessionData.tenantName) {
             dashboardTitle.textContent = `${sessionData.tenantName} - Project Dashboard`;
         }
 
-        // 3. Render Header (Using 'dashboard' as active ID)
+        // 4. Render Header (Using 'dashboard' as active ID)
         renderProjectHeader(sessionData, 'dashboard', 'Project Selection');
 
-        // 4. Load Project Data
+        // 5. Load Project Data
         await loadProjects();
     });
+
+    /**
+     * Creates a new project in Supabase with all required fields
+     */
+    window.saveNewProject = async () => {
+        // Collect values from the modal inputs
+        const name = document.getElementById('new-project-name').value.trim();
+        const title = document.getElementById('new-project-title').value.trim();
+        const priority = parseInt(document.getElementById('new-project-priority').value);
+        const rate = parseFloat(document.getElementById('new-project-rate').value);
+        const status = document.getElementById('new-project-status').value;
+
+        // Simple Validation
+        if (!name || !title) {
+            return alert("Project Name and Title/ID are required.");
+        }
+
+        // Use the ID from sessionData (likely the User's UUID)
+        const targetId = sessionData.user?.id || sessionData.tenantId;
+
+        const projectData = { 
+            name: name,
+            title: title,
+            priority_value: priority,
+            blended_rate: rate,
+            status: status,
+            is_complete: (status === 'Completed'),
+            tenant_id: targetId // Ensure this ID exists in your 'tenants' table!
+        };
+
+        // DEBUG: See exactly what is being sent in the console
+        console.log("Payload being sent to Supabase:");
+        console.table(projectData);
+
+        const { data, error } = await supabase
+            .from('projects')
+            .insert([projectData])
+            .select();
+
+        if (error) {
+            console.error("Supabase Insert Error:", error);
+            // This error often means targetId doesn't exist in the parent 'tenants' table
+            alert(`Error saving project: ${error.message}`);
+        } else {
+            console.log("Project saved successfully!");
+            window.toggleProjectModal();
+            // Clear inputs for next time
+            document.getElementById('new-project-name').value = '';
+            document.getElementById('new-project-title').value = '';
+            await loadProjects(); // Refresh the list
+        }
+    };
 
     /**
      * Fetches projects from Supabase filtered by the current user/tenant ID
@@ -121,12 +176,10 @@
         const projectContainer = document.getElementById('project-list');
         if (!projectContainer) return;
 
-        // Ensure we have a valid ID for filtering
         const targetId = sessionData.tenantId || sessionData.user?.id;
 
         if (!targetId) {
-            console.error("No valid ID found in sessionData", sessionData);
-            projectContainer.innerHTML = `<p class="text-red-500">Error: identity not found.</p>`;
+            projectContainer.innerHTML = `<p class="text-red-500">Error: User identity not found.</p>`;
             return;
         }
 
@@ -145,6 +198,7 @@
 
         if (error) {
             console.error("Supabase Error:", error);
+
             projectContainer.innerHTML = `<p class="text-red-500">Error: ${error.message}</p>`;
             return;
         }
@@ -167,7 +221,6 @@
         const projectContainer = document.getElementById('project-list');
         
         projectContainer.innerHTML = projects.map(project => {
-            // Calculate "Rolled-up" cost estimate from related requirements and steps
             const totalCost = project.requirements?.reduce((acc, req) => {
                 const stepSum = req.steps
                     ?.filter(s => s.is_active)
@@ -200,60 +253,11 @@
         }).join('');
     }
 
-    /**
-     * Modal and Project Creation Logic
-     */
+    // Modal UI Toggles
     window.toggleProjectModal = () => {
         const modal = document.getElementById('project-modal');
         if (modal) modal.classList.toggle('hidden');
     };
-
-window.saveNewProject = async () => {
-    // 1. Collect values from the modal
-    const name = document.getElementById('new-project-name').value.trim();
-    const title = document.getElementById('new-project-title').value.trim();
-    const priority = parseInt(document.getElementById('new-project-priority').value);
-    const rate = parseFloat(document.getElementById('new-project-rate').value);
-    const status = document.getElementById('new-project-status').value;
-
-    // 2. Simple Validation
-    if (!name || !title) return alert("Project Name and Title are required.");
-
-    const targetId = sessionData.tenantId || sessionData.user?.id;
-
-    // 3. Insert into Supabase with all required fields
-    const { data, error } = await supabase
-        .from('projects')
-        .insert([
-            { 
-                name: name,
-                title: title,
-                priority_value: priority,
-                blended_rate: rate,
-                status: status,
-                is_complete: (status === 'Completed'), // Automatically set bool based on status
-                tenant_id: targetId
-            }
-        ])
-        .select();
-
-    if (error) {
-        console.error("Insert Error:", error);
-        alert("Error saving project: " + error.message);
-    } else {
-        window.toggleProjectModal();
-        // Clear inputs
-        document.getElementById('new-project-name').value = '';
-        document.getElementById('new-project-title').value = '';
-        await loadProjects(); // Refresh the list
-    }
-};
-
-    // Attach Event Listener to Save button (fallback to ensure it works within the module)
-    const saveBtn = document.getElementById('save-project-btn');
-    if (saveBtn) {
-        saveBtn.addEventListener('click', window.saveNewProject);
-    }
 
     // Navigation logic
     window.openProject = (id, name) => {

@@ -24,6 +24,24 @@
             </div>
         </div>
 
+<div class="flex justify-between items-center mb-6">
+    <h1 class="text-2xl font-bold text-gray-900">Project Dashboard</h1>
+    <button onclick="toggleProjectModal()" class="bg-indigo-600 text-white px-4 py-2 rounded-md font-bold hover:bg-indigo-700 transition">
+        + New Project
+    </button>
+</div>
+
+<div id="project-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
+    <div class="bg-white p-6 rounded-lg shadow-xl w-96">
+        <h2 class="text-xl font-bold mb-4">Create New Project</h2>
+        <input type="text" id="new-project-name" placeholder="Project Name" class="w-full border p-2 rounded mb-4">
+        <div class="flex justify-end space-x-2">
+            <button onclick="toggleProjectModal()" class="text-gray-500 px-4 py-2">Cancel</button>
+            <button id="save-project-btn" class="bg-indigo-600 text-white px-4 py-2 rounded">Save Project</button>
+        </div>
+    </div>
+</div>
+
         <div id="project-list" class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
             <div class="animate-pulse flex space-x-4">
                 <div class="flex-1 space-y-4 py-1">
@@ -44,17 +62,19 @@
 
     let sessionData = null;
 
-    document.addEventListener('DOMContentLoaded', async () => {
-        // 1. Authenticate and check tenant subscription
-        sessionData = await checkAccess();
-        if (!sessionData) return;
+document.addEventListener('DOMContentLoaded', async () => {
+    sessionData = await checkAccess();
+    if (!sessionData) return;
 
-        // 2. Render Header (Using 'dashboard' as active ID)
-        renderProjectHeader(sessionData, 'dashboard', 'Project Selection');
+    // Update the Dashboard Title with the Tenant Name
+    const dashboardTitle = document.querySelector('h1'); // Or find the specific ID
+    if (dashboardTitle) {
+        dashboardTitle.textContent = `${sessionData.tenantName} - Project Dashboard`;
+    }
 
-        // 3. Load Project Data
-        await loadProjects();
-    });
+    renderProjectHeader(sessionData, 'dashboard', 'Project Selection');
+    await loadProjects();
+}); 
 
     async function loadProjects() {
         const projectContainer = document.getElementById('project-list');

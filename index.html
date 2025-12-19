@@ -31,13 +31,47 @@
     </button>
 </div>
 
-<div id="project-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
-    <div class="bg-white p-6 rounded-lg shadow-xl w-96">
-        <h2 class="text-xl font-bold mb-4">Create New Project</h2>
-        <input type="text" id="new-project-name" placeholder="Project Name" class="w-full border p-2 rounded mb-4">
-        <div class="flex justify-end space-x-2">
-            <button onclick="toggleProjectModal()" class="text-gray-500 px-4 py-2">Cancel</button>
-            <button id="save-project-btn" class="bg-indigo-600 text-white px-4 py-2 rounded">Save Project</button>
+<div id="project-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div class="bg-white p-6 rounded-lg shadow-xl w-full max-w-md">
+        <h2 class="text-xl font-bold mb-4 text-gray-800">Create New Project</h2>
+        
+        <div class="space-y-4">
+            <div>
+                <label class="block text-xs font-bold text-gray-700 uppercase">Project Name</label>
+                <input type="text" id="new-project-name" class="w-full border p-2 rounded mt-1" placeholder="e.g. Legato Phase 2">
+            </div>
+
+            <div>
+                <label class="block text-xs font-bold text-gray-700 uppercase">Internal Title/ID</label>
+                <input type="text" id="new-project-title" class="w-full border p-2 rounded mt-1" placeholder="e.g. LP2-2025">
+            </div>
+
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-xs font-bold text-gray-700 uppercase">Priority (1-100)</label>
+                    <input type="number" id="new-project-priority" value="50" class="w-full border p-2 rounded mt-1">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-700 uppercase">Blended Rate ($)</label>
+                    <input type="number" id="new-project-rate" value="150" class="w-full border p-2 rounded mt-1">
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-xs font-bold text-gray-700 uppercase">Status</label>
+                <select id="new-project-status" class="w-full border p-2 rounded mt-1 bg-white">
+                    <option value="Active">Active</option>
+                    <option value="On Hold">On Hold</option>
+                    <option value="Completed">Completed</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="flex justify-end space-x-2 mt-6">
+            <button onclick="toggleProjectModal()" class="text-gray-500 px-4 py-2 font-medium">Cancel</button>
+            <button id="save-project-btn" class="bg-indigo-600 text-white px-6 py-2 rounded font-bold hover:bg-indigo-700 transition">
+                Save Project
+            </button>
         </div>
     </div>
 </div>
@@ -174,33 +208,46 @@
         if (modal) modal.classList.toggle('hidden');
     };
 
-    window.saveNewProject = async () => {
-        const nameInput = document.getElementById('new-project-name');
-        const name = nameInput.value.trim();
-        
-        if (!name) return alert("Please enter a project name");
+window.saveNewProject = async () => {
+    // 1. Collect values from the modal
+    const name = document.getElementById('new-project-name').value.trim();
+    const title = document.getElementById('new-project-title').value.trim();
+    const priority = parseInt(document.getElementById('new-project-priority').value);
+    const rate = parseFloat(document.getElementById('new-project-rate').value);
+    const status = document.getElementById('new-project-status').value;
 
-        const targetId = sessionData.tenantId || sessionData.user?.id;
+    // 2. Simple Validation
+    if (!name || !title) return alert("Project Name and Title are required.");
 
-        const { data, error } = await supabase
-            .from('projects')
-            .insert([
-                { 
-                    name: name, 
-                    tenant_id: targetId, 
-                    status: 'Active' 
-                }
-            ])
-            .select();
+    const targetId = sessionData.tenantId || sessionData.user?.id;
 
-        if (error) {
-            alert("Error saving project: " + error.message);
-        } else {
-            window.toggleProjectModal();
-            nameInput.value = '';
-            await loadProjects(); // Refresh the list immediately
-        }
-    };
+    // 3. Insert into Supabase with all required fields
+    const { data, error } = await supabase
+        .from('projects')
+        .insert([
+            { 
+                name: name,
+                title: title,
+                priority_value: priority,
+                blended_rate: rate,
+                status: status,
+                is_complete: (status === 'Completed'), // Automatically set bool based on status
+                tenant_id: targetId
+            }
+        ])
+        .select();
+
+    if (error) {
+        console.error("Insert Error:", error);
+        alert("Error saving project: " + error.message);
+    } else {
+        window.toggleProjectModal();
+        // Clear inputs
+        document.getElementById('new-project-name').value = '';
+        document.getElementById('new-project-title').value = '';
+        await loadProjects(); // Refresh the list
+    }
+};
 
     // Attach Event Listener to Save button (fallback to ensure it works within the module)
     const saveBtn = document.getElementById('save-project-btn');

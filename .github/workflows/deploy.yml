@@ -1,44 +1,21 @@
-name: Deploy Static Pages
-
+name: Multi-Branch Deploy
 on:
   push:
-    branches:
-      - develop # Only runs when you push to the 'develop' branch
+    branches: [main, test, develop] # Triggers on any of these branches
 
 jobs:
   deploy:
-    # --- START OF THE DEPLOY JOB BLOCK ---
-    permissions: # Correctly indented under 'deploy:'
-      contents: read
-      pages: write
-      id-token: write
-    
-    runs-on: ubuntu-latest # Correctly indented under 'deploy:'
-    
-    steps: # Correctly indented under 'deploy:'
-      - name: Checkout Code
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Inject Supabase Secrets
-        # This uses the 'sed' utility to replace the placeholders in the index.html file
-        run: |
-          # Use the repository secrets to substitute the placeholders in index.html
-          sed -i 's|__SUPABASE_URL__|${{ secrets.SUPABASE_URL }}|g' index.html
-          sed -i 's|__SUPABASE_ANON_KEY__|${{ secrets.SUPABASE_ANON_KEY }}|g' index.html
-        env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
-          
-      - name: Setup Pages
-        uses: actions/configure-pages@v4
-      
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          # The entire repository folder is uploaded for deployment
-          path: '.' 
-
       - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
-    # --- END OF THE DEPLOY JOB BLOCK ---
+        uses: JamesIves/github-pages-deploy-action@v4
+        with:
+          folder: . # Deploy the root of the repo
+          branch: gh-pages # The hidden hosting branch
+          target-folder: ${{ github.ref_name == 'main' && '/' || github.ref_name }}
+          # Result: 'main' branch goes to root, 'test' goes to /test, 'develop' goes to /develop

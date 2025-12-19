@@ -37,99 +37,112 @@
         </div>
     </main>
 
-    <script type="module">
-        import { supabase } from './js/config.js';
-        import { checkAccess } from './js/auth.js';
-        import { renderProjectHeader } from './js/components.js';
+<script type="module">
+    import { supabase } from './js/config.js';
+    import { checkAccess } from './js/auth.js';
+    import { renderProjectHeader } from './js/components.js';
 
-        let sessionData = null;
+    let sessionData = null;
 
-        document.addEventListener('DOMContentLoaded', async () => {
-            // 1. Authenticate and check tenant subscription
-            sessionData = await checkAccess();
-            if (!sessionData) return;
+    document.addEventListener('DOMContentLoaded', async () => {
+        // 1. Authenticate and check tenant subscription
+        sessionData = await checkAccess();
+        if (!sessionData) return;
 
-            // 2. Render Header (Using 'dashboard' as active ID)
-            // Note: Since no project is selected yet, we pass a generic label
-            renderProjectHeader(sessionData, 'dashboard', 'Project Selection');
+        // 2. Render Header (Using 'dashboard' as active ID)
+        renderProjectHeader(sessionData, 'dashboard', 'Project Selection');
 
-            // 3. Load Project Data
-            await loadProjects();
-        });
+        // 3. Load Project Data
+        await loadProjects();
+    });
 
-        async function loadProjects() {
-            const projectContainer = document.getElementById('project-list');
+    async function loadProjects() {
+        const projectContainer = document.getElementById('project-list');
 
-            // Complex Query: Get projects and the sum of their requirement steps
-            // Note: We filter by tenant_id (though RLS would handle this automatically)
-            const { data: projects, error } = await supabase
-                .from('projects')
-                .select(`
-                    tenant_id,
-                    name,
-                    status,
-                    requirements (
-                        steps (cost, is_active)
-                    )
-                `)
-                .eq('tenant_id', sessionData.tenantId);
+        // FIX: Ensure we have a valid ID. 
+        // We'll try sessionData.tenantId, then fallback to the user's ID or metadata
+        const targetId = sessionData.tenantId || sessionData.user?.id;
 
-            if (error) {
-                projectContainer.innerHTML = `<p class="text-red-500">Error loading projects: ${error.message}</p>`;
-                return;
-            }
-
-            if (projects.length === 0) {
-                projectContainer.innerHTML = `<p class="text-gray-500 italic">No projects found. Create your first project to get started.</p>`;
-                return;
-            }
-
-            renderProjectCards(projects);
+        if (!targetId) {
+            console.error("Could not find a valid Tenant or User ID in sessionData", sessionData);
+            projectContainer.innerHTML = `<p class="text-red-500">Error: User identity not found. Please log in again.</p>`;
+            return;
         }
 
-        function renderProjectCards(projects) {
-            const projectContainer = document.getElementById('project-list');
-            
-            projectContainer.innerHTML = projects.map(project => {
-                // Calculate "Rolled-up" cost estimate
-                const totalCost = project.requirements?.reduce((acc, req) => {
-                    const stepSum = req.steps
-                        ?.filter(s => s.is_active)
-                        .reduce((sum, s) => sum + (s.cost || 0), 0);
-                    return acc + stepSum;
-                }, 0) || 0;
+        // Complex Query: Get projects and the sum of their requirement steps
+        const { data: projects, error } = await supabase
+            .from('projects')
+            .select(`
+                id,
+                tenant_id,
+                name,
+                status,
+                requirements (
+                    steps (cost, is_active)
+                )
+            `)
+            .eq('tenant_id', targetId); // This will no longer be "undefined"
 
-                return `
-                    <div class="bg-white overflow-hidden shadow rounded-lg border border-gray-200 hover:shadow-md transition cursor-pointer" 
-                         onclick="openProject('${project.id}', '${project.name}')">
-                        <div class="px-4 py-5 sm:p-6">
-                            <div class="flex items-center justify-between mb-4">
-                                <h3 class="text-lg font-medium text-gray-900 truncate">${project.name}</h3>
-                                <span class="px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
-                                    ${project.status}
-                                </span>
-                            </div>
-                            <dl>
-                                <dt class="text-sm font-medium text-gray-500">Rolled-up Cost Estimate</dt>
-                                <dd class="mt-1 text-2xl font-semibold text-indigo-600">$${totalCost.toLocaleString()}</dd>
-                            </dl>
+        if (error) {
+            console.error("Supabase Error:", error);
+            projectContainer.innerHTML = `<p class="text-red-500">Error loading projects: ${error.message}</p>`;
+            return;
+        }
+
+        if (!projects || projects.length === 0) {
+            projectContainer.innerHTML = `
+                <div class="col-span-full text-center py-12 bg-white rounded-lg border-2 border-dashed border-gray-300">
+                    <p class="text-gray-500 italic">No projects found for this account.</p>
+                </div>`;
+            return;
+        }
+
+        renderProjectCards(projects);
+    }
+
+    function renderProjectCards(projects) {
+        const projectContainer = document.getElementById('project-list');
+        
+        projectContainer.innerHTML = projects.map(project => {
+            // Calculate "Rolled-up" cost estimate
+            const totalCost = project.requirements?.reduce((acc, req) => {
+                const stepSum = req.steps
+                    ?.filter(s => s.is_active)
+                    .reduce((sum, s) => sum + (s.cost || 0), 0);
+                return acc + (stepSum || 0);
+            }, 0) || 0;
+
+            return `
+                <div class="bg-white overflow-hidden shadow rounded-lg border border-gray-200 hover:shadow-md transition cursor-pointer" 
+                     onclick="openProject('${project.id}', '${project.name}')">
+                    <div class="px-4 py-5 sm:p-6">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-lg font-medium text-gray-900 truncate">${project.name}</h3>
+                            <span class="px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
+                                ${project.status}
+                            </span>
                         </div>
-                        <div class="bg-gray-50 px-4 py-4 sm:px-6">
-                            <div class="text-sm">
-                                <span class="text-indigo-600 font-medium hover:text-indigo-500">Open Project Details &rarr;</span>
-                            </div>
+                        <dl>
+                            <dt class="text-sm font-medium text-gray-500">Rolled-up Cost Estimate</dt>
+                            <dd class="mt-1 text-2xl font-semibold text-indigo-600">$${totalCost.toLocaleString()}</dd>
+                        </dl>
+                    </div>
+                    <div class="bg-gray-50 px-4 py-4 sm:px-6">
+                        <div class="text-sm">
+                            <span class="text-indigo-600 font-medium hover:text-indigo-500">Open Project Details &rarr;</span>
                         </div>
                     </div>
-                `;
-            }).join('');
-        }
+                </div>
+            `;
+        }).join('');
+    }
 
-        // Handle project selection and store state
-        window.openProject = (id, name) => {
-            localStorage.setItem('selected_project_id', id);
-            localStorage.setItem('selected_project_name', name);
-            window.location.href = 'requirements.html'; // Go to first tab by default
-        };
-    </script>
+    // Handle project selection and store state
+    window.openProject = (id, name) => {
+        localStorage.setItem('selected_project_id', id);
+        localStorage.setItem('selected_project_name', name);
+        window.location.href = 'requirements.html';
+    };
+</script>
 </body>
 </html>

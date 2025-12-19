@@ -62,34 +62,40 @@
 
     let sessionData = null;
 
-document.addEventListener('DOMContentLoaded', async () => {
-    sessionData = await checkAccess();
-    if (!sessionData) return;
+    document.addEventListener('DOMContentLoaded', async () => {
+        // 1. Authenticate and check tenant subscription
+        sessionData = await checkAccess();
+        if (!sessionData) return;
 
-    // Update the Dashboard Title with the Tenant Name
-    const dashboardTitle = document.querySelector('h1'); // Or find the specific ID
-    if (dashboardTitle) {
-        dashboardTitle.textContent = `${sessionData.tenantName} - Project Dashboard`;
-    }
+        // 2. Update the Dashboard Title with the Tenant Name
+        const dashboardTitle = document.querySelector('h1');
+        if (dashboardTitle && sessionData.tenantName) {
+            dashboardTitle.textContent = `${sessionData.tenantName} - Project Dashboard`;
+        }
 
-    renderProjectHeader(sessionData, 'dashboard', 'Project Selection');
-    await loadProjects();
-}); 
+        // 3. Render Header (Using 'dashboard' as active ID)
+        renderProjectHeader(sessionData, 'dashboard', 'Project Selection');
 
+        // 4. Load Project Data
+        await loadProjects();
+    });
+
+    /**
+     * Fetches projects from Supabase filtered by the current user/tenant ID
+     */
     async function loadProjects() {
         const projectContainer = document.getElementById('project-list');
+        if (!projectContainer) return;
 
-        // FIX: Ensure we have a valid ID. 
-        // We'll try sessionData.tenantId, then fallback to the user's ID or metadata
+        // Ensure we have a valid ID for filtering
         const targetId = sessionData.tenantId || sessionData.user?.id;
 
         if (!targetId) {
-            console.error("Could not find a valid Tenant or User ID in sessionData", sessionData);
-            projectContainer.innerHTML = `<p class="text-red-500">Error: User identity not found. Please log in again.</p>`;
+            console.error("No valid ID found in sessionData", sessionData);
+            projectContainer.innerHTML = `<p class="text-red-500">Error: identity not found.</p>`;
             return;
         }
 
-        // Complex Query: Get projects and the sum of their requirement steps
         const { data: projects, error } = await supabase
             .from('projects')
             .select(`
@@ -101,18 +107,18 @@ document.addEventListener('DOMContentLoaded', async () => {
                     steps (cost, is_active)
                 )
             `)
-            .eq('tenant_id', targetId); // This will no longer be "undefined"
+            .eq('tenant_id', targetId);
 
         if (error) {
             console.error("Supabase Error:", error);
-            projectContainer.innerHTML = `<p class="text-red-500">Error loading projects: ${error.message}</p>`;
+            projectContainer.innerHTML = `<p class="text-red-500">Error: ${error.message}</p>`;
             return;
         }
 
         if (!projects || projects.length === 0) {
             projectContainer.innerHTML = `
                 <div class="col-span-full text-center py-12 bg-white rounded-lg border-2 border-dashed border-gray-300">
-                    <p class="text-gray-500 italic">No projects found for this account.</p>
+                    <p class="text-gray-500 italic">No projects found. Create your first project to get started.</p>
                 </div>`;
             return;
         }
@@ -120,11 +126,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         renderProjectCards(projects);
     }
 
+    /**
+     * Generates the HTML for project cards
+     */
     function renderProjectCards(projects) {
         const projectContainer = document.getElementById('project-list');
         
         projectContainer.innerHTML = projects.map(project => {
-            // Calculate "Rolled-up" cost estimate
+            // Calculate "Rolled-up" cost estimate from related requirements and steps
             const totalCost = project.requirements?.reduce((acc, req) => {
                 const stepSum = req.steps
                     ?.filter(s => s.is_active)
@@ -157,12 +166,55 @@ document.addEventListener('DOMContentLoaded', async () => {
         }).join('');
     }
 
-    // Handle project selection and store state
+    /**
+     * Modal and Project Creation Logic
+     */
+    window.toggleProjectModal = () => {
+        const modal = document.getElementById('project-modal');
+        if (modal) modal.classList.toggle('hidden');
+    };
+
+    window.saveNewProject = async () => {
+        const nameInput = document.getElementById('new-project-name');
+        const name = nameInput.value.trim();
+        
+        if (!name) return alert("Please enter a project name");
+
+        const targetId = sessionData.tenantId || sessionData.user?.id;
+
+        const { data, error } = await supabase
+            .from('projects')
+            .insert([
+                { 
+                    name: name, 
+                    tenant_id: targetId, 
+                    status: 'Active' 
+                }
+            ])
+            .select();
+
+        if (error) {
+            alert("Error saving project: " + error.message);
+        } else {
+            window.toggleProjectModal();
+            nameInput.value = '';
+            await loadProjects(); // Refresh the list immediately
+        }
+    };
+
+    // Attach Event Listener to Save button (fallback to ensure it works within the module)
+    const saveBtn = document.getElementById('save-project-btn');
+    if (saveBtn) {
+        saveBtn.addEventListener('click', window.saveNewProject);
+    }
+
+    // Navigation logic
     window.openProject = (id, name) => {
         localStorage.setItem('selected_project_id', id);
         localStorage.setItem('selected_project_name', name);
         window.location.href = 'requirements.html';
     };
 </script>
+
 </body>
 </html>

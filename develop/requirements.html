@@ -3,9 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    
     <title>Requirements | Project Manager</title>
-	<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="css/style.css">
     <link rel="icon" type="image/png" href="assets/favicon.png">
@@ -17,50 +16,55 @@
     <main class="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
             
-<section class="bg-white shadow rounded-lg overflow-hidden flex flex-col h-[700px]">
-    <div class="px-4 py-5 border-b border-gray-200 sm:px-6 bg-gray-50">
-        <h3 class="text-lg font-bold text-gray-900">1. Requirements & Estimates</h3>
-    </div>
-    
-    <div class="p-4 border-b bg-white space-y-4">
-    <div>
-        <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1">Requirement Title</label>
-        <input type="text" id="req-title-input" placeholder="e.g., User Authentication" 
-               class="w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
-    </div>
+            <section class="bg-white shadow rounded-lg overflow-hidden flex flex-col h-[700px]">
+                <div class="px-4 py-5 border-b border-gray-200 sm:px-6 bg-gray-50">
+                    <h3 class="text-lg font-bold text-gray-900">1. Requirements & Estimates</h3>
+                </div>
+                
+                <div class="p-5 border-b bg-indigo-50/50 space-y-4">
+                    <div class="flex items-center justify-between">
+                        <h4 class="text-xs font-bold text-indigo-900 uppercase tracking-wider">New Estimate</h4>
+                    </div>
+                    
+                    <div class="space-y-3">
+                        <div>
+                            <input type="text" id="req-title-input" placeholder="Requirement Title (e.g. API Integration)" 
+                                   class="w-full border-gray-300 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500 text-sm p-2.5">
+                        </div>
 
-    <div class="grid grid-cols-2 gap-4">
-        <div>
-            <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1">Est. Hours</label>
-            <input type="number" id="req-hours-input" placeholder="0" 
-                   class="w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
-        </div>
-        <div>
-            <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1">Rate Override ($)</label>
-            <input type="number" id="req-rate-override" placeholder="Optional" 
-                   class="w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
-        </div>
-    </div>
-    
-    <button onclick="addRequirement()" 
-            class="w-full bg-indigo-600 text-white px-3 py-2 rounded-md text-sm font-bold hover:bg-indigo-700 shadow-sm transition">
-        + Create Requirement & Estimate
-    </button>
-</div>
-    
-    <ul id="req-list" class="divide-y divide-gray-200 overflow-y-auto flex-grow">
-        </ul>
-</section>
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-[10px] font-bold text-gray-500 uppercase ml-1 mb-1">Estimated Hours</label>
+                                <input type="number" id="req-hours-input" placeholder="0.0" 
+                                       class="w-full border-gray-300 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500 text-sm p-2.5">
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-bold text-gray-500 uppercase ml-1 mb-1">Manual Rate ($)</label>
+                                <input type="number" id="req-rate-override" placeholder="Optional" 
+                                       class="w-full border-gray-300 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500 text-sm p-2.5">
+                            </div>
+                        </div>
+                        
+                        <button onclick="addRequirement()" 
+                                class="w-full bg-indigo-600 text-white py-2.5 rounded-lg text-sm font-bold hover:bg-indigo-700 shadow-md transition-all active:scale-[0.98]">
+                            Add to Estimate
+                        </button>
+                    </div>
+                </div>
+                
+                <ul id="req-list" class="divide-y divide-gray-200 overflow-y-auto flex-grow">
+                    </ul>
+            </section>
 
             <section id="steps-section" class="bg-white shadow rounded-lg overflow-hidden flex flex-col h-[700px] hidden">
                 <div class="px-4 py-5 border-b border-gray-200 sm:px-6 bg-indigo-50">
-                    <h3 id="selected-req-title" class="text-lg font-bold text-indigo-900">2. Steps for [Requirement]</h3>
-                    <p class="text-xs text-indigo-700">All active steps roll up to total cost.</p>
+                    <h3 id="selected-req-title" class="text-lg font-bold text-indigo-900">2. Steps</h3>
+                    <p class="text-xs text-indigo-700">Internal task breakdown and costs.</p>
                 </div>
                 
                 <div class="p-4 border-b bg-white">
                     <div class="flex justify-between items-center">
-                        <span class="text-sm font-medium text-gray-500">Requirement Total:</span>
+                        <span class="text-sm font-medium text-gray-500">Step Roll-up Total:</span>
                         <span id="req-rollup-total" class="text-xl font-bold text-indigo-600">$0.00</span>
                     </div>
                 </div>
@@ -69,23 +73,27 @@
                     </ul>
 
                 <div class="p-4 bg-gray-50 border-t">
-                    <button id="add-step-btn" class="w-full bg-white border border-gray-300 py-2 rounded text-sm font-medium hover:bg-gray-100">+ Add Step</button>
+                    <button id="add-step-btn" onclick="addStep()" class="w-full bg-white border border-gray-300 py-2 rounded text-sm font-medium hover:bg-gray-100 shadow-sm">
+                        + Add Detailed Step
+                    </button>
                 </div>
             </section>
 
             <section id="empty-steps" class="border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center h-[700px]">
-                <p class="text-gray-400 italic text-center px-10">Select a requirement on the left to manage steps and costs.</p>
+                <p class="text-gray-400 italic text-center px-10">Select a requirement on the left to manage detailed steps.</p>
             </section>
 
         </div>
     </main>
+
 <script type="module">
     import { supabase, MODULES } from './js/config.js';
     import { checkAccess } from './js/auth.js';
     import { renderProjectHeader } from './js/components.js';
 
     let session, projectId, selectedReqId;
-    let blendedRate = 0; // Fetched from the project record
+    let userProfileRate = null;
+    let projectBlendedRate = 0;
 
     document.addEventListener('DOMContentLoaded', async () => {
         session = await checkAccess(MODULES.REQUIREMENTS);
@@ -97,57 +105,60 @@
             return; 
         }
 
-        // Fetch Project details to get the Blended Rate
-        const { data: proj } = await supabase.from('projects').select('blended_rate').eq('id', projectId).single();
-        blendedRate = proj?.blended_rate || 0;
+        // 1. Fetch User Profile Rate
+        const { data: profile } = await supabase
+            .from('user_profiles')
+            .select('hourly_cost')
+            .eq('id', session.user.id)
+            .single();
+        userProfileRate = profile?.hourly_cost;
+
+        // 2. Fetch Project Blended Rate
+        const { data: proj } = await supabase
+            .from('projects')
+            .select('blended_rate')
+            .eq('id', projectId)
+            .single();
+        projectBlendedRate = proj?.blended_rate || 0;
 
         renderProjectHeader(session, 'requirements', projectName);
         loadRequirements();
         
-        // Ensure Sortable is ready
-        if (window.Sortable) {
-            initSortable();
-        } else {
-            setTimeout(initSortable, 1000); // Retry after 1s if CDN is slow
-        }
+        if (window.Sortable) initSortable();
+        else setTimeout(initSortable, 1000);
     });
 
     window.addRequirement = async () => {
-    const titleEl = document.getElementById('req-title-input');
-    const hoursEl = document.getElementById('req-hours-input');
-    const overrideEl = document.getElementById('req-rate-override');
-    
-    const title = titleEl.value.trim();
-    const hours = parseFloat(hoursEl.value) || 0;
-    const overrideRate = overrideEl.value ? parseFloat(overrideEl.value) : null;
+        const titleEl = document.getElementById('req-title-input');
+        const hoursEl = document.getElementById('req-hours-input');
+        const overrideEl = document.getElementById('req-rate-override');
+        
+        const title = titleEl.value.trim();
+        const hours = parseFloat(hoursEl.value) || 0;
+        const overrideRate = overrideEl.value ? parseFloat(overrideEl.value) : null;
 
-    if (!title) return alert("Please enter a title");
+        if (!title) return alert("Please enter a title");
 
-    const { data, error } = await supabase
-        .from('requirements')
-        .insert([{ 
-            title: title,
-            project_id: projectId,
-            status: 'active',
-            sequence_order: 0,
-            estimated_hours: hours, // Database column: estimated_hours
-            custom_rate: overrideRate // Database column: custom_rate
-        }])
-        .select();
+        const { error } = await supabase
+            .from('requirements')
+            .insert([{ 
+                title,
+                project_id: projectId,
+                status: 'active',
+                sequence_order: 0,
+                estimated_hours: hours,
+                custom_rate: overrideRate
+            }]);
 
-    if (error) {
-        alert("Database Error: " + error.message);
-    } else {
-        // Clear the fields
-        titleEl.value = '';
-        hoursEl.value = '';
-        overrideEl.value = '';
-        loadRequirements(); 
-    }
-};
+        if (error) alert("Error: " + error.message);
+        else {
+            titleEl.value = ''; hoursEl.value = ''; overrideEl.value = '';
+            loadRequirements(); 
+        }
+    };
 
     async function loadRequirements() {
-        const { data: reqs, error } = await supabase
+        const { data: reqs } = await supabase
             .from('requirements')
             .select(`*, steps(cost, is_active)`)
             .eq('project_id', projectId)
@@ -155,28 +166,35 @@
 
         const list = document.getElementById('req-list');
         list.innerHTML = reqs.map(req => {
-            // ESTIMATION LOGIC:
-            // 1. Calculate the 'Step Roll-up' (Internal Costs)
-            const stepTotal = req.steps?.filter(s => s.is_active).reduce((sum, s) => sum + (s.cost || 0), 0) || 0;
+            // Rate Hierarchy Logic
+            let activeRate = projectBlendedRate;
+            let rateSource = '(Blended)';
             
-            // 2. Calculate the 'Hours Estimate' (External/Client Facing)
-            const hoursEstimate = (req.estimated_hours || 0) * blendedRate;
-            
-            // Use hoursEstimate for the display, stepTotal for internal tracking
-            const displayTotal = hoursEstimate > 0 ? hoursEstimate : stepTotal;
+            if (req.custom_rate !== null) {
+                activeRate = req.custom_rate;
+                rateSource = '(Manual)';
+            } else if (userProfileRate !== null) {
+                activeRate = userProfileRate;
+                rateSource = '(Profile)';
+            }
+
+            const hoursEstimate = (req.estimated_hours || 0) * activeRate;
+            const safeTitle = (req.title || 'Untitled').replace(/'/g, "\\'");
 
             return `
-                <li class="p-4 hover:bg-gray-50 cursor-pointer transition flex justify-between items-center group" 
-                    data-id="${req.id}" onclick="selectRequirement('${req.id}', '${req.title.replace(/'/g, "\\'")}', ${displayTotal})">
+                <li class="p-4 hover:bg-gray-50 cursor-pointer transition flex justify-between items-center group border-b" 
+                    data-id="${req.id}" onclick="selectRequirement('${req.id}', '${safeTitle}', ${hoursEstimate})">
                     <div class="flex items-center space-x-3">
-                        <span class="cursor-move text-gray-400 hover:text-indigo-600 font-bold">?</span>
+                        <span class="cursor-move text-gray-300 group-hover:text-indigo-500 font-bold p-2">?</span>
                         <div>
                             <p class="text-sm font-bold text-gray-900">${req.title}</p>
-                            <p class="text-[10px] text-gray-500">${req.estimated_hours || 0} hrs @ $${blendedRate}/hr</p>
+                            <p class="text-[10px] text-gray-500">
+                                ${req.estimated_hours || 0} hrs @ $${activeRate}/hr <span class="text-indigo-400 italic">${rateSource}</span>
+                            </p>
                         </div>
                     </div>
                     <div class="text-right">
-                        <p class="text-sm font-mono font-bold text-indigo-600">$${displayTotal.toLocaleString()}</p>
+                        <p class="text-sm font-mono font-bold text-indigo-600">$${hoursEstimate.toLocaleString(undefined, {minimumFractionDigits: 2})}</p>
                         <span class="text-[9px] uppercase px-1.5 py-0.5 rounded-full ${getStatusStyle(req.status)}">${req.status}</span>
                     </div>
                 </li>
@@ -184,41 +202,73 @@
         }).join('');
     }
 
-    function initSortable() {
-        const el = document.getElementById('req-list');
-        if (!el) return;
-        
-        new Sortable(el, {
-            handle: '.cursor-move',
-            animation: 150,
-            ghostClass: 'bg-indigo-50',
-            onEnd: async () => {
-                const items = Array.from(el.children);
-                for(let i = 0; i < items.length; i++) {
-                    const id = items[i].getAttribute('data-id');
-                    await supabase.from('requirements').update({ sequence_order: i }).eq('id', id);
-                }
-            }
-        });
-    }
-
-    window.selectRequirement = async (reqId, title, total) => {
+    window.selectRequirement = async (reqId, title, displayTotal) => {
         selectedReqId = reqId;
         document.getElementById('empty-steps').classList.add('hidden');
         document.getElementById('steps-section').classList.remove('hidden');
         document.getElementById('selected-req-title').innerText = `2. Steps for ${title}`;
-        document.getElementById('req-rollup-total').innerText = `$${total.toLocaleString()}`;
 
-        const { data: steps } = await supabase.from('steps').select('*').eq('requirement_id', reqId);
+        const { data: steps } = await supabase
+            .from('steps')
+            .select('*')
+            .eq('requirement_id', reqId)
+            .order('created_at', { ascending: true });
+
+        const activeTotal = steps?.filter(s => s.is_active).reduce((sum, s) => sum + (s.cost || 0), 0) || 0;
+        document.getElementById('req-rollup-total').innerText = `$${activeTotal.toLocaleString(undefined, {minimumFractionDigits: 2})}`;
+
         const list = document.getElementById('step-list');
         list.innerHTML = steps.map(step => `
-            <li class="p-4 flex justify-between items-center ${step.is_active ? '' : 'opacity-50 bg-gray-50'}">
-                <p class="text-sm text-gray-700">${step.description}</p>
+            <li class="p-4 flex justify-between items-center ${step.is_active ? '' : 'opacity-50 bg-gray-50'} border-b">
+                <div class="flex flex-col flex-grow">
+                    <p class="text-sm text-gray-700">${step.description}</p>
+                    <button onclick="toggleStep('${step.id}', ${step.is_active})" class="text-[10px] uppercase font-bold mt-1 ${step.is_active ? 'text-red-500' : 'text-green-500'}">
+                        ${step.is_active ? 'Deactivate' : 'Activate'}
+                    </button>
+                </div>
                 <input type="number" value="${step.cost}" onchange="updateStepCost('${step.id}', this.value)" 
-                       class="w-20 text-right border-gray-200 rounded text-sm">
+                       class="w-24 text-right border-gray-200 rounded text-sm focus:ring-indigo-500">
             </li>
         `).join('');
     };
+
+    window.addStep = async () => {
+        if (!selectedReqId) return alert("Select a requirement first.");
+        const desc = prompt("Step description:");
+        if (!desc) return;
+        const cost = parseFloat(prompt("Estimated cost:", "0")) || 0;
+
+        await supabase.from('steps').insert([{ requirement_id: selectedReqId, description: desc, cost, is_active: true }]);
+        loadRequirements();
+        selectRequirement(selectedReqId, '...', 0);
+    };
+
+    window.updateStepCost = async (id, val) => {
+        await supabase.from('steps').update({ cost: parseFloat(val) }).eq('id', id);
+        loadRequirements();
+        selectRequirement(selectedReqId, '...', 0);
+    };
+
+    window.toggleStep = async (id, current) => {
+        await supabase.from('steps').update({ is_active: !current }).eq('id', id);
+        loadRequirements();
+        selectRequirement(selectedReqId, '...', 0);
+    };
+
+    function initSortable() {
+        const el = document.getElementById('req-list');
+        if (!el) return;
+        new Sortable(el, {
+            handle: '.cursor-move',
+            animation: 150,
+            onEnd: async () => {
+                const items = Array.from(el.children);
+                for(let i = 0; i < items.length; i++) {
+                    await supabase.from('requirements').update({ sequence_order: i }).eq('id', items[i].getAttribute('data-id'));
+                }
+            }
+        });
+    }
 
     function getStatusStyle(status) {
         return status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800';

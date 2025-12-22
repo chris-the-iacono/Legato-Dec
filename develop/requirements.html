@@ -17,16 +17,22 @@
     <main class="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
             
-            <section class="bg-white shadow rounded-lg overflow-hidden flex flex-col h-[700px]">
-                <div class="px-4 py-5 border-b border-gray-200 sm:px-6 flex justify-between items-center bg-gray-50">
-                    <h3 class="text-lg font-bold text-gray-900">1. Requirements (Drag to Sort)</h3>
-                    <button id="add-req-btn" onclick="addRequirement()" class="bg-indigo-600 text-white px-3 py-1 rounded text-sm hover:bg-indigo-700">+ Add
-					</button>
-                </div>
-                
-                <ul id="req-list" class="divide-y divide-gray-200 overflow-y-auto flex-grow">
-                    </ul>
-            </section>
+<section class="bg-white shadow rounded-lg overflow-hidden flex flex-col h-[700px]">
+    <div class="px-4 py-5 border-b border-gray-200 sm:px-6 bg-gray-50">
+        <h3 class="text-lg font-bold text-gray-900">1. Requirements & Estimates</h3>
+    </div>
+    
+    <div class="p-4 border-b bg-white space-y-3">
+        <input type="text" id="req-title-input" placeholder="Requirement Title" class="w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+        <div class="flex space-x-2">
+            <input type="number" id="req-hours-input" placeholder="Est. Hours" class="w-1/2 border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+            <button onclick="addRequirement()" class="w-1/2 bg-indigo-600 text-white px-3 py-2 rounded-md text-sm font-bold hover:bg-indigo-700">+ Add Requirement</button>
+        </div>
+    </div>
+    
+    <ul id="req-list" class="divide-y divide-gray-200 overflow-y-auto flex-grow">
+        </ul>
+</section>
 
             <section id="steps-section" class="bg-white shadow rounded-lg overflow-hidden flex flex-col h-[700px] hidden">
                 <div class="px-4 py-5 border-b border-gray-200 sm:px-6 bg-indigo-50">
@@ -61,6 +67,7 @@
     import { renderProjectHeader } from './js/components.js';
 
     let session, projectId, selectedReqId;
+    let blendedRate = 0; // Fetched from the project record
 
     document.addEventListener('DOMContentLoaded', async () => {
         session = await checkAccess(MODULES.REQUIREMENTS);
@@ -72,94 +79,106 @@
             return; 
         }
 
+        // Fetch Project details to get the Blended Rate
+        const { data: proj } = await supabase.from('projects').select('blended_rate').eq('id', projectId).single();
+        blendedRate = proj?.blended_rate || 0;
+
         renderProjectHeader(session, 'requirements', projectName);
         loadRequirements();
-        initSortable();
+        
+        // Ensure Sortable is ready
+        if (window.Sortable) {
+            initSortable();
+        } else {
+            setTimeout(initSortable, 1000); // Retry after 1s if CDN is slow
+        }
     });
 
-    // --- ADD REQUIREMENT ---
     window.addRequirement = async () => {
-        const inputTitle = prompt("Enter Requirement Title:");
-        if (!inputTitle) return;
+        const titleEl = document.getElementById('req-title-input');
+        const hoursEl = document.getElementById('req-hours-input');
+        
+        const title = titleEl.value.trim();
+        const hours = parseFloat(hoursEl.value) || 0;
+
+        if (!title) return alert("Please enter a title");
 
         const { data, error } = await supabase
             .from('requirements')
             .insert([{ 
-                title: inputTitle,
+                title: title,
                 project_id: projectId,
                 status: 'active',
-                sequence_order: 0 // CHANGED: Using sequence_order to satisfy NOT NULL constraint
+                sequence_order: 0,
+                estimated_hours: hours // Ensure this column exists in your DB!
             }])
             .select();
 
         if (error) {
-            console.error("Error adding requirement:", error);
             alert("Error: " + error.message);
         } else {
+            titleEl.value = '';
+            hoursEl.value = '';
             loadRequirements(); 
         }
     };
 
-    // --- LOAD REQUIREMENTS ---
     async function loadRequirements() {
         const { data: reqs, error } = await supabase
             .from('requirements')
             .select(`*, steps(cost, is_active)`)
             .eq('project_id', projectId)
-            .order('sequence_order', { ascending: true }); // CHANGED: Sorting by sequence_order
-
-        if (error) {
-            console.error("Error loading requirements:", error);
-            return;
-        }
+            .order('sequence_order', { ascending: true });
 
         const list = document.getElementById('req-list');
         list.innerHTML = reqs.map(req => {
-            const total = req.steps?.filter(s => s.is_active).reduce((sum, s) => sum + (s.cost || 0), 0) || 0;
-            const safeTitle = (req.title || 'Untitled').replace(/'/g, "\\'");
+            // ESTIMATION LOGIC:
+            // 1. Calculate the 'Step Roll-up' (Internal Costs)
+            const stepTotal = req.steps?.filter(s => s.is_active).reduce((sum, s) => sum + (s.cost || 0), 0) || 0;
             
+            // 2. Calculate the 'Hours Estimate' (External/Client Facing)
+            const hoursEstimate = (req.estimated_hours || 0) * blendedRate;
+            
+            // Use hoursEstimate for the display, stepTotal for internal tracking
+            const displayTotal = hoursEstimate > 0 ? hoursEstimate : stepTotal;
+
             return `
                 <li class="p-4 hover:bg-gray-50 cursor-pointer transition flex justify-between items-center group" 
-                    data-id="${req.id}" onclick="selectRequirement('${req.id}', '${safeTitle}', ${total})">
+                    data-id="${req.id}" onclick="selectRequirement('${req.id}', '${req.title.replace(/'/g, "\\'")}', ${displayTotal})">
                     <div class="flex items-center space-x-3">
-                        <span class="cursor-move text-gray-300 group-hover:text-gray-500">?</span>
+                        <span class="cursor-move text-gray-400 hover:text-indigo-600 font-bold">?</span>
                         <div>
-                            <p class="text-sm font-bold text-gray-900">${req.title || 'Untitled'}</p>
-                            <span class="text-xs px-2 py-0.5 rounded-full ${getStatusStyle(req.status)}">${req.status}</span>
+                            <p class="text-sm font-bold text-gray-900">${req.title}</p>
+                            <p class="text-[10px] text-gray-500">${req.estimated_hours || 0} hrs @ $${blendedRate}/hr</p>
                         </div>
                     </div>
-                    <p class="text-sm font-mono font-bold text-indigo-600">$${total.toLocaleString()}</p>
+                    <div class="text-right">
+                        <p class="text-sm font-mono font-bold text-indigo-600">$${displayTotal.toLocaleString()}</p>
+                        <span class="text-[9px] uppercase px-1.5 py-0.5 rounded-full ${getStatusStyle(req.status)}">${req.status}</span>
+                    </div>
                 </li>
             `;
         }).join('');
     }
 
-    // --- SORTING LOGIC ---
     function initSortable() {
         const el = document.getElementById('req-list');
-        if (!el || typeof Sortable === 'undefined') return;
+        if (!el) return;
         
-        Sortable.create(el, {
+        new Sortable(el, {
             handle: '.cursor-move',
             animation: 150,
+            ghostClass: 'bg-indigo-50',
             onEnd: async () => {
                 const items = Array.from(el.children);
-                const updates = items.map((li, index) => ({
-                    id: li.getAttribute('data-id'),
-                    sequence_order: index // CHANGED: Updating sequence_order
-                }));
-                
-                // Update each item's order in the database
-                for(const item of updates) {
-                    await supabase.from('requirements')
-                        .update({ sequence_order: item.sequence_order })
-                        .eq('id', item.id);
+                for(let i = 0; i < items.length; i++) {
+                    const id = items[i].getAttribute('data-id');
+                    await supabase.from('requirements').update({ sequence_order: i }).eq('id', id);
                 }
             }
         });
     }
 
-    // --- REMAINING HELPER FUNCTIONS (No changes needed) ---
     window.selectRequirement = async (reqId, title, total) => {
         selectedReqId = reqId;
         document.getElementById('empty-steps').classList.add('hidden');
@@ -171,38 +190,16 @@
         const list = document.getElementById('step-list');
         list.innerHTML = steps.map(step => `
             <li class="p-4 flex justify-between items-center ${step.is_active ? '' : 'opacity-50 bg-gray-50'}">
-                <div class="flex flex-col">
-                    <p class="text-sm text-gray-700">${step.description}</p>
-                    <button onclick="toggleStep('${step.id}', ${step.is_active})" class="text-[10px] uppercase font-bold mt-1 ${step.is_active ? 'text-red-500' : 'text-green-500'}">
-                        ${step.is_active ? 'Deactivate' : 'Activate'}
-                    </button>
-                </div>
-                <div class="flex items-center space-x-2">
-                    <span class="text-xs text-gray-400">$</span>
-                    <input type="number" value="${step.cost}" onchange="updateStepCost('${step.id}', this.value)" 
-                           class="w-20 text-right border-gray-200 rounded text-sm focus:ring-indigo-500">
-                </div>
+                <p class="text-sm text-gray-700">${step.description}</p>
+                <input type="number" value="${step.cost}" onchange="updateStepCost('${step.id}', this.value)" 
+                       class="w-20 text-right border-gray-200 rounded text-sm">
             </li>
         `).join('');
     };
 
     function getStatusStyle(status) {
-        if (status === 'active') return 'bg-green-100 text-green-800';
-        if (status === 'removed') return 'bg-red-100 text-red-800';
-        return 'bg-blue-100 text-blue-800';
+        return status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800';
     }
-
-    window.updateStepCost = async (id, val) => {
-        await supabase.from('steps').update({ cost: parseFloat(val) }).eq('id', id);
-        loadRequirements(); 
-        selectRequirement(selectedReqId, 'Requirement Updated', 0); 
-    };
-
-    window.toggleStep = async (id, currentStatus) => {
-        await supabase.from('steps').update({ is_active: !currentStatus }).eq('id', id);
-        loadRequirements();
-        selectRequirement(selectedReqId, 'Requirement Updated', 0);
-    };
 </script>
 </body>
 </html>

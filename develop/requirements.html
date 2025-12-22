@@ -77,19 +77,19 @@
         initSortable();
     });
 
-    // --- ADD REQUIREMENT TO A PROJECT ---
-    // Attached to window so the onclick="addRequirement()" in HTML works
+    // --- ADD REQUIREMENT ---
     window.addRequirement = async () => {
-        const name = prompt("Enter Requirement Name:");
-        if (!name) return;
+        // We prompt for name but save it into the 'title' column
+        const inputTitle = prompt("Enter Requirement Title:");
+        if (!inputTitle) return;
 
         const { data, error } = await supabase
             .from('requirements')
             .insert([{ 
-                name: name, 
+                title: inputTitle, // CHANGED FROM 'name' TO 'title'
                 project_id: projectId,
                 status: 'active',
-                priority_order: 0 // Will be handled by sortable later
+                priority_order: 0 
             }])
             .select();
 
@@ -97,7 +97,7 @@
             console.error("Error adding requirement:", error);
             alert("Error: " + error.message);
         } else {
-            loadRequirements(); // Refresh the list
+            loadRequirements(); 
         }
     };
 
@@ -117,13 +117,16 @@
         const list = document.getElementById('req-list');
         list.innerHTML = reqs.map(req => {
             const total = req.steps?.filter(s => s.is_active).reduce((sum, s) => sum + (s.cost || 0), 0) || 0;
+            // CHANGED: Using req.title instead of req.name
+            const safeTitle = (req.title || 'Untitled').replace(/'/g, "\\'");
+            
             return `
                 <li class="p-4 hover:bg-gray-50 cursor-pointer transition flex justify-between items-center group" 
-                    data-id="${req.id}" onclick="selectRequirement('${req.id}', '${req.name.replace(/'/g, "\\'")}', ${total})">
+                    data-id="${req.id}" onclick="selectRequirement('${req.id}', '${safeTitle}', ${total})">
                     <div class="flex items-center space-x-3">
                         <span class="cursor-move text-gray-300 group-hover:text-gray-500">?</span>
                         <div>
-                            <p class="text-sm font-bold text-gray-900">${req.name}</p>
+                            <p class="text-sm font-bold text-gray-900">${req.title || 'Untitled'}</p>
                             <span class="text-xs px-2 py-0.5 rounded-full ${getStatusStyle(req.status)}">${req.status}</span>
                         </div>
                     </div>
@@ -134,11 +137,11 @@
     }
 
     // --- LOAD STEPS ---
-    window.selectRequirement = async (reqId, name, total) => {
+    window.selectRequirement = async (reqId, title, total) => {
         selectedReqId = reqId;
         document.getElementById('empty-steps').classList.add('hidden');
         document.getElementById('steps-section').classList.remove('hidden');
-        document.getElementById('selected-req-title').innerText = `2. Steps for ${name}`;
+        document.getElementById('selected-req-title').innerText = `2. Steps for ${title}`;
         document.getElementById('req-rollup-total').innerText = `$${total.toLocaleString()}`;
 
         const { data: steps } = await supabase
@@ -149,6 +152,7 @@
         const list = document.getElementById('step-list');
         list.innerHTML = steps.map(step => `
             <li class="p-4 flex justify-between items-center ${step.is_active ? '' : 'opacity-50 bg-gray-50'}">
+
                 <div class="flex flex-col">
                     <p class="text-sm text-gray-700">${step.description}</p>
                     <button onclick="toggleStep('${step.id}', ${step.is_active})" class="text-[10px] uppercase font-bold mt-1 ${step.is_active ? 'text-red-500' : 'text-green-500'}">
@@ -198,7 +202,6 @@
     window.updateStepCost = async (id, val) => {
         await supabase.from('steps').update({ cost: parseFloat(val) }).eq('id', id);
         loadRequirements(); 
-        // We pass '...' and 0 because loadRequirements will recalculate the correct total
         selectRequirement(selectedReqId, 'Requirement Updated', 0); 
     };
 

@@ -79,17 +79,16 @@
 
     // --- ADD REQUIREMENT ---
     window.addRequirement = async () => {
-        // We prompt for name but save it into the 'title' column
         const inputTitle = prompt("Enter Requirement Title:");
         if (!inputTitle) return;
 
         const { data, error } = await supabase
             .from('requirements')
             .insert([{ 
-                title: inputTitle, // CHANGED FROM 'name' TO 'title'
+                title: inputTitle,
                 project_id: projectId,
                 status: 'active',
-                priority_order: 0 
+                sequence_order: 0 // CHANGED: Using sequence_order to satisfy NOT NULL constraint
             }])
             .select();
 
@@ -107,7 +106,7 @@
             .from('requirements')
             .select(`*, steps(cost, is_active)`)
             .eq('project_id', projectId)
-            .order('priority_order', { ascending: true });
+            .order('sequence_order', { ascending: true }); // CHANGED: Sorting by sequence_order
 
         if (error) {
             console.error("Error loading requirements:", error);
@@ -117,7 +116,6 @@
         const list = document.getElementById('req-list');
         list.innerHTML = reqs.map(req => {
             const total = req.steps?.filter(s => s.is_active).reduce((sum, s) => sum + (s.cost || 0), 0) || 0;
-            // CHANGED: Using req.title instead of req.name
             const safeTitle = (req.title || 'Untitled').replace(/'/g, "\\'");
             
             return `
@@ -136,7 +134,32 @@
         }).join('');
     }
 
-    // --- LOAD STEPS ---
+    // --- SORTING LOGIC ---
+    function initSortable() {
+        const el = document.getElementById('req-list');
+        if (!el || typeof Sortable === 'undefined') return;
+        
+        Sortable.create(el, {
+            handle: '.cursor-move',
+            animation: 150,
+            onEnd: async () => {
+                const items = Array.from(el.children);
+                const updates = items.map((li, index) => ({
+                    id: li.getAttribute('data-id'),
+                    sequence_order: index // CHANGED: Updating sequence_order
+                }));
+                
+                // Update each item's order in the database
+                for(const item of updates) {
+                    await supabase.from('requirements')
+                        .update({ sequence_order: item.sequence_order })
+                        .eq('id', item.id);
+                }
+            }
+        });
+    }
+
+    // --- REMAINING HELPER FUNCTIONS (No changes needed) ---
     window.selectRequirement = async (reqId, title, total) => {
         selectedReqId = reqId;
         document.getElementById('empty-steps').classList.add('hidden');
@@ -144,15 +167,10 @@
         document.getElementById('selected-req-title').innerText = `2. Steps for ${title}`;
         document.getElementById('req-rollup-total').innerText = `$${total.toLocaleString()}`;
 
-        const { data: steps } = await supabase
-            .from('steps')
-            .select('*')
-            .eq('requirement_id', reqId);
-
+        const { data: steps } = await supabase.from('steps').select('*').eq('requirement_id', reqId);
         const list = document.getElementById('step-list');
         list.innerHTML = steps.map(step => `
             <li class="p-4 flex justify-between items-center ${step.is_active ? '' : 'opacity-50 bg-gray-50'}">
-
                 <div class="flex flex-col">
                     <p class="text-sm text-gray-700">${step.description}</p>
                     <button onclick="toggleStep('${step.id}', ${step.is_active})" class="text-[10px] uppercase font-bold mt-1 ${step.is_active ? 'text-red-500' : 'text-green-500'}">
@@ -168,31 +186,6 @@
         `).join('');
     };
 
-    // --- SORTING LOGIC ---
-    function initSortable() {
-        const el = document.getElementById('req-list');
-        if (!el || typeof Sortable === 'undefined') return;
-        
-        Sortable.create(el, {
-            handle: '.cursor-move',
-            animation: 150,
-            onEnd: async () => {
-                const items = Array.from(el.children);
-                const updates = items.map((li, index) => ({
-                    id: li.getAttribute('data-id'),
-                    priority_order: index
-                }));
-                
-                for(const item of updates) {
-                    await supabase.from('requirements')
-                        .update({ priority_order: item.priority_order })
-                        .eq('id', item.id);
-                }
-            }
-        });
-    }
-
-    // --- HELPERS ---
     function getStatusStyle(status) {
         if (status === 'active') return 'bg-green-100 text-green-800';
         if (status === 'removed') return 'bg-red-100 text-red-800';

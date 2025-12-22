@@ -69,9 +69,9 @@
 
         <div class="flex justify-end space-x-2 mt-6">
             <button onclick="toggleProjectModal()" class="text-gray-500 px-4 py-2 font-medium">Cancel</button>
-            <button id="save-project-btn" class="bg-indigo-600 text-white px-6 py-2 rounded font-bold hover:bg-indigo-700 transition">
-                Save Project
-            </button>
+			<button onclick="saveNewProject()" class="bg-indigo-600 text-white px-6 py-2 rounded font-bold hover:bg-indigo-700 transition">
+    Save Project
+</button>
         </div>
     </div>
 </div>
@@ -122,42 +122,37 @@
      */
 window.saveNewProject = async () => {
     console.log("Step 1: Save Button Clicked");
+	if (!sessionData) {
+        console.error("No session data found");
+        return alert("Session expired. Please refresh.");
+    }
     
     try {
         const nameInput = document.getElementById('new-project-name');
         const titleInput = document.getElementById('new-project-title');
-        
         console.log("Step 2: Inputs found", { nameInput, titleInput });
-
         const name = nameInput.value.trim();
         const title = titleInput.value.trim();
         const priority = parseInt(document.getElementById('new-project-priority').value);
         const rate = parseFloat(document.getElementById('new-project-rate').value);
         const status = document.getElementById('new-project-status').value;
-
         console.log("Step 3: Values collected", { name, title, priority, rate, status });
 
         if (!name || !title) return alert("Project Name and Title are required.");
-
         const targetId = sessionData.user?.id || sessionData.tenantId;
         console.log("Step 4: Target ID determined:", targetId);
-
         const projectData = { 
             name, title, priority_value: priority, 
             blended_rate: rate, status, 
             is_complete: (status === 'Completed'), 
             tenant_id: targetId 
         };
-
         console.log("Step 5: Sending to Supabase...");
         const { data, error } = await supabase.from('projects').insert([projectData]).select();
-
-        if (error) throw error;
-        
+        if (error) throw error;        
         console.log("Step 6: Success!", data);
         window.toggleProjectModal();
         await loadProjects();
-
     } catch (err) {
         console.error("CRITICAL ERROR IN SAVE:", err);
         alert("System Error: Check Console for details.");

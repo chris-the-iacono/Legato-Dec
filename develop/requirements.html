@@ -22,13 +22,31 @@
         <h3 class="text-lg font-bold text-gray-900">1. Requirements & Estimates</h3>
     </div>
     
-    <div class="p-4 border-b bg-white space-y-3">
-        <input type="text" id="req-title-input" placeholder="Requirement Title" class="w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
-        <div class="flex space-x-2">
-            <input type="number" id="req-hours-input" placeholder="Est. Hours" class="w-1/2 border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
-            <button onclick="addRequirement()" class="w-1/2 bg-indigo-600 text-white px-3 py-2 rounded-md text-sm font-bold hover:bg-indigo-700">+ Add Requirement</button>
+    <div class="p-4 border-b bg-white space-y-4">
+    <div>
+        <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1">Requirement Title</label>
+        <input type="text" id="req-title-input" placeholder="e.g., User Authentication" 
+               class="w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+    </div>
+
+    <div class="grid grid-cols-2 gap-4">
+        <div>
+            <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1">Est. Hours</label>
+            <input type="number" id="req-hours-input" placeholder="0" 
+                   class="w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+        </div>
+        <div>
+            <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1">Rate Override ($)</label>
+            <input type="number" id="req-rate-override" placeholder="Optional" 
+                   class="w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
         </div>
     </div>
+    
+    <button onclick="addRequirement()" 
+            class="w-full bg-indigo-600 text-white px-3 py-2 rounded-md text-sm font-bold hover:bg-indigo-700 shadow-sm transition">
+        + Create Requirement & Estimate
+    </button>
+</div>
     
     <ul id="req-list" class="divide-y divide-gray-200 overflow-y-auto flex-grow">
         </ul>
@@ -95,33 +113,38 @@
     });
 
     window.addRequirement = async () => {
-        const titleEl = document.getElementById('req-title-input');
-        const hoursEl = document.getElementById('req-hours-input');
-        
-        const title = titleEl.value.trim();
-        const hours = parseFloat(hoursEl.value) || 0;
+    const titleEl = document.getElementById('req-title-input');
+    const hoursEl = document.getElementById('req-hours-input');
+    const overrideEl = document.getElementById('req-rate-override');
+    
+    const title = titleEl.value.trim();
+    const hours = parseFloat(hoursEl.value) || 0;
+    const overrideRate = overrideEl.value ? parseFloat(overrideEl.value) : null;
 
-        if (!title) return alert("Please enter a title");
+    if (!title) return alert("Please enter a title");
 
-        const { data, error } = await supabase
-            .from('requirements')
-            .insert([{ 
-                title: title,
-                project_id: projectId,
-                status: 'active',
-                sequence_order: 0,
-                estimated_hours: hours // Ensure this column exists in your DB!
-            }])
-            .select();
+    const { data, error } = await supabase
+        .from('requirements')
+        .insert([{ 
+            title: title,
+            project_id: projectId,
+            status: 'active',
+            sequence_order: 0,
+            estimated_hours: hours, // Database column: estimated_hours
+            custom_rate: overrideRate // Database column: custom_rate
+        }])
+        .select();
 
-        if (error) {
-            alert("Error: " + error.message);
-        } else {
-            titleEl.value = '';
-            hoursEl.value = '';
-            loadRequirements(); 
-        }
-    };
+    if (error) {
+        alert("Database Error: " + error.message);
+    } else {
+        // Clear the fields
+        titleEl.value = '';
+        hoursEl.value = '';
+        overrideEl.value = '';
+        loadRequirements(); 
+    }
+};
 
     async function loadRequirements() {
         const { data: reqs, error } = await supabase

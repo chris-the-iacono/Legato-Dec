@@ -158,11 +158,14 @@
     };
 
     async function loadRequirements() {
-        const { data: reqs } = await supabase
-            .from('requirements')
-            .select(`*, steps(cost, is_active)`)
-            .eq('project_id', projectId)
-            .order('sequence_order', { ascending: true });
+    const { data: reqs } = await supabase
+        .from('requirements')
+        .select(`
+            *, 
+            user_profiles!requirements_assigned_to_fkey(hourly_cost, email)
+        `)
+        .eq('project_id', projectId)
+        .order('sequence_order', { ascending: true });
 
         const list = document.getElementById('req-list');
         list.innerHTML = reqs.map(req => {

@@ -97,119 +97,81 @@
     let sessionData = null;
 
     document.addEventListener('DOMContentLoaded', async () => {
-        // 1. Authenticate and check session
-        sessionData = await checkAccess();
-        if (!sessionData) return;
+        console.log("?? App Initializing...");
+        
+        try {
+            // 1. Get Session from the new auth.js logic
+            sessionData = await checkAccess();
+            
+            if (!sessionData) {
+                console.error("? No session data returned from checkAccess");
+                return; // auth.js handles the redirect to auth.html
+            }
 
-        // 2. EXPOSE TO CONSOLE: This allows you to type 'window.sessionData' in F12
-        window.sessionData = sessionData;
+            console.log("? Session Loaded for Tenant:", sessionData.tenantId);
+            window.sessionData = sessionData;
 
-        // 3. Update the Dashboard Title with the Tenant Name
-        const dashboardTitle = document.querySelector('h1');
-        if (dashboardTitle && sessionData.tenantName) {
-            dashboardTitle.textContent = `${sessionData.tenantName} - Project Dashboard`;
+            // 2. Render Header
+            const headerElement = document.getElementById('main-header');
+            if (headerElement) {
+                renderProjectHeader(sessionData, 'dashboard', 'Project Selection');
+                console.log("? Header Rendered");
+            } else {
+                console.warn("?? Element #main-header not found in HTML");
+            }
+
+            // 3. Update Title
+            const dashboardTitle = document.querySelector('h1');
+            if (dashboardTitle) {
+                dashboardTitle.textContent = `${sessionData.tenantName} - Project Dashboard`;
+            }
+
+            // 4. Load Projects
+            await loadProjects();
+
+        } catch (err) {
+            console.error("? CRITICAL INIT ERROR:", err);
         }
-
-        // 4. Render Header (Using 'dashboard' as active ID)
-        renderProjectHeader(sessionData, 'dashboard', 'Project Selection');
-
-        // 5. Load Project Data
-        await loadProjects();
     });
 
-    /**
-     * Creates a new project in Supabase with all required fields
-     */
-window.saveNewProject = async () => {
-    console.log("Step 1: Save Button Clicked");
-	if (!sessionData) {
-        console.error("No session data found");
-        return alert("Session expired. Please refresh.");
-    }
-    
-    try {
-        const nameInput = document.getElementById('new-project-name');
-        const titleInput = document.getElementById('new-project-title');
-        console.log("Step 2: Inputs found", { nameInput, titleInput });
-        const name = nameInput.value.trim();
-        const title = titleInput.value.trim();
-        const priority = parseInt(document.getElementById('new-project-priority').value);
-        const rate = parseFloat(document.getElementById('new-project-rate').value);
-        const status = document.getElementById('new-project-status').value;
-        console.log("Step 3: Values collected", { name, title, priority, rate, status });
-
-        if (!name || !title) return alert("Project Name and Title are required.");
-        const targetId = sessionData.user?.id || sessionData.tenantId;
-        console.log("Step 4: Target ID determined:", targetId);
-        const projectData = { 
-            name, title, priority_value: priority, 
-            blended_rate: rate, status, 
-            is_complete: (status === 'Completed'), 
-            tenant_id: targetId 
-        };
-        console.log("Step 5: Sending to Supabase...");
-        const { data, error } = await supabase.from('projects').insert([projectData]).select();
-        if (error) throw error;        
-        console.log("Step 6: Success!", data);
-        window.toggleProjectModal();
-        await loadProjects();
-    } catch (err) {
-        console.error("CRITICAL ERROR IN SAVE:", err);
-        alert("System Error: Check Console for details.");
-    }
-};
-
-    /**
-     * Fetches projects from Supabase filtered by the current user/tenant ID
-     */
     async function loadProjects() {
         const projectContainer = document.getElementById('project-list');
         if (!projectContainer) return;
 
-        const targetId = sessionData.tenantId || sessionData.user?.id;
-
-        if (!targetId) {
-            projectContainer.innerHTML = `<p class="text-red-500">Error: User identity not found.</p>`;
-            return;
-        }
+        console.log("?? Fetching projects for tenant:", sessionData.tenantId);
 
         const { data: projects, error } = await supabase
             .from('projects')
             .select(`
                 id,
-                tenant_id,
                 name,
                 status,
                 requirements (
                     steps (cost, is_active)
                 )
             `)
-            .eq('tenant_id', targetId);
+            .eq('tenant_id', sessionData.tenantId);
 
         if (error) {
-            console.error("Supabase Error:", error);
-
-            projectContainer.innerHTML = `<p class="text-red-500">Error: ${error.message}</p>`;
+            console.error("? Supabase Load Error:", error);
+            projectContainer.innerHTML = `<p class="text-red-500">Error loading projects: ${error.message}</p>`;
             return;
         }
 
         if (!projects || projects.length === 0) {
             projectContainer.innerHTML = `
                 <div class="col-span-full text-center py-12 bg-white rounded-lg border-2 border-dashed border-gray-300">
-                    <p class="text-gray-500 italic">No projects found. Create your first project to get started.</p>
+                    <p class="text-gray-500 italic">No projects found for this workspace.</p>
                 </div>`;
             return;
         }
 
         renderProjectCards(projects);
+        console.log("? Projects Rendered");
     }
 
-    /**
-     * Generates the HTML for project cards
-     */
     function renderProjectCards(projects) {
         const projectContainer = document.getElementById('project-list');
-        
         projectContainer.innerHTML = projects.map(project => {
             const totalCost = project.requirements?.reduce((acc, req) => {
                 const stepSum = req.steps
@@ -219,41 +181,56 @@ window.saveNewProject = async () => {
             }, 0) || 0;
 
             return `
-                <div class="bg-white overflow-hidden shadow rounded-lg border border-gray-200 hover:shadow-md transition cursor-pointer" 
+                <div class="bg-white shadow rounded-lg border border-gray-200 hover:shadow-md transition cursor-pointer" 
                      onclick="openProject('${project.id}', '${project.name}')">
                     <div class="px-4 py-5 sm:p-6">
-                        <div class="flex items-center justify-between mb-4">
-                            <h3 class="text-lg font-medium text-gray-900 truncate">${project.name}</h3>
-                            <span class="px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
+                        <div class="flex items-center justify-between mb-2">
+                            <h3 class="text-lg font-bold text-gray-900">${project.name}</h3>
+                            <span class="px-2 py-0.5 text-xs font-bold rounded-full bg-indigo-50 text-indigo-700 uppercase border border-indigo-100">
                                 ${project.status}
                             </span>
                         </div>
-                        <dl>
-                            <dt class="text-sm font-medium text-gray-500">Rolled-up Cost Estimate</dt>
-                            <dd class="mt-1 text-2xl font-semibold text-indigo-600">$${totalCost.toLocaleString()}</dd>
-                        </dl>
+                        <p class="text-sm text-gray-500 mb-4">Total Estimate</p>
+                        <p class="text-2xl font-black text-indigo-600">$${totalCost.toLocaleString()}</p>
                     </div>
-                    <div class="bg-gray-50 px-4 py-4 sm:px-6">
-                        <div class="text-sm">
-                            <span class="text-indigo-600 font-medium hover:text-indigo-500">Open Project Details &rarr;</span>
-                        </div>
-                    </div>
-                </div>
-            `;
+                </div>`;
         }).join('');
     }
 
-    // Modal UI Toggles
+    // Modal & Navigation Globals
     window.toggleProjectModal = () => {
         const modal = document.getElementById('project-modal');
         if (modal) modal.classList.toggle('hidden');
     };
 
-    // Navigation logic
     window.openProject = (id, name) => {
         localStorage.setItem('selected_project_id', id);
         localStorage.setItem('selected_project_name', name);
         window.location.href = 'requirements.html';
+    };
+
+    window.saveNewProject = async () => {
+        try {
+            const name = document.getElementById('new-project-name').value.trim();
+            const title = document.getElementById('new-project-title').value.trim();
+            const rate = parseFloat(document.getElementById('new-project-rate').value) || 0;
+
+            if (!name || !title) return alert("Please fill in Name and Title.");
+
+            const { error } = await supabase.from('projects').insert([{
+                name,
+                title,
+                tenant_id: sessionData.tenantId,
+                blended_rate: rate,
+                status: 'Active'
+            }]);
+
+            if (error) throw error;
+            window.toggleProjectModal();
+            await loadProjects();
+        } catch (err) {
+            alert("Save failed: " + err.message);
+        }
     };
 </script>
 

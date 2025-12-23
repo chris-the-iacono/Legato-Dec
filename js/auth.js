@@ -3,10 +3,8 @@ import { supabase } from './config.js';
 
 /**
  * Handles the Sign-In process
- * @param {Event} e - The form submission event
  */
 export async function handleSignIn(e) {
-    // 1. STOP THE REFRESH: This prevents the browser from reloading the page
     e.preventDefault();
 
     const email = document.getElementById('email').value;
@@ -14,16 +12,12 @@ export async function handleSignIn(e) {
     const errorDisplay = document.getElementById('error-message');
 
     try {
-        // 2. SUPABASE AUTH: Attempt to sign in
         const { data, error } = await supabase.auth.signInWithPassword({
             email: email,
             password: password,
         });
 
         if (error) throw error;
-
-        // 3. SUCCESS: Redirect to the main dashboard
-        // Note: Using './index.html' ensures it stays in the current environment folder
         window.location.href = 'index.html';
 
     } catch (error) {
@@ -43,33 +37,59 @@ export async function handleSignOut() {
     if (error) {
         console.error('Error signing out:', error.message);
     } else {
-        // Redirect back to login page
         window.location.href = 'auth.html';
     }
 }
 
 /**
- * Check Access: Verifies if a user is logged in before showing page content
- * Returns the session and user metadata
+ * Check Access: Verifies session and fetches Tenant/Profile data
  */
 export async function checkAccess() {
-    const { data: { session }, error } = await supabase.auth.getSession();
+    // 1. Check if a basic Auth session exists
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
 
-    if (error || !session) {
+    if (sessionError || !session) {
         window.location.href = 'auth.html';
         return null;
     }
 
-    // Return the user data and any custom claims (like tenant name or modules)
+    // 2. FETCH DATABASE PROFILE: Get the linked Tenant and Role
+    // This connects user_profiles to the tenants table using the foreign key
+    const { data: profile, error: profileError } = await supabase
+        .from('user_profiles')
+        .select(`
+            role,
+            tenant_id,
+            full_name,
+            tenants (
+                name,
+                module_requirements,
+                module_risks,
+                module_issues,
+                module_changes
+            )
+        `)
+        .eq('user_id', session.user.id)
+        .single();
+
+    if (profileError || !profile) {
+        console.error("Profile Link Error:", profileError);
+        // If profile doesn't exist, we can't determine the tenant
+        return null;
+    }
+
+    // 3. RETURN UNIFIED SESSION OBJECT
     return {
         user: session.user,
-        fullName: session.user.user_metadata.full_name || "User",
-        tenantName: session.user.user_metadata.tenant_name || "Organization",
-        modules: session.user.user_metadata.modules || {
-            module_requirements: true,
-            module_risks: true,
-            module_issues: true,
-            module_changes: true
+        fullName: profile.full_name || "User",
+        role: profile.role || 'user',
+        tenantId: profile.tenant_id, // THIS IS THE KEY FOR YOUR 409 ERROR
+        tenantName: profile.tenants?.name || "Organization",
+        modules: {
+            module_requirements: profile.tenants?.module_requirements ?? true,
+            module_risks: profile.tenants?.module_risks ?? true,
+            module_issues: profile.tenants?.module_issues ?? true,
+            module_changes: profile.tenants?.module_changes ?? true
         }
     };
 }

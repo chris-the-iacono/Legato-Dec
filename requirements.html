@@ -74,7 +74,6 @@
         const { data: proj } = await supabase.from('projects').select('blended_rate').eq('id', projectId).single();
         projectBlendedRate = proj?.blended_rate || 0;
 
-        // FETCH USING user_id
         const { data: profiles } = await supabase.from('user_profiles').select('user_id, email, hourly_cost');
         teamMembers = profiles || [];
         
@@ -89,7 +88,7 @@
         select.innerHTML = '<option value="">Select User...</option>';
         teamMembers.forEach(user => {
             const opt = document.createElement('option');
-            opt.value = user.user_id; // Using user_id
+            opt.value = user.user_id;
             opt.textContent = user.email;
             select.appendChild(opt);
         });
@@ -122,28 +121,31 @@
             loadRequirements(); 
         }
     };
-	window.editRequirement = async (reqId, currentTitle, currentHours) => {
-    // Only allow if user is admin (you can add a session check here)
-    const newTitle = prompt("Edit Requirement Title:", currentTitle);
-    if (newTitle === null) return; // Cancelled
 
-    const newHours = prompt("Edit Estimated Hours:", currentHours);
-    if (newHours === null) return;
+    window.editRequirement = async (reqId, currentTitle, currentHours) => {
+        // Admin authorization check
+        const isAdmin = session.role === 'admin' || session.role === 'owner';
+        if (!isAdmin) return alert("Access Denied: Only admins can edit requirements.");
 
-    const { error } = await supabase
-        .from('requirements')
-        .update({ 
-            title: newTitle, 
-            estimated_hours: parseFloat(newHours) || 0 
-        })
-        .eq('id', reqId);
+        const newTitle = prompt("Edit Requirement Title:", currentTitle);
+        if (newTitle === null) return; 
 
-    if (error) alert(error.message);
-    else loadRequirements();
-};
+        const newHours = prompt("Edit Estimated Hours:", currentHours);
+        if (newHours === null) return;
+
+        const { error } = await supabase
+            .from('requirements')
+            .update({ 
+                title: newTitle.trim(), 
+                estimated_hours: parseFloat(newHours) || 0 
+            })
+            .eq('id', reqId);
+
+        if (error) alert(error.message);
+        else loadRequirements();
+    };
 
     async function loadRequirements() {
-        // Updated Join to use the assigned_to foreign key relationship correctly
         const { data: reqs } = await supabase
             .from('requirements')
             .select(`*, user_profiles:assigned_to(email, hourly_cost)`)
@@ -154,18 +156,23 @@
         list.innerHTML = reqs.map(req => {
             const rate = req.custom_rate || projectBlendedRate;
             const total = (req.estimated_hours || 0) * rate;
+            const safeTitle = (req.title || 'Untitled').replace(/'/g, "\\'");
+            
             return `
                 <li class="p-4 hover:bg-gray-50 transition border-b flex justify-between items-center group">
                     <div class="flex items-center space-x-3">
                         <span class="cursor-move text-gray-300 group-hover:text-indigo-500 font-bold p-2">?</span>
                         <div>
-                            <p class="text-sm font-bold text-gray-900">${req.title}</p>
+                            <p class="text-sm font-bold text-gray-900 cursor-pointer hover:text-indigo-600" 
+                               onclick="event.stopPropagation(); editRequirement('${req.id}', '${safeTitle}', ${req.estimated_hours})">
+                               ${req.title} <span class="text-gray-300 ml-1 text-xs">?</span>
+                            </p>
                             <p class="text-[10px] text-gray-500">${req.user_profiles?.email || 'No Resource'} | ${req.estimated_hours} hrs @ $${rate}/hr</p>
                         </div>
                     </div>
                     <div class="flex items-center space-x-4">
                         <p class="text-sm font-mono font-bold text-indigo-600">$${total.toLocaleString(undefined, {minimumFractionDigits: 2})}</p>
-                        <button onclick="openSteps('${req.id}', '${req.title.replace(/'/g, "\\'")}', ${total}, '${req.user_profiles?.email || 'N/A'}')" 
+                        <button onclick="openSteps('${req.id}', '${safeTitle}', ${total}, '${req.user_profiles?.email || 'N/A'}')" 
                                 class="p-2 hover:bg-indigo-100 rounded-full text-gray-400 hover:text-indigo-600 transition">
                             <span class="text-xl font-bold">?</span>
                         </button>
@@ -195,13 +202,14 @@
             <li class="p-4 flex justify-between items-center ${step.is_active ? '' : 'opacity-50'} border-b">
                 <div class="flex flex-col flex-grow">
                     <p class="text-sm font-medium text-gray-700">${step.description}</p>
-                    <button onclick="toggleStep('${step.id}', ${step.is_active})" class="text-[10px] uppercase font-bold text-indigo-500">Toggle</button>
+                    <button onclick="toggleStep('${step.id}', ${step.is_active})" class="text-[10px] uppercase font-bold text-indigo-500">Toggle Status</button>
                 </div>
                 <input type="number" value="${step.cost}" onchange="updateStepCost('${step.id}', this.value)" class="w-24 text-right border-gray-200 rounded text-sm">
             </li>`).join('');
     }
 
     window.addStep = async () => {
+        if (!selectedReqId) return;
         const desc = prompt("Task description:");
         if (!desc) return;
         await supabase.from('steps').insert([{ requirement_id: selectedReqId, description: desc, cost: 0, is_active: true }]);

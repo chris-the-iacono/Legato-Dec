@@ -122,6 +122,25 @@
             loadRequirements(); 
         }
     };
+	window.editRequirement = async (reqId, currentTitle, currentHours) => {
+    // Only allow if user is admin (you can add a session check here)
+    const newTitle = prompt("Edit Requirement Title:", currentTitle);
+    if (newTitle === null) return; // Cancelled
+
+    const newHours = prompt("Edit Estimated Hours:", currentHours);
+    if (newHours === null) return;
+
+    const { error } = await supabase
+        .from('requirements')
+        .update({ 
+            title: newTitle, 
+            estimated_hours: parseFloat(newHours) || 0 
+        })
+        .eq('id', reqId);
+
+    if (error) alert(error.message);
+    else loadRequirements();
+};
 
     async function loadRequirements() {
         // Updated Join to use the assigned_to foreign key relationship correctly

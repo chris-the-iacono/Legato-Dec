@@ -7,81 +7,52 @@
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="css/style.css">
-    <link rel="icon" type="image/png" href="assets/favicon.png">
 </head>
 <body class="bg-gray-50 min-h-screen pb-20">
-
     <div id="main-header"></div>
-
     <main class="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            
             <section class="bg-white shadow rounded-lg overflow-hidden flex flex-col h-[750px]">
-                <div class="px-4 py-5 border-b border-gray-200 sm:px-6 bg-gray-50 flex justify-between items-center">
-                    <h3 class="text-lg font-bold text-gray-900">1. Requirements & Estimates</h3>
-                </div>
-                
+                <div class="px-4 py-5 border-b bg-gray-50"><h3 class="text-lg font-bold text-gray-900">1. Requirements & Estimates</h3></div>
                 <div class="p-5 border-b bg-indigo-50/50 space-y-4">
                     <div class="grid grid-cols-1 gap-3">
-                        <div>
-                            <label class="block text-[10px] font-bold text-gray-500 uppercase ml-1 mb-1">Requirement Title</label>
-                            <input type="text" id="req-title-input" placeholder="e.g. User Authentication" 
-                                   class="w-full border-gray-300 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500 text-sm p-2.5">
-                        </div>
-                        
+                        <input type="text" id="req-title-input" placeholder="Requirement Title" class="w-full border-gray-300 rounded-lg text-sm p-2.5">
                         <div class="grid grid-cols-3 gap-2">
-                            <div class="col-span-1">
-                                <label class="block text-[10px] font-bold text-gray-500 uppercase ml-1 mb-1">Assign To</label>
-                                <select id="req-assign-select" onchange="handleUserSelection()" 
-                                        class="w-full border-gray-300 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500 text-sm p-2.5">
-                                    <option value="">Select User...</option>
-                                </select>
+                            <div>
+                                <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1">Assign To</label>
+                                <select id="req-assign-select" onchange="handleUserSelection()" class="w-full border-gray-300 rounded-lg text-sm p-2.5"></select>
                             </div>
                             <div>
-                                <label class="block text-[10px] font-bold text-gray-500 uppercase ml-1 mb-1">Hours</label>
-                                <input type="number" id="req-hours-input" placeholder="0" 
-                                       class="w-full border-gray-300 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500 text-sm p-2.5">
+                                <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1">Hours</label>
+                                <input type="number" id="req-hours-input" placeholder="0" class="w-full border-gray-300 rounded-lg text-sm p-2.5">
                             </div>
                             <div>
-                                <label class="block text-[10px] font-bold text-gray-500 uppercase ml-1 mb-1">Applied Rate</label>
-                                <input type="number" id="req-applied-rate" readonly 
-                                       class="w-full bg-gray-100 border-gray-300 rounded-lg text-sm p-2.5 text-gray-500 font-mono">
+                                <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1">Applied Rate</label>
+                                <input type="number" id="req-applied-rate" readonly class="w-full bg-gray-100 border-gray-300 rounded-lg text-sm p-2.5 font-mono">
                             </div>
                         </div>
-                        
-                        <button onclick="addRequirement()" 
-                                class="w-full bg-indigo-600 text-white py-2.5 rounded-lg text-sm font-bold hover:bg-indigo-700 shadow-md transition-all active:scale-[0.98]">
-                            Create Requirement & Estimate
-                        </button>
+                        <button onclick="addRequirement()" class="w-full bg-indigo-600 text-white py-2.5 rounded-lg text-sm font-bold hover:bg-indigo-700 transition">Create Requirement</button>
                     </div>
                 </div>
-                
                 <ul id="req-list" class="divide-y divide-gray-200 overflow-y-auto flex-grow"></ul>
             </section>
 
             <section id="steps-section" class="bg-white shadow rounded-lg overflow-hidden flex flex-col h-[750px] hidden">
-                <div class="px-4 py-5 border-b border-gray-200 sm:px-6 bg-indigo-50 flex justify-between items-center">
+                <div class="px-4 py-5 border-b bg-indigo-50 flex justify-between items-center">
                     <div>
-                        <h3 id="selected-req-title" class="text-lg font-bold text-indigo-900 underline underline-offset-4">Steps Detail</h3>
-                        <p id="selected-req-meta" class="text-[10px] text-indigo-600 mt-1 uppercase font-bold tracking-wider"></p>
+                        <h3 id="selected-req-title" class="text-lg font-bold text-indigo-900">Steps</h3>
+                        <p id="selected-req-meta" class="text-[10px] text-indigo-600 font-bold uppercase"></p>
                     </div>
-                    <button onclick="closeSteps()" class="text-gray-400 hover:text-gray-600 font-bold text-xl">?</button>
+                    <button onclick="closeSteps()" class="text-gray-400 hover:text-gray-600 text-xl">?</button>
                 </div>
-                
                 <ul id="step-list" class="divide-y divide-gray-200 overflow-y-auto flex-grow"></ul>
-
                 <div class="p-4 bg-gray-50 border-t">
-                    <button id="add-step-btn" onclick="addStep()" 
-                            class="w-full bg-white border border-gray-300 py-2 rounded text-sm font-medium hover:bg-gray-100 shadow-sm transition">
-                        + Add Detailed Step
-                    </button>
+                    <button onclick="addStep()" class="w-full bg-white border border-gray-300 py-2 rounded text-sm font-medium hover:bg-gray-100">+ Add Step</button>
                 </div>
             </section>
-
-            <section id="empty-steps" class="border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center h-[750px]">
-                <p class="text-gray-400 italic text-center px-10">Select a requirement's ? menu on the left to manage steps and detailed breakdown.</p>
+            <section id="empty-steps" class="border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center h-[750px] text-gray-400 italic px-10 text-center">
+                Select ? to manage steps.
             </section>
-
         </div>
     </main>
 
@@ -98,15 +69,13 @@
         session = await checkAccess(MODULES.REQUIREMENTS);
         projectId = localStorage.getItem('selected_project_id');
         const projectName = localStorage.getItem('selected_project_name');
+        if (!session || !projectId) return window.location.href = 'index.html';
 
-        if (!session || !projectId) { window.location.href = 'index.html'; return; }
-
-        // 1. Fetch Project Blended Rate
         const { data: proj } = await supabase.from('projects').select('blended_rate').eq('id', projectId).single();
         projectBlendedRate = proj?.blended_rate || 0;
 
-        // 2. Fetch User Profiles for Dropdown
-        const { data: profiles } = await supabase.from('user_profiles').select('id, email, hourly_cost');
+        // FETCH USING user_id
+        const { data: profiles } = await supabase.from('user_profiles').select('user_id, email, hourly_cost');
         teamMembers = profiles || [];
         
         populateUserDropdown();
@@ -117,60 +86,45 @@
 
     function populateUserDropdown() {
         const select = document.getElementById('req-assign-select');
+        select.innerHTML = '<option value="">Select User...</option>';
         teamMembers.forEach(user => {
             const opt = document.createElement('option');
-            opt.value = user.id;
+            opt.value = user.user_id; // Using user_id
             opt.textContent = user.email;
             select.appendChild(opt);
         });
-        handleUserSelection(); // Set default rate
+        handleUserSelection();
     }
 
     window.handleUserSelection = () => {
         const userId = document.getElementById('req-assign-select').value;
         const rateInput = document.getElementById('req-applied-rate');
-        
-        if (!userId) {
-            rateInput.value = projectBlendedRate;
-        } else {
-            const selectedUser = teamMembers.find(u => u.id === userId);
-            rateInput.value = (selectedUser && selectedUser.hourly_cost) ? selectedUser.hourly_cost : projectBlendedRate;
-        }
+        const user = teamMembers.find(u => u.user_id === userId);
+        rateInput.value = (user && user.hourly_cost) ? user.hourly_cost : projectBlendedRate;
     };
 
     window.addRequirement = async () => {
-        const titleEl = document.getElementById('req-title-input');
-        const hoursEl = document.getElementById('req-hours-input');
-        const assignEl = document.getElementById('req-assign-select');
-        const rateEl = document.getElementById('req-applied-rate');
-        
-        const title = titleEl.value.trim();
-        const hours = parseFloat(hoursEl.value) || 0;
-        const assignedId = assignEl.value || null;
-        const rate = parseFloat(rateEl.value) || 0;
+        const title = document.getElementById('req-title-input').value.trim();
+        const hours = parseFloat(document.getElementById('req-hours-input').value) || 0;
+        const assignedId = document.getElementById('req-assign-select').value || null;
+        const rate = parseFloat(document.getElementById('req-applied-rate').value) || 0;
 
-        if (!title) return alert("Please enter a title");
-
-        const { error } = await supabase
-            .from('requirements')
-            .insert([{ 
-                title,
-                project_id: projectId,
-                status: 'active',
-                sequence_order: 0,
-                estimated_hours: hours,
-                assigned_to: assignedId,
-                custom_rate: rate // Saving the rate used at time of creation
-            }]);
+        if (!title) return alert("Title required");
+        const { error } = await supabase.from('requirements').insert([{ 
+            title, project_id: projectId, status: 'active', sequence_order: 0, 
+            estimated_hours: hours, assigned_to: assignedId, custom_rate: rate 
+        }]);
 
         if (error) alert(error.message);
-        else {
-            titleEl.value = ''; hoursEl.value = ''; 
+        else { 
+            document.getElementById('req-title-input').value = ''; 
+            document.getElementById('req-hours-input').value = ''; 
             loadRequirements(); 
         }
     };
 
     async function loadRequirements() {
+        // Updated Join to use the assigned_to foreign key relationship correctly
         const { data: reqs } = await supabase
             .from('requirements')
             .select(`*, user_profiles:assigned_to(email, hourly_cost)`)
@@ -181,28 +135,23 @@
         list.innerHTML = reqs.map(req => {
             const rate = req.custom_rate || projectBlendedRate;
             const total = (req.estimated_hours || 0) * rate;
-            const safeTitle = (req.title || 'Untitled').replace(/'/g, "\\'");
-
             return `
                 <li class="p-4 hover:bg-gray-50 transition border-b flex justify-between items-center group">
                     <div class="flex items-center space-x-3">
                         <span class="cursor-move text-gray-300 group-hover:text-indigo-500 font-bold p-2">?</span>
                         <div>
                             <p class="text-sm font-bold text-gray-900">${req.title}</p>
-                            <p class="text-[10px] text-gray-500">
-                                ${req.user_profiles?.email || 'No Resource'} | ${req.estimated_hours} hrs @ $${rate}/hr
-                            </p>
+                            <p class="text-[10px] text-gray-500">${req.user_profiles?.email || 'No Resource'} | ${req.estimated_hours} hrs @ $${rate}/hr</p>
                         </div>
                     </div>
                     <div class="flex items-center space-x-4">
                         <p class="text-sm font-mono font-bold text-indigo-600">$${total.toLocaleString(undefined, {minimumFractionDigits: 2})}</p>
-                        <button onclick="openSteps('${req.id}', '${safeTitle}', ${total}, '${req.user_profiles?.email || 'N/A'}')" 
+                        <button onclick="openSteps('${req.id}', '${req.title.replace(/'/g, "\\'")}', ${total}, '${req.user_profiles?.email || 'N/A'}')" 
                                 class="p-2 hover:bg-indigo-100 rounded-full text-gray-400 hover:text-indigo-600 transition">
                             <span class="text-xl font-bold">?</span>
                         </button>
                     </div>
-                </li>
-            `;
+                </li>`;
         }).join('');
     }
 
@@ -224,28 +173,19 @@
         const { data: steps } = await supabase.from('steps').select('*').eq('requirement_id', selectedReqId).order('created_at', { ascending: true });
         const list = document.getElementById('step-list');
         list.innerHTML = steps.map(step => `
-            <li class="p-4 flex justify-between items-center ${step.is_active ? '' : 'opacity-50 bg-gray-50'} border-b">
+            <li class="p-4 flex justify-between items-center ${step.is_active ? '' : 'opacity-50'} border-b">
                 <div class="flex flex-col flex-grow">
                     <p class="text-sm font-medium text-gray-700">${step.description}</p>
-                    <button onclick="toggleStep('${step.id}', ${step.is_active})" class="text-[10px] uppercase font-bold mt-1 ${step.is_active ? 'text-red-500' : 'text-green-500'}">
-                        ${step.is_active ? 'Deactivate' : 'Activate'}
-                    </button>
+                    <button onclick="toggleStep('${step.id}', ${step.is_active})" class="text-[10px] uppercase font-bold text-indigo-500">Toggle</button>
                 </div>
-                <div class="flex items-center space-x-2">
-                    <span class="text-xs text-gray-400">$</span>
-                    <input type="number" value="${step.cost}" onchange="updateStepCost('${step.id}', this.value)" 
-                           class="w-24 text-right border-gray-200 rounded text-sm focus:ring-indigo-500">
-                </div>
-            </li>
-        `).join('');
+                <input type="number" value="${step.cost}" onchange="updateStepCost('${step.id}', this.value)" class="w-24 text-right border-gray-200 rounded text-sm">
+            </li>`).join('');
     }
 
     window.addStep = async () => {
-        if (!selectedReqId) return;
-        const desc = prompt("Enter task/step description:");
+        const desc = prompt("Task description:");
         if (!desc) return;
-        const cost = parseFloat(prompt("Enter internal cost ($):", "0")) || 0;
-        await supabase.from('steps').insert([{ requirement_id: selectedReqId, description: desc, cost, is_active: true }]);
+        await supabase.from('steps').insert([{ requirement_id: selectedReqId, description: desc, cost: 0, is_active: true }]);
         refreshSteps();
     };
 
@@ -261,21 +201,12 @@
 
     function initSortable() {
         const el = document.getElementById('req-list');
-        if (!el) return;
-        new Sortable(el, {
-            handle: '.cursor-move',
-            animation: 150,
-            onEnd: async () => {
-                const items = Array.from(el.children);
-                for(let i = 0; i < items.length; i++) {
-                    await supabase.from('requirements').update({ sequence_order: i }).eq('id', items[i].getAttribute('data-id'));
-                }
+        if (el) new Sortable(el, { handle: '.cursor-move', animation: 150, onEnd: async () => {
+            const items = Array.from(el.children);
+            for(let i = 0; i < items.length; i++) {
+                await supabase.from('requirements').update({ sequence_order: i }).eq('id', items[i].getAttribute('data-id'));
             }
-        });
-    }
-
-    function getStatusStyle(status) {
-        return status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800';
+        }});
     }
 </script>
 </body>

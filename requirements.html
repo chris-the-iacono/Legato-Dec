@@ -115,29 +115,43 @@
         if (window.Sortable) initSortable();
     });
 
-    function populateUserDropdown() {
-        const select = document.getElementById('req-assign-select');
-        teamMembers.forEach(user => {
+function populateUserDropdown() {
+    const select = document.getElementById('req-assign-select');
+    if (!select) return;
+    
+    // Clear existing options except the first
+    select.innerHTML = '<option value="">Select User...</option>';
+    
+    teamMembers.forEach(user => {
+        // Safety: check for both .id and .user_id
+        const actualId = user.id || user.user_id;
+        if (actualId) {
             const opt = document.createElement('option');
-            opt.value = user.id;
-            opt.textContent = user.email;
+            opt.value = actualId;
+            opt.textContent = user.email || 'Unknown User';
             select.appendChild(opt);
-        });
-        handleUserSelection(); // Set default rate
-    }
-
-    window.handleUserSelection = () => {
-        const userId = document.getElementById('req-assign-select').value;
-        const rateInput = document.getElementById('req-applied-rate');
-        
-        if (!userId) {
-            rateInput.value = projectBlendedRate;
-        } else {
-            const selectedUser = teamMembers.find(u => u.id === userId);
-            rateInput.value = (selectedUser && selectedUser.hourly_cost) ? selectedUser.hourly_cost : projectBlendedRate;
         }
-    };
+    });
+handleUserSelection();
+}
 
+window.handleUserSelection = () => {
+    const userId = document.getElementById('req-assign-select').value;
+    const rateInput = document.getElementById('req-applied-rate');
+    
+    if (!userId) {
+        rateInput.value = projectBlendedRate;
+    } else {
+        // Find user by id or user_id
+        const selectedUser = teamMembers.find(u => (u.id === userId || u.user_id === userId));
+        
+        if (selectedUser && selectedUser.hourly_cost !== null && selectedUser.hourly_cost !== undefined) {
+            rateInput.value = selectedUser.hourly_cost;
+        } else {
+            rateInput.value = projectBlendedRate;
+        }
+    }
+};
     window.addRequirement = async () => {
         const titleEl = document.getElementById('req-title-input');
         const hoursEl = document.getElementById('req-hours-input');

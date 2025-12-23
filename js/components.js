@@ -2,31 +2,30 @@
 import { handleSignOut } from './auth.js';
 
 /**
-* Updated file
- * Renders the Tabbed UI Header for a selected project.
- * @param {Object} session - The session object from checkAccess()
- * @param {string} activeTab - The ID of the currently active tab
- * @param {string} projectName - The name of the currently selected project
+ * Renders the Tabbed UI Header with Admin and Navigation features.
  */
 export function renderProjectHeader(session, activeTab, projectName = "Select Project") {
     const headerElement = document.getElementById('main-header');
     
-    // Safety check: if the HTML doesn't have <div id="main-header"></div>, stop.
     if (!headerElement) return;
 
-    // 1. DYNAMIC TAB TITLE: Updates the browser tab name automatically
+    // 1. DYNAMIC TAB TITLE
     document.title = `${projectName} | ${activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}`;
 
-   // 2. ENVIRONMENT BADGE: Shows if we are in Dev or Test based on URL
+    // 2. ENVIRONMENT BADGE
     const currentPath = window.location.pathname;
     let envBadge = '';
     if (currentPath.includes('/develop/')) {
-        envBadge = '<span class="bg-yellow-500 text-black px-2 py-0.5 text-[10px] font-bold rounded ml-2 shadow-sm env-badge-pulse">DEV</span>';
+        envBadge = '<span class="bg-yellow-500 text-black px-2 py-0.5 text-[10px] font-bold rounded ml-2 shadow-sm animate-pulse">DEV</span>';
     } else if (currentPath.includes('/test/')) {
-        envBadge = '<span class="bg-blue-500 text-white px-2 py-0.5 text-[10px] font-bold rounded ml-2 shadow-sm env-badge-pulse">STAGE</span>';
+        envBadge = '<span class="bg-blue-500 text-white px-2 py-0.5 text-[10px] font-bold rounded ml-2 shadow-sm animate-pulse">STAGE</span>';
     }
 
-    // 3. DEFINE TABS: Filtered by what the Tenant has actually purchased
+    // 3. ADMIN CHECK
+    // Checks if user is an admin to show the Team Management button
+    const isAdmin = session.role === 'admin' || session.role === 'owner';
+
+    // 4. DEFINE TABS (Filtered by purchased modules)
     const allTabs = [
         { id: 'requirements', name: 'Requirements & Estimates', link: 'requirements.html', enabled: session.modules.module_requirements },
         { id: 'risks', name: 'Risks', link: 'risks.html', enabled: session.modules.module_risks },
@@ -36,21 +35,35 @@ export function renderProjectHeader(session, activeTab, projectName = "Select Pr
 
     const visibleTabs = allTabs.filter(tab => tab.enabled);
 
-    // 4. RENDER THE HTML
+    // 5. RENDER THE HTML
     headerElement.innerHTML = `
         <header class="bg-white border-b border-gray-200 sticky top-0 z-50 shadow-sm">
             <div class="max-w-7xl mx-auto px-4 flex justify-between items-center h-12 border-b border-gray-100">
                 <div class="flex items-center space-x-4">
+                    <button onclick="window.history.back()" class="p-1.5 hover:bg-gray-100 rounded-full transition text-gray-500 mr-2" title="Go Back">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                        </svg>
+                    </button>
+
                     <span class="text-xs font-black text-indigo-600 uppercase tracking-widest flex items-center">
-                        ${session.tenantName || 'Project Workspace'} ${envBadge}
+                        ${session.tenantName || 'Workspace'} ${envBadge}
                     </span>
                     <span class="text-gray-300">|</span>
                     <span class="text-sm font-semibold text-gray-800">${projectName}</span>
                 </div>
-                <div class="flex items-center space-x-6">
-                    <span class="text-xs text-gray-500 font-medium">
-                        <span class="hidden sm:inline">Logged in as:</span> ${session.fullName}
+
+                <div class="flex items-center space-x-4">
+                    ${isAdmin ? `
+                        <a href="admin.html" class="text-[10px] font-bold bg-indigo-50 text-indigo-700 px-2.5 py-1 rounded-md border border-indigo-100 hover:bg-indigo-100 transition uppercase tracking-tight">
+                            Team Management
+                        </a>
+                    ` : ''}
+                    
+                    <span class="text-xs text-gray-500 font-medium hidden sm:inline">
+                        ${session.fullName}
                     </span>
+                    
                     <button id="global-signout" class="text-xs font-bold text-red-600 hover:text-red-800 transition">
                         Sign Out
                     </button>
@@ -73,9 +86,10 @@ export function renderProjectHeader(session, activeTab, projectName = "Select Pr
         </header>
     `;
 
-    // 5. ATTACH EVENTS
+    // 6. ATTACH EVENTS
     document.getElementById('global-signout').addEventListener('click', (e) => {
         e.preventDefault();
-        handleSignOut();
+        handleSignOut(); 
+        // Note: auth.js handleSignOut should handle the window.location.href = 'index.html'
     });
 }

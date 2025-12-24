@@ -103,24 +103,51 @@
     };
 
     window.addRequirement = async () => {
-        const title = document.getElementById('req-title-input').value.trim();
-        const hours = parseFloat(document.getElementById('req-hours-input').value) || 0;
-        const assignedId = document.getElementById('req-assign-select').value || null;
-        const rate = parseFloat(document.getElementById('req-applied-rate').value) || 0;
+    // 1. Capture raw inputs for validation
+    const titleInput = document.getElementById('req-title-input');
+    const hoursInput = document.getElementById('req-hours-input');
+    
+    const title = titleInput.value.trim();
+    const rawHours = hoursInput.value.trim(); // Get raw string to check if empty
+    const hours = parseFloat(rawHours) || 0;
+    
+    const assignedId = document.getElementById('req-assign-select').value || null;
+    const rate = parseFloat(document.getElementById('req-applied-rate').value) || 0;
 
-        if (!title) return alert("Title required");
-        const { error } = await supabase.from('requirements').insert([{ 
-            title, project_id: projectId, status: 'active', sequence_order: 0, 
-            estimated_hours: hours, assigned_to: assignedId, custom_rate: rate 
-        }]);
+    // 2. Validation Checks
+    if (!title) {
+        alert("Title required");
+        titleInput.focus();
+        return;
+    }
 
-        if (error) alert(error.message);
-        else { 
-            document.getElementById('req-title-input').value = ''; 
-            document.getElementById('req-hours-input').value = ''; 
-            loadRequirements(); 
-        }
-    };
+    if (!rawHours || hours <= 0) {
+        alert("Hours required"); // Your specific requested message
+        hoursInput.focus();
+        return;
+    }
+
+    // 3. Database Insert
+    const { error } = await supabase.from('requirements').insert([{ 
+        title, 
+        project_id: projectId, 
+        status: 'active', 
+        sequence_order: 0, 
+        estimated_hours: hours, 
+        assigned_to: assignedId, 
+        custom_rate: rate 
+    }]);
+
+    // 4. Handle Result
+    if (error) {
+        alert(error.message);
+    } else { 
+        // Success: Clear fields and reload
+        titleInput.value = ''; 
+        hoursInput.value = ''; 
+        loadRequirements(); 
+    }
+};
 
     window.editRequirement = async (reqId, currentTitle, currentHours) => {
         // Admin authorization check

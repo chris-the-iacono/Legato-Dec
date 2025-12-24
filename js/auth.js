@@ -43,7 +43,7 @@ export async function handleSignOut() {
 
 /**
  * Check Access: Verifies session and fetches Tenant/Profile data
- * Fixed: Uses two-step fetch to avoid 400 Join errors and 42703 Column errors
+ * Fixed: Uses two-step fetch and maps 'hourly_cost' to 'hourlyRate'
  */
 export async function checkAccess() {
     // 1. Check if a basic Auth session exists
@@ -55,22 +55,20 @@ export async function checkAccess() {
     }
 
     // 2. STEP 1: Fetch Profile 
-    // We select only columns we know exist. 
-    // If 'full_name' gives an error, remove it from the select string below.
+    // Uses 'hourly_cost' to match your database column name
     const { data: profile, error: profileError } = await supabase
         .from('user_profiles')
-        .select('role, tenant_id, full_name') 
+        .select('role, tenant_id, full_name, hourly_cost') 
         .eq('user_id', session.user.id)
         .single();
 
     if (profileError || !profile) {
-        console.error("Profile Fetch Error:", profileError);
-        // We return null here because without a profile, we don't know the tenant_id
+        console.error("Profile Fetch Error (Check if columns exist):", profileError);
         return null;
     }
 
     // 3. STEP 2: Fetch Tenant data separately
-    // This bypasses the need for a database "Foreign Key" relationship for the Join to work
+    // This bypasses the need for a complex database JOIN
     const { data: tenant, error: tenantError } = await supabase
         .from('tenants')
         .select('*')
@@ -88,6 +86,8 @@ export async function checkAccess() {
         role: profile.role || 'user',
         tenantId: profile.tenant_id,
         tenantName: tenant?.name || "Organization",
+        // Mapping database 'hourly_cost' to frontend 'hourlyRate'
+        hourlyRate: profile.hourly_cost || 0,
         modules: {
             module_requirements: tenant?.module_requirements ?? true,
             module_risks: tenant?.module_risks ?? true,

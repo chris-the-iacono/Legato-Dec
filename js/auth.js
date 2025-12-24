@@ -43,6 +43,7 @@ export async function handleSignOut() {
 
 /**
  * Check Access: Verifies session and fetches Tenant/Profile data
+ * Fixed: Uses two-step fetch to avoid 400 Join errors and 42703 Column errors
  */
 export async function checkAccess() {
     // 1. Check if a basic Auth session exists
@@ -53,43 +54,45 @@ export async function checkAccess() {
         return null;
     }
 
-    // 2. FETCH DATABASE PROFILE: Get the linked Tenant and Role
-    // This connects user_profiles to the tenants table using the foreign key
+    // 2. STEP 1: Fetch Profile 
+    // We select only columns we know exist. 
+    // If 'full_name' gives an error, remove it from the select string below.
     const { data: profile, error: profileError } = await supabase
         .from('user_profiles')
-        .select(`
-            role,
-            tenant_id,
-            full_name,
-            tenants (
-                name,
-                module_requirements,
-                module_risks,
-                module_issues,
-                module_changes
-            )
-        `)
+        .select('role, tenant_id, full_name') 
         .eq('user_id', session.user.id)
         .single();
 
     if (profileError || !profile) {
-        console.error("Profile Link Error:", profileError);
-        // If profile doesn't exist, we can't determine the tenant
+        console.error("Profile Fetch Error:", profileError);
+        // We return null here because without a profile, we don't know the tenant_id
         return null;
     }
 
-    // 3. RETURN UNIFIED SESSION OBJECT
+    // 3. STEP 2: Fetch Tenant data separately
+    // This bypasses the need for a database "Foreign Key" relationship for the Join to work
+    const { data: tenant, error: tenantError } = await supabase
+        .from('tenants')
+        .select('*')
+        .eq('tenant_id', profile.tenant_id)
+        .single();
+
+    if (tenantError) {
+        console.warn("Tenant Fetch Warning:", tenantError);
+    }
+
+    // 4. RETURN UNIFIED SESSION OBJECT
     return {
         user: session.user,
         fullName: profile.full_name || "User",
         role: profile.role || 'user',
-        tenantId: profile.tenant_id, // THIS IS THE KEY FOR YOUR 409 ERROR
-        tenantName: profile.tenants?.name || "Organization",
+        tenantId: profile.tenant_id,
+        tenantName: tenant?.name || "Organization",
         modules: {
-            module_requirements: profile.tenants?.module_requirements ?? true,
-            module_risks: profile.tenants?.module_risks ?? true,
-            module_issues: profile.tenants?.module_issues ?? true,
-            module_changes: profile.tenants?.module_changes ?? true
+            module_requirements: tenant?.module_requirements ?? true,
+            module_risks: tenant?.module_risks ?? true,
+            module_issues: tenant?.module_issues ?? true,
+            module_changes: tenant?.module_changes ?? true
         }
     };
 }

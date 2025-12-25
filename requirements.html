@@ -12,7 +12,7 @@
         .list-viewport { overflow-y: auto; flex-grow: 1; position: relative; }
         .list-viewport::-webkit-scrollbar { width: 6px; }
         .list-viewport::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
-        .kebab-menu { z-index: 100; }
+        .req-item.active { border-left-color: #4f46e5; background-color: #f5f3ff; }
     </style>
 </head>
 <body class="bg-gray-100 min-h-screen overflow-hidden">
@@ -28,7 +28,7 @@
                 </div>
 
                 <div class="p-4 border-b bg-white space-y-3">
-                    <input type="text" id="req-title-input" placeholder="Requirement Title" class="w-full border-gray-200 rounded-lg text-sm p-2.5 focus:ring-2 focus:ring-indigo-500 outline-none transition">
+                    <input type="text" id="req-title-input" placeholder="Requirement Title" class="w-full border-gray-200 rounded-lg text-sm p-2.5 focus:ring-2 focus:ring-indigo-500 outline-none">
                     <div class="grid grid-cols-3 gap-2">
                         <div class="flex flex-col">
                             <label class="text-[9px] font-bold text-gray-400 uppercase mb-1 ml-1">Assign To</label>
@@ -49,7 +49,7 @@
                 <ul id="req-list" class="list-viewport divide-y divide-gray-100"></ul>
             </section>
 
-            <section id="steps-panel" class="bg-white rounded-xl shadow-sm border border-gray-200 flex flex-col overflow-hidden opacity-40 pointer-events-none transition-opacity duration-300">
+            <section id="steps-panel" class="bg-white rounded-xl shadow-sm border border-gray-200 flex flex-col overflow-hidden opacity-40 pointer-events-none transition-all duration-300">
                 <div class="px-4 py-4 border-b bg-indigo-50/50 flex justify-between items-center">
                     <div>
                         <h3 id="selected-req-title" class="font-bold text-indigo-900">2. Task Breakdown</h3>
@@ -59,7 +59,7 @@
                 </div>
 
                 <div class="p-4 border-b bg-white space-y-3">
-                    <input type="text" id="step-title-input" placeholder="Task Title (e.g. Frontend Implementation)" class="w-full border-gray-200 rounded-lg text-sm p-2.5 focus:ring-2 focus:ring-indigo-500 outline-none">
+                    <input type="text" id="step-title-input" placeholder="Task Title" class="w-full border-gray-200 rounded-lg text-sm p-2.5 focus:ring-2 focus:ring-indigo-500 outline-none">
                     <div class="grid grid-cols-2 gap-3">
                         <div class="flex flex-col">
                             <label class="text-[9px] font-bold text-gray-400 uppercase mb-1 ml-1">Assign To</label>
@@ -76,7 +76,7 @@
                             </div>
                         </div>
                     </div>
-                    <textarea id="step-desc-input" placeholder="Optional notes/description..." class="w-full border-gray-200 rounded-lg text-sm p-2 resize-none" rows="2"></textarea>
+                    <textarea id="step-desc-input" placeholder="Notes..." class="w-full border-gray-200 rounded-lg text-sm p-2 resize-none" rows="2"></textarea>
                     <button onclick="submitStep()" class="w-full bg-indigo-500 text-white py-2 rounded-lg text-sm font-bold hover:bg-indigo-600 transition shadow-sm">Save Task Step</button>
                 </div>
 
@@ -103,12 +103,12 @@
                     </div>
                 </div>
                 <div>
-                    <label class="block text-[10px] font-bold text-gray-400 uppercase mb-2">Description / Notes</label>
+                    <label class="block text-[10px] font-bold text-gray-400 uppercase mb-2">Description</label>
                     <div id="modal-desc" class="p-4 bg-gray-50 rounded-xl text-sm text-gray-600 italic border border-dashed border-gray-300 min-h-[100px] whitespace-pre-wrap"></div>
                 </div>
             </div>
             <div class="p-4 bg-gray-50 flex justify-end">
-                <button onclick="closeModal()" class="px-6 py-2 rounded-lg bg-white border border-gray-300 text-sm font-bold text-gray-700 hover:bg-gray-100 transition">Close</button>
+                <button onclick="closeModal()" class="px-6 py-2 rounded-lg bg-white border border-gray-300 text-sm font-bold">Close</button>
             </div>
         </div>
     </div>
@@ -124,9 +124,8 @@
 
     document.addEventListener('DOMContentLoaded', async () => {
         session = await checkAccess(MODULES.REQUIREMENTS);
-        
-        // GUARDRAIL: Verify Project ID
         projectId = localStorage.getItem('selected_project_id');
+        
         if (!projectId || projectId === "undefined") {
             alert("Please select a project first.");
             window.location.href = 'index.html';
@@ -134,7 +133,6 @@
         }
 
         const projectName = localStorage.getItem('selected_project_name');
-
         const { data: proj } = await supabase.from('projects').select('blended_rate').eq('id', projectId).single();
         projectBlendedRate = proj?.blended_rate || 0;
 
@@ -150,7 +148,7 @@
     function populateDropdowns() {
         ['req-assign-select', 'step-assign-select'].forEach(id => {
             const select = document.getElementById(id);
-            if(!select) return;
+            if (!select) return;
             select.innerHTML = '<option value="">Select Resource</option>';
             teamMembers.forEach(u => {
                 const opt = document.createElement('option');
@@ -174,6 +172,7 @@
         }
     };
 
+    // --- REQUIREMENTS ---
     window.addRequirement = async () => {
         const title = document.getElementById('req-title-input').value.trim();
         const hours = parseFloat(document.getElementById('req-hours-input').value) || 0;
@@ -196,17 +195,26 @@
     };
 
     async function loadRequirements() {
-        const { data: reqs } = await supabase.from('requirements')
+        const { data: reqs, error } = await supabase.from('requirements')
             .select(`*, user_profiles:assigned_to(full_name, email)`)
             .eq('project_id', projectId).order('sequence_order');
 
+        if (error) return console.error(error);
+
         document.getElementById('req-count').innerText = `${reqs.length} ITEMS`;
         const list = document.getElementById('req-list');
+        
         list.innerHTML = reqs.map(req => {
             const name = req.user_profiles?.full_name || req.user_profiles?.email || 'Unassigned';
             const total = (req.estimated_hours || 0) * (req.custom_rate || 0);
+            
+            // Critical fix: escape the title for JS string passing
+            const escapedTitle = req.title.replace(/'/g, "\\'").replace(/"/g, "&quot;");
+            
             return `
-                <li class="p-4 hover:bg-indigo-50/50 flex justify-between items-center group relative cursor-pointer" data-id="${req.id}" onclick="openSteps('${req.id}', '${req.title.replace(/'/g, "\\")}')">
+                <li class="req-row p-4 hover:bg-indigo-50/50 flex justify-between items-center group relative cursor-pointer border-l-4 border-transparent transition" 
+                    data-id="${req.id}" 
+                    onclick="openSteps('${req.id}', '${escapedTitle}')">
                     <div class="flex items-center gap-3">
                         <span class="cursor-move text-gray-300 group-hover:text-indigo-400 font-bold p-1">::</span>
                         <div>
@@ -227,11 +235,17 @@
         }).join('');
     }
 
+    // --- STEPS ---
     window.openSteps = async (id, title) => {
-        // GUARDRAIL: Verify ID
         if (!id || id === "undefined") return;
-
         selectedReqId = id;
+
+        // Visual highlight for active row
+        document.querySelectorAll('.req-row').forEach(row => {
+            row.classList.remove('border-indigo-500', 'bg-indigo-50');
+            if (row.dataset.id === id) row.classList.add('border-indigo-500', 'bg-indigo-50');
+        });
+
         const panel = document.getElementById('steps-panel');
         panel.classList.remove('opacity-40', 'pointer-events-none');
         document.getElementById('selected-req-title').innerText = title;
@@ -240,19 +254,19 @@
 
     window.closeSteps = () => {
         document.getElementById('steps-panel').classList.add('opacity-40', 'pointer-events-none');
+        document.querySelectorAll('.req-row').forEach(row => row.classList.remove('border-indigo-500', 'bg-indigo-50'));
         selectedReqId = null;
     };
 
     window.submitStep = async () => {
         if (!selectedReqId) return;
-
         const title = document.getElementById('step-title-input').value.trim();
         const assignedId = document.getElementById('step-assign-select').value;
         const hours = parseFloat(document.getElementById('step-hours-input').value) || 0;
         const cost = parseFloat(document.getElementById('step-cost-input').value) || 0;
         const description = document.getElementById('step-desc-input').value.trim();
 
-        if (!title || !assignedId || hours <= 0) return alert("Fill all Task fields");
+        if (!title || !assignedId || hours <= 0) return alert("Fill all fields");
 
         const { error } = await supabase.from('steps').insert([{
             requirement_id: selectedReqId, title, assigned_to: assignedId,
@@ -318,7 +332,7 @@
     };
 
     window.deleteReq = async (id) => {
-        if (!confirm("Delete Requirement and all associated tasks?")) return;
+        if (!confirm("Delete Requirement and all tasks?")) return;
         await supabase.from('requirements').delete().eq('id', id);
         loadRequirements();
         closeSteps();

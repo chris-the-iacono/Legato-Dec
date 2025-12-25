@@ -7,25 +7,42 @@
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="../../Projects/_Legato_/css/style.css">
-    <style>
-        .app-container { height: calc(100vh - 140px); }
-        .list-viewport { overflow-y: auto; flex-grow: 1; position: relative; }
-        .active-req { border-left: 4px solid #4f46e5 !important; background-color: #f5f3ff !important; }
-        
-        /* THE ACTIVATION FIX */
-        /* We use a data-attribute to force the panel to be 'live' or 'dead' */
-        #steps-panel[data-locked="true"] {
-            opacity: 0.4 !important;
-            pointer-events: none !important;
-            filter: grayscale(1);
-            user-select: none;
-        }
-        #steps-panel[data-locked="false"] {
-            opacity: 1 !important;
-            pointer-events: auto !important;
-            filter: grayscale(0);
-        }
-    </style>
+<style>
+    /* 1. Layout & Scrollbars (Aligns with your style.css) */
+    .app-container { height: calc(100vh - 140px); }
+    .list-viewport { 
+        overflow-y: auto; 
+        flex-grow: 1; 
+        position: relative; 
+    }
+    
+    /* 2. THE ACTIVATION LOGIC */
+    /* Default state: Visual cue that it is "locked" */
+    #steps-panel {
+        opacity: 0.4;
+        pointer-events: none;
+        background-color: #f9fafb;
+        transition: all 0.2s ease-in-out;
+    }
+
+    /* Active state: Triggered via JS classList.add('active-panel') */
+    #steps-panel.active-panel {
+        opacity: 1;
+        pointer-events: auto;
+        background-color: #ffffff;
+    }
+
+    /* 3. ROW HIGHLIGHTING */
+    .active-req { 
+        background-color: #f5f3ff !important; 
+        border-left: 4px solid #6366f1 !important; 
+    }
+
+    /* 4. STATUS COLOR BADGES */
+    .status-pending { background-color: #fef3c7; color: #b45309; }     /* Amber */
+    .status-inprogress { background-color: #dbeafe; color: #1d4ed8; }  /* Blue */
+    .status-complete { background-color: #dcfce7; color: #15803d; }    /* Green */
+</style>
 </head>
 <body class="bg-gray-100 min-h-screen overflow-hidden">
     <div id="main-header"></div>
@@ -61,7 +78,7 @@
                 <ul id="req-list" class="list-viewport divide-y divide-gray-100"></ul>
             </section>
 
-            <section id="steps-panel" data-locked="true" class="bg-white rounded-xl shadow-sm border border-gray-200 flex flex-col overflow-hidden transition-all duration-300">
+			<section id="steps-panel" class="bg-white rounded-xl shadow-sm border border-gray-200 flex flex-col overflow-hidden transition-all duration-300">
                 <div class="px-4 py-4 border-b bg-indigo-50/50 flex justify-between items-center">
                     <div>
                         <h3 id="selected-req-title" class="font-bold text-indigo-900">2. Task Breakdown</h3>
@@ -187,31 +204,31 @@
         const name = req.user_profiles?.full_name || req.user_profiles?.email || 'Unassigned';
         const status = req.status || 'Pending';
         
-        let statusColor = "bg-amber-100 text-amber-700";
-        if (status === 'In Progress') statusColor = "bg-blue-100 text-blue-700";
-        if (status === 'Complete') statusColor = "bg-green-100 text-green-700";
+        // Status Color Mapping using the classes from your style block
+        let statusClass = "status-pending"; 
+        if (status === 'In Progress') statusClass = "status-inprogress";
+        if (status === 'Complete') statusClass = "status-complete";
 
-        // IMPORTANT: We use data-id to hold the UUID safely
         return `
             <li class="req-row p-4 hover:bg-gray-50 flex justify-between items-center cursor-pointer border-l-4 border-transparent" 
                 data-id="${req.id}" 
                 onclick="openSteps(this, \`${req.title.replace(/`/g, '\\`')}\`)">
-                <div class="flex items-center gap-3 pointer-events-none">
+                <div class="flex items-center gap-3">
                     <span class="cursor-move text-gray-300 font-bold p-1">::</span>
                     <div>
                         <div class="flex items-center gap-2">
                             <p class="text-sm font-bold text-gray-800">${req.title}</p>
-                            <span class="text-[8px] px-1.5 py-0.5 rounded font-black uppercase ${statusColor}">${status}</span>
+                            <span class="text-[8px] px-1.5 py-0.5 rounded font-black uppercase ${statusClass}">${status}</span>
                         </div>
                         <p class="text-[10px] text-gray-400 font-bold uppercase">${name} | ${req.estimated_hours}h</p>
                     </div>
                 </div>
                 <div class="flex items-center gap-2">
-                    <p class="text-sm font-mono font-bold text-indigo-600 pointer-events-none">$${((req.estimated_hours || 0) * (req.custom_rate || 0)).toLocaleString()}</p>
+                    <p class="text-sm font-mono font-bold text-indigo-600">$${((req.estimated_hours || 0) * (req.custom_rate || 0)).toLocaleString()}</p>
                     <div class="relative kebab-container">
                         <button onclick="event.stopPropagation(); toggleKebab('req-${req.id}')" class="p-2 text-gray-400 hover:text-indigo-600 font-bold text-lg">?</button>
                         <div id="kebab-req-${req.id}" class="hidden absolute right-0 top-8 w-40 bg-white border shadow-xl rounded z-[100] p-1">
-                            <p class="text-[9px] font-bold text-gray-400 uppercase px-2 py-1">Set Status</p>
+                            <p class="text-[9px] font-bold text-gray-400 uppercase px-2 py-1 border-b mb-1">Set Status</p>
                             <button onclick="event.stopPropagation(); updateStatus('${req.id}', 'Pending')" class="w-full text-left p-2 text-xs hover:bg-gray-50">Pending</button>
                             <button onclick="event.stopPropagation(); updateStatus('${req.id}', 'In Progress')" class="w-full text-left p-2 text-xs text-blue-600 hover:bg-blue-50">In Progress</button>
                             <button onclick="event.stopPropagation(); updateStatus('${req.id}', 'Complete')" class="w-full text-left p-2 text-xs text-green-600 hover:bg-green-50">Complete</button>
@@ -224,31 +241,37 @@
     }).join('');
 }
 
+// 1. THIS OPENS/UNLOCKS THE PANEL
 window.openSteps = (element, title) => {
-    // Instead of passing the ID as a string, we grab it from the element's data attribute
     const id = element.getAttribute('data-id');
     
     if (!id || id === "undefined") {
-        console.error("Critical Error: UUID is missing from the element attribute.");
+        console.error("Critical Error: UUID is missing.");
         return;
     }
 
-    selectedReqId = id; // Update the global variable
-    console.log("Requirement Selected (ID Locked):", selectedReqId);
+    selectedReqId = id; 
 
+    // UI: Highlight the selected requirement
     document.querySelectorAll('.req-row').forEach(el => el.classList.remove('active-req'));
     element.classList.add('active-req');
 
-    document.getElementById('steps-panel').setAttribute('data-locked', 'false');
+    // UI: ACTIVATE the panel by adding the class
+    document.getElementById('steps-panel').classList.add('active-panel');
+    
     document.getElementById('selected-req-title').innerText = title;
     refreshSteps();
 };
 
-    window.closeSteps = () => {
-        document.getElementById('steps-panel').setAttribute('data-locked', 'true');
-        document.querySelectorAll('.req-row').forEach(el => el.classList.remove('active-req'));
-        selectedReqId = null;
-    };
+// 2. THIS CLOSES/LOCKS THE PANEL
+window.closeSteps = () => {
+    selectedReqId = null;
+
+    // UI: DEACTIVATE the panel by removing the class
+    document.getElementById('steps-panel').classList.remove('active-panel');
+    
+    document.querySelectorAll('.req-row').forEach(el => el.classList.remove('active-req'));
+};
 
     window.submitStep = async () => {
     const titleInput = document.getElementById('step-title-input');

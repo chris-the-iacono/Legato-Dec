@@ -6,37 +6,13 @@
     <title>Requirements | Project Manager</title>
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="../../Desktop/Legato%20backups/css/style.css">
 <style>
-    /* 1. Layout & Scrollbars */
     .app-container { height: calc(100vh - 140px); }
-    .list-viewport { 
-        overflow-y: auto; 
-        flex-grow: 1; 
-        position: relative; 
-    }
-    
-    /* 2. PANEL ACTIVATION LOGIC */
-    #steps-panel {
-        opacity: 0.4;
-        pointer-events: none;
-        background-color: #f9fafb;
-        transition: all 0.2s ease-in-out;
-    }
-
-    #steps-panel.active-panel {
-        opacity: 1;
-        pointer-events: auto;
-        background-color: #ffffff;
-    }
-
-    /* 3. ROW HIGHLIGHTING */
-    .active-req { 
-        background-color: #f5f3ff !important; 
-        border-left: 4px solid #6366f1 !important; 
-    }
-
-    /* 4. STATUS COLOR BADGES */
+    .list-viewport { overflow-y: auto; flex-grow: 1; position: relative; }
+    #steps-panel { opacity: 0.4; pointer-events: none; background-color: #f9fafb; transition: all 0.2s ease-in-out; }
+    #steps-panel.active-panel { opacity: 1; pointer-events: auto; background-color: #ffffff; }
+    .active-req { background-color: #f5f3ff !important; border-left: 4px solid #6366f1 !important; }
     .status-pending { background-color: #fef3c7; color: #b45309; }
     .status-inprogress { background-color: #dbeafe; color: #1d4ed8; }
     .status-complete { background-color: #dcfce7; color: #15803d; }
@@ -44,16 +20,13 @@
 </head>
 <body class="bg-gray-100 min-h-screen overflow-hidden">
     <div id="main-header"></div>
-
     <main class="max-w-7xl mx-auto p-4 lg:p-6">
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 app-container">
-            
             <section class="bg-white rounded-xl shadow-sm border border-gray-200 flex flex-col overflow-hidden">
                 <div class="px-4 py-4 border-b bg-gray-50/80 flex justify-between items-center">
                     <h3 class="font-bold text-gray-800">1. Requirements & Estimates</h3>
                     <span id="req-count" class="text-[10px] bg-gray-200 text-gray-600 px-2 py-1 rounded-full font-bold">0 ITEMS</span>
                 </div>
-
                 <div class="p-4 border-b bg-white space-y-3">
                     <input type="text" id="req-title-input" placeholder="Requirement Title" class="w-full border-gray-200 rounded-lg text-sm p-2.5 outline-none focus:ring-2 focus:ring-indigo-500">
                     <div class="grid grid-cols-3 gap-2">
@@ -72,7 +45,6 @@
                     </div>
                     <button onclick="addRequirement()" class="w-full bg-indigo-600 text-white py-2.5 rounded-lg text-sm font-bold hover:bg-indigo-700 transition">Create Requirement</button>
                 </div>
-
                 <ul id="req-list" class="list-viewport divide-y divide-gray-100"></ul>
             </section>
 
@@ -84,7 +56,6 @@
                     </div>
                     <button onclick="closeSteps()" class="text-gray-400 hover:text-indigo-600 text-2xl leading-none">&times;</button>
                 </div>
-
                 <div class="p-4 border-b bg-white space-y-3">
                     <input type="text" id="step-title-input" placeholder="Task Title" class="w-full border-gray-200 rounded-lg text-sm p-2.5">
                     <div class="grid grid-cols-2 gap-3">
@@ -106,7 +77,6 @@
                     <textarea id="step-desc-input" placeholder="Notes..." class="w-full border-gray-200 rounded-lg text-sm p-2" rows="2"></textarea>
                     <button onclick="submitStep()" class="w-full bg-indigo-500 text-white py-2 rounded-lg text-sm font-bold shadow-sm hover:bg-indigo-600">Save Task Step</button>
                 </div>
-
                 <ul id="step-list" class="list-viewport divide-y divide-gray-100 bg-white"></ul>
             </section>
         </div>
@@ -141,25 +111,16 @@
         renderProjectHeader(session, 'requirements', localStorage.getItem('selected_project_name'));
         loadRequirements();
         initSortable();
-// Add this inside document.addEventListener('DOMContentLoaded', ...)
-	document.getElementById('req-list').addEventListener('click', (e) => {
-    // 1. Find the nearest <li> parent with the class .req-row
-    const row = e.target.closest('.req-row');
-    
-    // 2. If we didn't click a row, or we clicked the kebab menu, ignore
-    if (!row || e.target.closest('.kebab-container')) return;
 
-    // 3. Extract the data safely
-    const id = row.getAttribute('data-id');
-    const title = row.getAttribute('data-title');
-
-    // 4. Trigger the opening logic
-    if (id) {
-        window.openSteps(row, title);
-    } else {
-        console.error("Clicked row but ID was missing from attributes");
-    }		
-    });
+        // New Event Listener for Requirement Selection
+        document.getElementById('req-list').addEventListener('click', (e) => {
+            const row = e.target.closest('.req-row');
+            if (!row || e.target.closest('.kebab-container')) return;
+            const id = row.getAttribute('data-id');
+            const title = row.getAttribute('data-title');
+            if (id) window.openSteps(row, title);
+        });
+    }); // <--- THIS WAS MISSING AND CAUSING THE ERROR
 
     function populateDropdowns() {
         ['req-assign-select', 'step-assign-select'].forEach(id => {
@@ -179,7 +140,6 @@
         const userId = document.getElementById(`${type}-assign-select`).value;
         const user = teamMembers.find(u => u.user_id === userId);
         const rate = (user && user.hourly_cost) ? user.hourly_cost : projectBlendedRate;
-        
         if (type === 'req') {
             document.getElementById('req-applied-rate').value = rate;
         } else {
@@ -193,14 +153,11 @@
         const hours = parseFloat(document.getElementById('req-hours-input').value) || 0;
         const assignedId = document.getElementById('req-assign-select').value;
         const rate = parseFloat(document.getElementById('req-applied-rate').value) || 0;
-
         if (!title || !assignedId || hours <= 0) return alert("Please fill all fields");
-
         await supabase.from('requirements').insert([{ 
             title, project_id: projectId, status: 'Pending', sequence_order: 999, 
             estimated_hours: hours, assigned_to: assignedId, custom_rate: rate 
         }]);
-
         document.getElementById('req-title-input').value = '';
         document.getElementById('req-hours-input').value = '';
         loadRequirements();
@@ -210,70 +167,52 @@
         const { data: reqs, error } = await supabase.from('requirements')
             .select(`*, user_profiles:assigned_to(full_name, email)`)
             .eq('project_id', projectId).order('sequence_order');
-
         if (error) return console.error(error);
-
         document.getElementById('req-count').innerText = `${reqs.length} ITEMS`;
         const list = document.getElementById('req-list');
-        
-list.innerHTML = reqs.map(req => {
-    const name = req.user_profiles?.full_name || req.user_profiles?.email || 'Unassigned';
-    const status = req.status || 'Pending';
-    
-    let statusClass = "status-pending"; 
-    if (status === 'In Progress') statusClass = "status-inprogress";
-    if (status === 'Complete') statusClass = "status-complete";
-
-    return `
-        <li class="req-row p-4 hover:bg-gray-50 flex justify-between items-center cursor-pointer border-l-4 border-transparent" 
-            data-id="${req.id}" 
-            data-title="${req.title.replace(/"/g, '&quot;')}">
-            
-            <div class="flex items-center gap-3">
-                <span class="cursor-move text-gray-300 font-bold p-1">::</span>
-                <div>
+        list.innerHTML = reqs.map(req => {
+            const name = req.user_profiles?.full_name || req.user_profiles?.email || 'Unassigned';
+            const status = req.status || 'Pending';
+            let statusClass = (status === 'In Progress') ? "status-inprogress" : (status === 'Complete' ? "status-complete" : "status-pending");
+            return `
+                <li class="req-row p-4 hover:bg-gray-50 flex justify-between items-center cursor-pointer border-l-4 border-transparent" 
+                    data-id="${req.id}" data-title="${req.title.replace(/"/g, '&quot;')}">
+                    <div class="flex items-center gap-3">
+                        <span class="cursor-move text-gray-300 font-bold p-1">::</span>
+                        <div>
+                            <div class="flex items-center gap-2">
+                                <p class="text-sm font-bold text-gray-800">${req.title}</p>
+                                <span class="text-[8px] px-1.5 py-0.5 rounded font-black uppercase ${statusClass}">${status}</span>
+                            </div>
+                            <p class="text-[10px] text-gray-400 font-bold uppercase">${name} | ${req.estimated_hours}h</p>
+                        </div>
+                    </div>
                     <div class="flex items-center gap-2">
-                        <p class="text-sm font-bold text-gray-800">${req.title}</p>
-                        <span class="text-[8px] px-1.5 py-0.5 rounded font-black uppercase ${statusClass}">${status}</span>
+                        <p class="text-sm font-mono font-bold text-indigo-600">$${((req.estimated_hours || 0) * (req.custom_rate || 0)).toLocaleString()}</p>
+                        <div class="relative kebab-container">
+                            <button onclick="event.stopPropagation(); toggleKebab('req-${req.id}')" class="p-2 text-gray-400 hover:text-indigo-600 font-bold text-lg">?</button>
+                            <div id="kebab-req-${req.id}" class="hidden absolute right-0 top-8 w-40 bg-white border shadow-xl rounded z-[100] p-1">
+                                <button onclick="event.stopPropagation(); updateStatus('${req.id}', 'Pending')" class="w-full text-left p-2 text-xs hover:bg-gray-50">Pending</button>
+                                <button onclick="event.stopPropagation(); updateStatus('${req.id}', 'In Progress')" class="w-full text-left p-2 text-xs text-blue-600 hover:bg-blue-50">In Progress</button>
+                                <button onclick="event.stopPropagation(); updateStatus('${req.id}', 'Complete')" class="w-full text-left p-2 text-xs text-green-600 hover:bg-green-50">Complete</button>
+                                <hr class="my-1"><button onclick="event.stopPropagation(); deleteReq('${req.id}')" class="w-full text-left p-2 text-xs text-red-600 hover:bg-red-50">Delete</button>
+                            </div>
+                        </div>
                     </div>
-                    <p class="text-[10px] text-gray-400 font-bold uppercase">${name} | ${req.estimated_hours}h</p>
-                </div>
-            </div>
-
-            <div class="flex items-center gap-2">
-                <p class="text-sm font-mono font-bold text-indigo-600">$${((req.estimated_hours || 0) * (req.custom_rate || 0)).toLocaleString()}</p>
-                <div class="relative kebab-container">
-                    <button onclick="event.stopPropagation(); toggleKebab('req-${req.id}')" class="p-2 text-gray-400 hover:text-indigo-600 font-bold text-lg">?</button>
-                    <div id="kebab-req-${req.id}" class="hidden absolute right-0 top-8 w-40 bg-white border shadow-xl rounded z-[100] p-1">
-                        <p class="text-[9px] font-bold text-gray-400 uppercase px-2 py-1 border-b mb-1">Set Status</p>
-                        <button onclick="event.stopPropagation(); updateStatus('${req.id}', 'Pending')" class="w-full text-left p-2 text-xs hover:bg-gray-50">Pending</button>
-                        <button onclick="event.stopPropagation(); updateStatus('${req.id}', 'In Progress')" class="w-full text-left p-2 text-xs text-blue-600 hover:bg-blue-50">In Progress</button>
-                        <button onclick="event.stopPropagation(); updateStatus('${req.id}', 'Complete')" class="w-full text-left p-2 text-xs text-green-600 hover:bg-green-50">Complete</button>
-                        <hr class="my-1">
-                        <button onclick="event.stopPropagation(); deleteReq('${req.id}')" class="w-full text-left p-2 text-xs text-red-600 hover:bg-red-50">Delete</button>
-                    </div>
-                </div>
-            </div>
-        </li>`;
-}).join('');
+                </li>`;
+        }).join('');
     }
 
-window.openSteps = (rowElement, title) => {
-    const id = rowElement.getAttribute('data-id');
-    if (!id) return;
-
-    selectedReqId = id; 
-
-    // UI: Update Active Row
-    document.querySelectorAll('.req-row').forEach(el => el.classList.remove('active-req'));
-    rowElement.classList.add('active-req');
-
-    // UI: Activate Panel via Class
-    document.getElementById('steps-panel').classList.add('active-panel');
-    document.getElementById('selected-req-title').innerText = title;
-    
-    refreshSteps();
-};
+    window.openSteps = (rowElement, title) => {
+        const id = rowElement.getAttribute('data-id');
+        if (!id) return;
+        selectedReqId = id; 
+        document.querySelectorAll('.req-row').forEach(el => el.classList.remove('active-req'));
+        rowElement.classList.add('active-req');
+        document.getElementById('steps-panel').classList.add('active-panel');
+        document.getElementById('selected-req-title').innerText = title;
+        refreshSteps();
+    };
 
     window.closeSteps = () => {
         selectedReqId = null;
@@ -287,42 +226,24 @@ window.openSteps = (rowElement, title) => {
         const hoursInput = document.getElementById('step-hours-input');
         const costInput = document.getElementById('step-cost-input');
         const descInput = document.getElementById('step-desc-input');
-
         const title = titleInput.value.trim();
         const assignedId = assignedSelect.value;
         const hours = parseFloat(hoursInput.value) || 0;
         const cost = parseFloat(costInput.value) || 0;
-
         if (!selectedReqId) return alert("Select a requirement first.");
         if (!title || !assignedId || hours <= 0) return alert("Fill all fields.");
-
         const { error } = await supabase.from('steps').insert([{
-            requirement_id: selectedReqId,
-            title,
-            assigned_to: assignedId,
-            estimated_hours: hours,
-            cost,
-            description: descInput.value.trim(),
-            sequence_order: 999
+            requirement_id: selectedReqId, title, assigned_to: assignedId, estimated_hours: hours, cost, description: descInput.value.trim(), sequence_order: 999
         }]);
-
-        if (error) {
-            alert(`Save failed: ${error.message}`);
-        } else {
-            titleInput.value = '';
-            hoursInput.value = '';
-            costInput.value = '';
-            descInput.value = '';
-            refreshSteps();
-            rollupToRequirement();
+        if (error) alert(`Save failed: ${error.message}`);
+        else {
+            titleInput.value = ''; hoursInput.value = ''; costInput.value = ''; descInput.value = '';
+            refreshSteps(); rollupToRequirement();
         }
     };
 
     async function refreshSteps() {
-        const { data: steps } = await supabase.from('steps')
-            .select(`*, user_profiles:assigned_to(full_name, email)`)
-            .eq('requirement_id', selectedReqId).order('sequence_order');
-
+        const { data: steps } = await supabase.from('steps').select(`*, user_profiles:assigned_to(full_name, email)`).eq('requirement_id', selectedReqId).order('sequence_order');
         document.getElementById('selected-req-meta').innerText = `${steps?.length || 0} tasks identified`;
         const list = document.getElementById('step-list');
         list.innerHTML = (steps || []).map(s => `
@@ -335,10 +256,7 @@ window.openSteps = (rowElement, title) => {
                     </div>
                 </div>
                 <div class="flex items-center gap-2">
-                    <div class="text-right mr-2">
-                        <p class="text-[11px] font-bold text-gray-900">$${s.cost.toLocaleString()}</p>
-                        <p class="text-[9px] text-gray-400">${s.estimated_hours}h</p>
-                    </div>
+                    <div class="text-right mr-2"><p class="text-[11px] font-bold text-gray-900">$${s.cost.toLocaleString()}</p><p class="text-[9px] text-gray-400">${s.estimated_hours}h</p></div>
                     <button onclick="deleteStep('${s.id}')" class="opacity-0 group-hover:opacity-100 p-2 text-red-300 hover:text-red-600 transition">&times;</button>
                 </div>
             </li>`).join('');
@@ -349,8 +267,7 @@ window.openSteps = (rowElement, title) => {
         const totalCost = steps.reduce((sum, s) => sum + (s.cost || 0), 0);
         const totalHours = steps.reduce((sum, s) => sum + (s.estimated_hours || 0), 0);
         await supabase.from('requirements').update({ 
-            estimated_hours: totalHours, 
-            custom_rate: totalHours > 0 ? (totalCost / totalHours) : 0 
+            estimated_hours: totalHours, custom_rate: totalHours > 0 ? (totalCost / totalHours) : 0 
         }).eq('id', selectedReqId);
         loadRequirements();
     }
@@ -370,16 +287,14 @@ window.openSteps = (rowElement, title) => {
     window.deleteReq = async (id) => {
         if (confirm("Delete Requirement?")) {
             await supabase.from('requirements').delete().eq('id', id);
-            loadRequirements();
-            closeSteps();
+            loadRequirements(); closeSteps();
         }
     };
 
     window.deleteStep = async (id) => {
         if (confirm("Delete Task?")) {
             await supabase.from('steps').delete().eq('id', id);
-            refreshSteps();
-            rollupToRequirement();
+            refreshSteps(); rollupToRequirement();
         }
     };
 

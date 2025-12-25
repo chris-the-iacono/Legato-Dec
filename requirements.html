@@ -113,13 +113,21 @@
         initSortable();
 
         // New Event Listener for Requirement Selection
-        document.getElementById('req-list').addEventListener('click', (e) => {
-            const row = e.target.closest('.req-row');
-            if (!row || e.target.closest('.kebab-container')) return;
-            const id = row.getAttribute('data-id');
-            const title = row.getAttribute('data-title');
-            if (id) window.openSteps(row, title);
-        });
+document.getElementById('req-list').addEventListener('click', (e) => {
+    const row = e.target.closest('.req-row');
+    
+    // Ignore if not a row or if clicking the kebab/delete buttons
+    if (!row || e.target.closest('.kebab-container')) return;
+
+    const id = row.getAttribute('data-id');
+    const title = row.getAttribute('data-title');
+
+    if (id) {
+        // Force the global variable to update immediately
+        selectedReqId = id; 
+        window.openSteps(row, title);
+    }
+});
     }); // <--- THIS WAS MISSING AND CAUSING THE ERROR
 
     function populateDropdowns() {
@@ -203,16 +211,29 @@
         }).join('');
     }
 
-    window.openSteps = (rowElement, title) => {
-        const id = rowElement.getAttribute('data-id');
-        if (!id) return;
-        selectedReqId = id; 
-        document.querySelectorAll('.req-row').forEach(el => el.classList.remove('active-req'));
-        rowElement.classList.add('active-req');
-        document.getElementById('steps-panel').classList.add('active-panel');
-        document.getElementById('selected-req-title').innerText = title;
-        refreshSteps();
-    };
+window.openSteps = (rowElement, title) => {
+    const id = rowElement.getAttribute('data-id');
+    if (!id) {
+        console.error("Requirement ID missing on clicked element");
+        return;
+    }
+
+    selectedReqId = id; // Ensure this is set
+
+    // UI: Update Active Row styling
+    document.querySelectorAll('.req-row').forEach(el => el.classList.remove('active-req'));
+    rowElement.classList.add('active-req');
+
+    // UI: Show the panel
+    const panel = document.getElementById('steps-panel');
+    panel.classList.add('active-panel');
+    document.getElementById('selected-req-title').innerText = title;
+    
+    // Clear any old data in the task inputs
+    document.getElementById('step-title-input').value = '';
+    
+    refreshSteps();
+};
 
     window.closeSteps = () => {
         selectedReqId = null;

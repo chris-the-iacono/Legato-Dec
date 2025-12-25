@@ -115,18 +115,19 @@
         // New Event Listener for Requirement Selection
 document.getElementById('req-list').addEventListener('click', (e) => {
     const row = e.target.closest('.req-row');
-    
-    // Ignore if not a row or if clicking the kebab/delete buttons
     if (!row || e.target.closest('.kebab-container')) return;
 
     const id = row.getAttribute('data-id');
     const title = row.getAttribute('data-title');
 
-    if (id) {
-        // Force the global variable to update immediately
-        selectedReqId = id; 
+    console.log("DEBUG: Clicked Row ID:", id); // Check your browser console for this!
+
+    if (id && id !== "undefined") {
         window.openSteps(row, title);
+    } else {
+        alert("Error: This requirement has no ID in the database.");
     }
+});
 });
     }); // <--- THIS WAS MISSING AND CAUSING THE ERROR
 

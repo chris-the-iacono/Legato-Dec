@@ -12,7 +12,7 @@
         .list-viewport { overflow-y: auto; flex-grow: 1; position: relative; }
         .list-viewport::-webkit-scrollbar { width: 6px; }
         .list-viewport::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
-        .req-item.active { border-left-color: #4f46e5; background-color: #f5f3ff; }
+        .active-req { border-left: 4px solid #4f46e5 !important; background-color: #f5f3ff !important; }
     </style>
 </head>
 <body class="bg-gray-100 min-h-screen overflow-hidden">
@@ -49,7 +49,7 @@
                 <ul id="req-list" class="list-viewport divide-y divide-gray-100"></ul>
             </section>
 
-            <section id="steps-panel" class="bg-white rounded-xl shadow-sm border border-gray-200 flex flex-col overflow-hidden opacity-40 pointer-events-none transition-all duration-300">
+            <section id="steps-panel" style="opacity: 0.4; pointer-events: none;" class="bg-white rounded-xl shadow-sm border border-gray-200 flex flex-col overflow-hidden transition-all duration-300">
                 <div class="px-4 py-4 border-b bg-indigo-50/50 flex justify-between items-center">
                     <div>
                         <h3 id="selected-req-title" class="font-bold text-indigo-900">2. Task Breakdown</h3>
@@ -59,7 +59,7 @@
                 </div>
 
                 <div class="p-4 border-b bg-white space-y-3">
-                    <input type="text" id="step-title-input" placeholder="Task Title" class="w-full border-gray-200 rounded-lg text-sm p-2.5 focus:ring-2 focus:ring-indigo-500 outline-none">
+                    <input type="text" id="step-title-input" placeholder="Task Title" class="w-full border-gray-200 rounded-lg text-sm p-2.5">
                     <div class="grid grid-cols-2 gap-3">
                         <div class="flex flex-col">
                             <label class="text-[9px] font-bold text-gray-400 uppercase mb-1 ml-1">Assign To</label>
@@ -72,46 +72,18 @@
                             </div>
                             <div class="flex flex-col">
                                 <label class="text-[9px] font-bold text-gray-400 uppercase mb-1 ml-1">Cost</label>
-                                <input type="number" id="step-cost-input" readonly class="bg-gray-100 border-gray-200 rounded-lg text-sm p-2 font-mono text-gray-500">
+                                <input type="number" id="step-cost-input" readonly class="bg-gray-100 border-gray-200 rounded-lg text-sm p-2 font-mono">
                             </div>
                         </div>
                     </div>
-                    <textarea id="step-desc-input" placeholder="Notes..." class="w-full border-gray-200 rounded-lg text-sm p-2 resize-none" rows="2"></textarea>
-                    <button onclick="submitStep()" class="w-full bg-indigo-500 text-white py-2 rounded-lg text-sm font-bold hover:bg-indigo-600 transition shadow-sm">Save Task Step</button>
+                    <textarea id="step-desc-input" placeholder="Notes..." class="w-full border-gray-200 rounded-lg text-sm p-2" rows="2"></textarea>
+                    <button onclick="submitStep()" class="w-full bg-indigo-500 text-white py-2 rounded-lg text-sm font-bold shadow-sm hover:bg-indigo-600">Save Task Step</button>
                 </div>
 
                 <ul id="step-list" class="list-viewport divide-y divide-gray-100 bg-white"></ul>
             </section>
         </div>
     </main>
-
-    <div id="step-detail-modal" class="fixed inset-0 bg-gray-900/60 hidden items-center justify-center z-[110] p-4 backdrop-blur-sm">
-        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden transform transition-all">
-            <div class="p-5 border-b flex justify-between items-center bg-indigo-900 text-white">
-                <h3 id="modal-title" class="font-bold tracking-tight">Task Details</h3>
-                <button onclick="closeModal()" class="text-white/70 hover:text-white text-2xl">&times;</button>
-            </div>
-            <div class="p-6 space-y-5">
-                <div class="grid grid-cols-2 gap-4">
-                    <div class="bg-gray-50 p-3 rounded-xl border border-gray-100">
-                        <label class="block text-[10px] font-bold text-gray-400 uppercase">Resource</label>
-                        <p id="modal-user" class="text-sm font-semibold text-gray-800 mt-1"></p>
-                    </div>
-                    <div class="bg-indigo-50 p-3 rounded-xl border border-indigo-100">
-                        <label class="block text-[10px] font-bold text-indigo-400 uppercase">Cost Impact</label>
-                        <p id="modal-cost" class="text-sm font-bold text-indigo-700 mt-1"></p>
-                    </div>
-                </div>
-                <div>
-                    <label class="block text-[10px] font-bold text-gray-400 uppercase mb-2">Description</label>
-                    <div id="modal-desc" class="p-4 bg-gray-50 rounded-xl text-sm text-gray-600 italic border border-dashed border-gray-300 min-h-[100px] whitespace-pre-wrap"></div>
-                </div>
-            </div>
-            <div class="p-4 bg-gray-50 flex justify-end">
-                <button onclick="closeModal()" class="px-6 py-2 rounded-lg bg-white border border-gray-300 text-sm font-bold">Close</button>
-            </div>
-        </div>
-    </div>
 
 <script type="module">
     import { supabase, MODULES } from './js/config.js';
@@ -127,12 +99,11 @@
         projectId = localStorage.getItem('selected_project_id');
         
         if (!projectId || projectId === "undefined") {
-            alert("Please select a project first.");
+            alert("No project selected.");
             window.location.href = 'index.html';
             return;
         }
 
-        const projectName = localStorage.getItem('selected_project_name');
         const { data: proj } = await supabase.from('projects').select('blended_rate').eq('id', projectId).single();
         projectBlendedRate = proj?.blended_rate || 0;
 
@@ -140,21 +111,21 @@
         teamMembers = profiles || [];
         
         populateDropdowns();
-        renderProjectHeader(session, 'requirements', projectName);
+        renderProjectHeader(session, 'requirements', localStorage.getItem('selected_project_name'));
         loadRequirements();
         initSortable();
     });
 
     function populateDropdowns() {
         ['req-assign-select', 'step-assign-select'].forEach(id => {
-            const select = document.getElementById(id);
-            if (!select) return;
-            select.innerHTML = '<option value="">Select Resource</option>';
+            const el = document.getElementById(id);
+            if (!el) return;
+            el.innerHTML = '<option value="">Select Resource</option>';
             teamMembers.forEach(u => {
                 const opt = document.createElement('option');
                 opt.value = u.user_id;
                 opt.textContent = u.full_name || u.email;
-                select.appendChild(opt);
+                el.appendChild(opt);
             });
         });
     }
@@ -172,17 +143,16 @@
         }
     };
 
-    // --- REQUIREMENTS ---
     window.addRequirement = async () => {
         const title = document.getElementById('req-title-input').value.trim();
         const hours = parseFloat(document.getElementById('req-hours-input').value) || 0;
         const assignedId = document.getElementById('req-assign-select').value;
         const rate = parseFloat(document.getElementById('req-applied-rate').value) || 0;
 
-        if (!title || !assignedId || hours <= 0) return alert("Required: Title, Resource, and Hours");
+        if (!title || !assignedId || hours <= 0) return alert("Please fill all fields");
 
         const { error } = await supabase.from('requirements').insert([{ 
-            title, project_id: projectId, status: 'active', sequence_order: 999, 
+            title, project_id: projectId, status: 'Pending', sequence_order: 999, 
             estimated_hours: hours, assigned_to: assignedId, custom_rate: rate 
         }]);
 
@@ -195,38 +165,38 @@
     };
 
     async function loadRequirements() {
-        const { data: reqs, error } = await supabase.from('requirements')
+        const { data: reqs } = await supabase.from('requirements')
             .select(`*, user_profiles:assigned_to(full_name, email)`)
             .eq('project_id', projectId).order('sequence_order');
-
-        if (error) return console.error(error);
 
         document.getElementById('req-count').innerText = `${reqs.length} ITEMS`;
         const list = document.getElementById('req-list');
         
         list.innerHTML = reqs.map(req => {
             const name = req.user_profiles?.full_name || req.user_profiles?.email || 'Unassigned';
-            const total = (req.estimated_hours || 0) * (req.custom_rate || 0);
-            
-            // Critical fix: escape the title for JS string passing
-            const escapedTitle = req.title.replace(/'/g, "\\'").replace(/"/g, "&quot;");
+            const status = req.status || 'Pending';
+            const statusColor = status === 'Pending' ? 'bg-amber-100 text-amber-700' : 'bg-green-100 text-green-700';
             
             return `
-                <li class="req-row p-4 hover:bg-indigo-50/50 flex justify-between items-center group relative cursor-pointer border-l-4 border-transparent transition" 
+                <li class="req-row p-4 hover:bg-gray-50 flex justify-between items-center cursor-pointer transition border-l-4 border-transparent" 
                     data-id="${req.id}" 
-                    onclick="openSteps('${req.id}', '${escapedTitle}')">
+                    onclick="openSteps('${req.id}', \`${req.title.replace(/`/g, '\\`')}\`)">
                     <div class="flex items-center gap-3">
-                        <span class="cursor-move text-gray-300 group-hover:text-indigo-400 font-bold p-1">::</span>
+                        <span class="cursor-move text-gray-300">::</span>
                         <div>
-                            <p class="text-sm font-bold text-gray-800">${req.title}</p>
+                            <div class="flex items-center gap-2">
+                                <p class="text-sm font-bold text-gray-800">${req.title}</p>
+                                <span class="text-[8px] px-1.5 py-0.5 rounded font-black uppercase ${statusColor}">${status}</span>
+                            </div>
                             <p class="text-[10px] text-gray-400 font-bold uppercase">${name} | ${req.estimated_hours}h</p>
                         </div>
                     </div>
                     <div class="flex items-center gap-2">
-                        <p class="text-sm font-mono font-bold text-indigo-600">$${total.toLocaleString()}</p>
+                        <p class="text-sm font-mono font-bold text-indigo-600">$${((req.estimated_hours || 0) * (req.custom_rate || 0)).toLocaleString()}</p>
                         <div class="relative kebab-container">
-                            <button onclick="event.stopPropagation(); toggleKebab('req-${req.id}')" class="p-2 text-gray-300 hover:text-indigo-600 text-lg">?</button>
+                            <button onclick="event.stopPropagation(); toggleKebab('req-${req.id}')" class="p-2 text-gray-400 hover:text-indigo-600">?</button>
                             <div id="kebab-req-${req.id}" class="hidden absolute right-0 top-10 w-32 bg-white border shadow-xl rounded z-[100]">
+                                <button onclick="event.stopPropagation(); updateStatus('${req.id}', 'Complete')" class="w-full text-left p-2 text-xs hover:bg-gray-50">Mark Complete</button>
                                 <button onclick="event.stopPropagation(); deleteReq('${req.id}')" class="w-full text-left p-2 text-xs text-red-600 hover:bg-red-50">Delete</button>
                             </div>
                         </div>
@@ -235,50 +205,35 @@
         }).join('');
     }
 
-    // --- STEPS ---
-    window.openSteps = async (id, title) => {
-        if (!id || id === "undefined") return;
+    window.openSteps = (id, title) => {
+        if (!id) return;
         selectedReqId = id;
 
-        // Visual highlight for active row
-        document.querySelectorAll('.req-row').forEach(row => {
-            row.classList.remove('border-indigo-500', 'bg-indigo-50');
-            if (row.dataset.id === id) row.classList.add('border-indigo-500', 'bg-indigo-50');
-        });
+        // Visual feedback
+        document.querySelectorAll('.req-row').forEach(el => el.classList.remove('active-req'));
+        const activeEl = document.querySelector(`[data-id="${id}"]`);
+        if (activeEl) activeEl.classList.add('active-req');
 
+        // FORCE ACTIVATE PANEL
         const panel = document.getElementById('steps-panel');
-        panel.classList.remove('opacity-40', 'pointer-events-none');
+        panel.style.opacity = "1";
+        panel.style.pointerEvents = "auto";
+        
         document.getElementById('selected-req-title').innerText = title;
         refreshSteps();
     };
 
     window.closeSteps = () => {
-        document.getElementById('steps-panel').classList.add('opacity-40', 'pointer-events-none');
-        document.querySelectorAll('.req-row').forEach(row => row.classList.remove('border-indigo-500', 'bg-indigo-50'));
+        const panel = document.getElementById('steps-panel');
+        panel.style.opacity = "0.4";
+        panel.style.pointerEvents = "none";
+        document.querySelectorAll('.req-row').forEach(el => el.classList.remove('active-req'));
         selectedReqId = null;
     };
 
-    window.submitStep = async () => {
-        if (!selectedReqId) return;
-        const title = document.getElementById('step-title-input').value.trim();
-        const assignedId = document.getElementById('step-assign-select').value;
-        const hours = parseFloat(document.getElementById('step-hours-input').value) || 0;
-        const cost = parseFloat(document.getElementById('step-cost-input').value) || 0;
-        const description = document.getElementById('step-desc-input').value.trim();
-
-        if (!title || !assignedId || hours <= 0) return alert("Fill all fields");
-
-        const { error } = await supabase.from('steps').insert([{
-            requirement_id: selectedReqId, title, assigned_to: assignedId,
-            estimated_hours: hours, cost, description, sequence_order: 999
-        }]);
-
-        if (error) alert(error.message);
-        else {
-            ['step-title-input', 'step-hours-input', 'step-cost-input', 'step-desc-input'].forEach(i => document.getElementById(i).value = '');
-            refreshSteps();
-            rollupToRequirement();
-        }
+    window.updateStatus = async (id, status) => {
+        await supabase.from('requirements').update({ status }).eq('id', id);
+        loadRequirements();
     };
 
     async function refreshSteps() {
@@ -304,7 +259,6 @@
                     <div class="relative kebab-container">
                         <button onclick="toggleKebab('step-${s.id}')" class="p-2 text-gray-300 hover:text-indigo-600 text-lg">?</button>
                         <div id="kebab-step-${s.id}" class="hidden absolute right-0 top-10 w-32 bg-white border shadow-xl rounded z-[100]">
-                            <button onclick="viewStepDetails('${s.id}')" class="w-full text-left p-2 text-xs hover:bg-gray-50">Details</button>
                             <button onclick="deleteStep('${s.id}')" class="w-full text-left p-2 text-xs text-red-600 hover:bg-red-50">Delete</button>
                         </div>
                     </div>
@@ -312,16 +266,36 @@
             </li>`).join('');
     }
 
+    // -- CRUD & UTILS --
+    window.submitStep = async () => {
+        if (!selectedReqId) return;
+        const title = document.getElementById('step-title-input').value.trim();
+        const assignedId = document.getElementById('step-assign-select').value;
+        const hours = parseFloat(document.getElementById('step-hours-input').value) || 0;
+        const cost = parseFloat(document.getElementById('step-cost-input').value) || 0;
+        const description = document.getElementById('step-desc-input').value.trim();
+
+        if (!title || !assignedId || hours <= 0) return alert("Fill all fields");
+
+        const { error } = await supabase.from('steps').insert([{
+            requirement_id: selectedReqId, title, assigned_to: assignedId,
+            estimated_hours: hours, cost, description, sequence_order: 999
+        }]);
+
+        if (error) alert(error.message);
+        else {
+            ['step-title-input', 'step-hours-input', 'step-cost-input', 'step-desc-input'].forEach(i => document.getElementById(i).value = '');
+            refreshSteps();
+            rollupToRequirement();
+        }
+    };
+
     async function rollupToRequirement() {
         if (!selectedReqId) return;
         const { data: steps } = await supabase.from('steps').select('cost, estimated_hours').eq('requirement_id', selectedReqId);
         const totalCost = steps.reduce((sum, s) => sum + (s.cost || 0), 0);
         const totalHours = steps.reduce((sum, s) => sum + (s.estimated_hours || 0), 0);
-        
-        await supabase.from('requirements').update({ 
-            estimated_hours: totalHours, 
-            custom_rate: totalHours > 0 ? (totalCost / totalHours) : 0 
-        }).eq('id', selectedReqId);
+        await supabase.from('requirements').update({ estimated_hours: totalHours, custom_rate: totalHours > 0 ? (totalCost / totalHours) : 0 }).eq('id', selectedReqId);
         loadRequirements();
     }
 
@@ -332,38 +306,28 @@
     };
 
     window.deleteReq = async (id) => {
-        if (!confirm("Delete Requirement and all tasks?")) return;
+        if (!confirm("Delete Requirement?")) return;
         await supabase.from('requirements').delete().eq('id', id);
         loadRequirements();
         closeSteps();
     };
 
     window.deleteStep = async (id) => {
-        if (!confirm("Delete this task?")) return;
+        if (!confirm("Delete Task?")) return;
         await supabase.from('steps').delete().eq('id', id);
         refreshSteps();
         rollupToRequirement();
     };
 
-    window.viewStepDetails = async (id) => {
-        const { data: step } = await supabase.from('steps').select(`*, user_profiles:assigned_to(full_name, email)`).eq('id', id).single();
-        document.getElementById('modal-title').innerText = step.title;
-        document.getElementById('modal-user').innerText = step.user_profiles?.full_name || step.user_profiles?.email;
-        document.getElementById('modal-cost').innerText = `$${step.cost.toLocaleString()} (${step.estimated_hours}h)`;
-        document.getElementById('modal-desc').innerText = step.description || "No notes.";
-        document.getElementById('step-detail-modal').classList.replace('hidden', 'flex');
-    };
-
-    window.closeModal = () => document.getElementById('step-detail-modal').classList.replace('flex', 'hidden');
-
     function initSortable() {
-        [{ id: 'req-list', table: 'requirements' }, { id: 'step-list', table: 'steps' }].forEach(c => {
-            const el = document.getElementById(c.id);
+        ['req-list', 'step-list'].forEach(id => {
+            const el = document.getElementById(id);
             if (el) new Sortable(el, {
                 handle: '.cursor-move', animation: 150,
                 onEnd: async () => {
                     const items = Array.from(el.children);
-                    const updates = items.map((li, i) => supabase.from(c.table).update({ sequence_order: i }).eq('id', li.dataset.id));
+                    const table = id === 'req-list' ? 'requirements' : 'steps';
+                    const updates = items.map((li, i) => supabase.from(table).update({ sequence_order: i }).eq('id', li.dataset.id));
                     await Promise.all(updates);
                 }
             });

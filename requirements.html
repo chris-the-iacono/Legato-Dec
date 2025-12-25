@@ -242,23 +242,56 @@
     };
 
     window.submitStep = async () => {
-        const title = document.getElementById('step-title-input').value.trim();
-        const assignedId = document.getElementById('step-assign-select').value;
-        const hours = parseFloat(document.getElementById('step-hours-input').value) || 0;
-        const cost = parseFloat(document.getElementById('step-cost-input').value) || 0;
-        const description = document.getElementById('step-desc-input').value.trim();
+    const titleInput = document.getElementById('step-title-input');
+    const assignedSelect = document.getElementById('step-assign-select');
+    const hoursInput = document.getElementById('step-hours-input');
+    const costInput = document.getElementById('step-cost-input');
+    const descInput = document.getElementById('step-desc-input');
 
-        if (!title || !assignedId || hours <= 0) return alert("Fill all fields");
+    const title = titleInput.value.trim();
+    const assignedId = assignedSelect.value;
+    const hours = parseFloat(hoursInput.value) || 0;
+    const cost = parseFloat(costInput.value) || 0;
+    const description = descInput.value.trim();
 
-        await supabase.from('steps').insert([{
-            requirement_id: selectedReqId, title, assigned_to: assignedId,
-            estimated_hours: hours, cost, description, sequence_order: 999
-        }]);
+    // Debugging: Check if we actually have a Requirement selected
+    if (!selectedReqId) {
+        return alert("Error: No Requirement selected. Please click a requirement on the left first.");
+    }
 
-        ['step-title-input', 'step-hours-input', 'step-cost-input', 'step-desc-input'].forEach(i => document.getElementById(i).value = '');
-        refreshSteps();
-        rollupToRequirement();
-    };
+    if (!title || !assignedId || hours <= 0) {
+        return alert("Please provide a title, resource, and hours.");
+    }
+
+    console.log("Attempting to save step for Req ID:", selectedReqId);
+
+    const { data, error } = await supabase.from('steps').insert([{
+        requirement_id: selectedReqId, // Ensure this column name matches your DB exactly
+        title: title,
+        assigned_to: assignedId,
+        estimated_hours: hours,
+        cost: cost,
+        description: description,
+        sequence_order: 999
+    }]).select(); // Adding .select() helps confirm the row was actually created
+
+    if (error) {
+        console.error("Supabase Error:", error);
+        alert(`Save failed: ${error.message} (${error.code})`);
+    } else {
+        console.log("Success! Row created:", data);
+        
+        // Clear inputs
+        titleInput.value = '';
+        hoursInput.value = '';
+        costInput.value = '';
+        descInput.value = '';
+        
+        // Refresh the list immediately
+        await refreshSteps();
+        await rollupToRequirement();
+    }
+};
 
     async function refreshSteps() {
         const { data: steps } = await supabase.from('steps')

@@ -206,22 +206,28 @@
     }
 
     window.openSteps = (id, title) => {
-        if (!id) return;
-        selectedReqId = id;
+    // GUARD: Don't proceed if ID is missing or literally the string "undefined"
+    if (!id || id === "undefined" || id === "[object Object]") {
+        console.error("Invalid ID detected in openSteps:", id);
+        return;
+    }
+    
+    selectedReqId = id; // Store the UUID globally
+    console.log("Requirement Selected:", selectedReqId); // Debugging line
 
-        // Visual feedback
-        document.querySelectorAll('.req-row').forEach(el => el.classList.remove('active-req'));
-        const activeEl = document.querySelector(`[data-id="${id}"]`);
-        if (activeEl) activeEl.classList.add('active-req');
+    // Visual feedback
+    document.querySelectorAll('.req-row').forEach(el => el.classList.remove('active-req'));
+    const activeEl = document.querySelector(`[data-id="${id}"]`);
+    if (activeEl) activeEl.classList.add('active-req');
 
-        // FORCE ACTIVATE PANEL
-        const panel = document.getElementById('steps-panel');
-        panel.style.opacity = "1";
-        panel.style.pointerEvents = "auto";
-        
-        document.getElementById('selected-req-title').innerText = title;
-        refreshSteps();
-    };
+    // FORCE ACTIVATE PANEL
+    const panel = document.getElementById('steps-panel');
+    panel.style.opacity = "1";
+    panel.style.pointerEvents = "auto";
+    
+    document.getElementById('selected-req-title').innerText = title;
+    refreshSteps();
+};
 
     window.closeSteps = () => {
         const panel = document.getElementById('steps-panel');
@@ -268,27 +274,46 @@
 
     // -- CRUD & UTILS --
     window.submitStep = async () => {
-        if (!selectedReqId) return;
-        const title = document.getElementById('step-title-input').value.trim();
-        const assignedId = document.getElementById('step-assign-select').value;
-        const hours = parseFloat(document.getElementById('step-hours-input').value) || 0;
-        const cost = parseFloat(document.getElementById('step-cost-input').value) || 0;
-        const description = document.getElementById('step-desc-input').value.trim();
+    // FINAL GUARD: Prevent the UUID error
+    if (!selectedReqId || selectedReqId === "undefined") {
+        alert("Error: No requirement selected. Please click a requirement on the left again.");
+        return;
+    }
 
-        if (!title || !assignedId || hours <= 0) return alert("Fill all fields");
+    const title = document.getElementById('step-title-input').value.trim();
+    const assignedId = document.getElementById('step-assign-select').value;
+    const hours = parseFloat(document.getElementById('step-hours-input').value) || 0;
+    const cost = parseFloat(document.getElementById('step-cost-input').value) || 0;
+    const description = document.getElementById('step-desc-input').value.trim();
 
-        const { error } = await supabase.from('steps').insert([{
-            requirement_id: selectedReqId, title, assigned_to: assignedId,
-            estimated_hours: hours, cost, description, sequence_order: 999
-        }]);
+    if (!title || !assignedId || hours <= 0) {
+        alert("Please fill all Task fields (Title, Resource, and Hours).");
+        return;
+    }
 
-        if (error) alert(error.message);
-        else {
-            ['step-title-input', 'step-hours-input', 'step-cost-input', 'step-desc-input'].forEach(i => document.getElementById(i).value = '');
-            refreshSteps();
-            rollupToRequirement();
-        }
-    };
+    // Attempt the insert
+    const { data, error } = await supabase.from('steps').insert([{
+        requirement_id: selectedReqId, // This is where the UUID goes
+        title, 
+        assigned_to: assignedId,
+        estimated_hours: hours, 
+        cost, 
+        description, 
+        sequence_order: 999
+    }]).select();
+
+    if (error) {
+        console.error("Supabase Error:", error);
+        alert("Database Error: " + error.message);
+    } else {
+        // Clear inputs on success
+        ['step-title-input', 'step-hours-input', 'step-cost-input', 'step-desc-input'].forEach(i => {
+            document.getElementById(i).value = '';
+        });
+        refreshSteps();
+        rollupToRequirement();
+    }
+};
 
     async function rollupToRequirement() {
         if (!selectedReqId) return;

@@ -184,7 +184,7 @@ document.getElementById('req-list').addEventListener('click', (e) => {
             let statusClass = (status === 'In Progress') ? "status-inprogress" : (status === 'Complete' ? "status-complete" : "status-pending");
             return `
                 <li class="req-row p-4 hover:bg-gray-50 flex justify-between items-center cursor-pointer border-l-4 border-transparent" 
-                    data-id="${req.id}" data-title="${req.title.replace(/"/g, '&quot;')}">
+                    data-id="${req.id}" data-title="${(req.title || '').replace(/"/g, '&quot;')}">
                     <div class="flex items-center gap-3">
                         <span class="cursor-move text-gray-300 font-bold p-1">::</span>
                         <div>

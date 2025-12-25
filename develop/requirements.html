@@ -321,7 +321,7 @@ async function rollupToRequirement() {
     const panelId = document.getElementById('steps-panel').getAttribute('data-selected-id');
     if (!panelId || panelId === "undefined") return;
 
-    // 1. Fetch all steps for this requirement
+    // 1. Fetch all steps for this requirement. Note added correction for restraint on sequence field save
     // Using 'requirement_id' (the foreign key in the steps table)
     const { data: steps } = await supabase.from('steps')
         .select('cost, estimated_hours')

@@ -8,12 +8,11 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="../../Projects/_Legato_/css/style.css">
     <style>
-        /* Prevents the whole page from scrolling, creating a SaaS-like feel */
         .app-container { height: calc(100vh - 140px); }
-        .list-viewport { overflow-y: auto; flex-grow: 1; }
-        /* Custom scrollbar for better aesthetics */
+        .list-viewport { overflow-y: auto; flex-grow: 1; position: relative; }
         .list-viewport::-webkit-scrollbar { width: 6px; }
         .list-viewport::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
+        .kebab-menu { z-index: 100; }
     </style>
 </head>
 <body class="bg-gray-100 min-h-screen overflow-hidden">
@@ -86,7 +85,7 @@
         </div>
     </main>
 
-    <div id="step-detail-modal" class="fixed inset-0 bg-gray-900/60 hidden items-center justify-center z-[100] p-4 backdrop-blur-sm">
+    <div id="step-detail-modal" class="fixed inset-0 bg-gray-900/60 hidden items-center justify-center z-[110] p-4 backdrop-blur-sm">
         <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden transform transition-all">
             <div class="p-5 border-b flex justify-between items-center bg-indigo-900 text-white">
                 <h3 id="modal-title" class="font-bold tracking-tight">Task Details</h3>
@@ -125,11 +124,17 @@
 
     document.addEventListener('DOMContentLoaded', async () => {
         session = await checkAccess(MODULES.REQUIREMENTS);
+        
+        // GUARDRAIL: Verify Project ID
         projectId = localStorage.getItem('selected_project_id');
-        const projectName = localStorage.getItem('selected_project_name');
-        if (!session || !projectId) return window.location.href = 'index.html';
+        if (!projectId || projectId === "undefined") {
+            alert("Please select a project first.");
+            window.location.href = 'index.html';
+            return;
+        }
 
-        // Initial Data Fetch
+        const projectName = localStorage.getItem('selected_project_name');
+
         const { data: proj } = await supabase.from('projects').select('blended_rate').eq('id', projectId).single();
         projectBlendedRate = proj?.blended_rate || 0;
 
@@ -145,6 +150,7 @@
     function populateDropdowns() {
         ['req-assign-select', 'step-assign-select'].forEach(id => {
             const select = document.getElementById(id);
+            if(!select) return;
             select.innerHTML = '<option value="">Select Resource</option>';
             teamMembers.forEach(u => {
                 const opt = document.createElement('option');
@@ -168,7 +174,6 @@
         }
     };
 
-    // --- REQUIREMENTS ---
     window.addRequirement = async () => {
         const title = document.getElementById('req-title-input').value.trim();
         const hours = parseFloat(document.getElementById('req-hours-input').value) || 0;
@@ -201,24 +206,31 @@
             const name = req.user_profiles?.full_name || req.user_profiles?.email || 'Unassigned';
             const total = (req.estimated_hours || 0) * (req.custom_rate || 0);
             return `
-                <li class="p-4 hover:bg-indigo-50/50 flex justify-between items-center group cursor-pointer transition" data-id="${req.id}" onclick="openSteps('${req.id}', '${req.title.replace(/'/g, "\\")}')">
+                <li class="p-4 hover:bg-indigo-50/50 flex justify-between items-center group relative cursor-pointer" data-id="${req.id}" onclick="openSteps('${req.id}', '${req.title.replace(/'/g, "\\")}')">
                     <div class="flex items-center gap-3">
                         <span class="cursor-move text-gray-300 group-hover:text-indigo-400 font-bold p-1">::</span>
                         <div>
-                            <p class="text-sm font-bold text-gray-800 group-hover:text-indigo-600">${req.title}</p>
-                            <p class="text-[10px] text-gray-400 font-bold uppercase">${name} | ${req.estimated_hours} Hours</p>
+                            <p class="text-sm font-bold text-gray-800">${req.title}</p>
+                            <p class="text-[10px] text-gray-400 font-bold uppercase">${name} | ${req.estimated_hours}h</p>
                         </div>
                     </div>
-                    <div class="text-right">
+                    <div class="flex items-center gap-2">
                         <p class="text-sm font-mono font-bold text-indigo-600">$${total.toLocaleString()}</p>
-                        <p class="text-[9px] text-indigo-300 font-bold uppercase tracking-tighter">Tasks &rarr;</p>
+                        <div class="relative kebab-container">
+                            <button onclick="event.stopPropagation(); toggleKebab('req-${req.id}')" class="p-2 text-gray-300 hover:text-indigo-600 text-lg">?</button>
+                            <div id="kebab-req-${req.id}" class="hidden absolute right-0 top-10 w-32 bg-white border shadow-xl rounded z-[100]">
+                                <button onclick="event.stopPropagation(); deleteReq('${req.id}')" class="w-full text-left p-2 text-xs text-red-600 hover:bg-red-50">Delete</button>
+                            </div>
+                        </div>
                     </div>
                 </li>`;
         }).join('');
     }
 
-    // --- STEPS ---
     window.openSteps = async (id, title) => {
+        // GUARDRAIL: Verify ID
+        if (!id || id === "undefined") return;
+
         selectedReqId = id;
         const panel = document.getElementById('steps-panel');
         panel.classList.remove('opacity-40', 'pointer-events-none');
@@ -232,6 +244,8 @@
     };
 
     window.submitStep = async () => {
+        if (!selectedReqId) return;
+
         const title = document.getElementById('step-title-input').value.trim();
         const assignedId = document.getElementById('step-assign-select').value;
         const hours = parseFloat(document.getElementById('step-hours-input').value) || 0;
@@ -260,7 +274,7 @@
 
         const list = document.getElementById('step-list');
         list.innerHTML = steps.map(s => `
-            <li class="px-4 py-3 flex justify-between items-center group transition" data-id="${s.id}">
+            <li class="px-4 py-3 flex justify-between items-center group relative transition" data-id="${s.id}">
                 <div class="flex items-center gap-3">
                     <span class="cursor-move text-gray-200 group-hover:text-indigo-300 font-bold">::</span>
                     <div>
@@ -268,17 +282,24 @@
                         <p class="text-[10px] text-indigo-400 font-bold uppercase">${s.user_profiles?.full_name || s.user_profiles?.email}</p>
                     </div>
                 </div>
-                <div class="flex items-center gap-4">
-                    <div class="text-right">
+                <div class="flex items-center gap-2">
+                    <div class="text-right mr-2">
                         <p class="text-[11px] font-bold text-gray-900">$${s.cost.toLocaleString()}</p>
                         <p class="text-[9px] text-gray-400">${s.estimated_hours}h</p>
                     </div>
-                    <button onclick="viewStepDetails('${s.id}')" class="p-2 text-gray-300 hover:text-indigo-600 transition">?</button>
+                    <div class="relative kebab-container">
+                        <button onclick="toggleKebab('step-${s.id}')" class="p-2 text-gray-300 hover:text-indigo-600 text-lg">?</button>
+                        <div id="kebab-step-${s.id}" class="hidden absolute right-0 top-10 w-32 bg-white border shadow-xl rounded z-[100]">
+                            <button onclick="viewStepDetails('${s.id}')" class="w-full text-left p-2 text-xs hover:bg-gray-50">Details</button>
+                            <button onclick="deleteStep('${s.id}')" class="w-full text-left p-2 text-xs text-red-600 hover:bg-red-50">Delete</button>
+                        </div>
+                    </div>
                 </div>
             </li>`).join('');
     }
 
     async function rollupToRequirement() {
+        if (!selectedReqId) return;
         const { data: steps } = await supabase.from('steps').select('cost, estimated_hours').eq('requirement_id', selectedReqId);
         const totalCost = steps.reduce((sum, s) => sum + (s.cost || 0), 0);
         const totalHours = steps.reduce((sum, s) => sum + (s.estimated_hours || 0), 0);
@@ -290,41 +311,56 @@
         loadRequirements();
     }
 
+    window.toggleKebab = (id) => {
+        const menu = document.getElementById(`kebab-${id}`);
+        document.querySelectorAll('[id^="kebab-"]').forEach(el => { if (el !== menu) el.classList.add('hidden'); });
+        menu.classList.toggle('hidden');
+    };
+
+    window.deleteReq = async (id) => {
+        if (!confirm("Delete Requirement and all associated tasks?")) return;
+        await supabase.from('requirements').delete().eq('id', id);
+        loadRequirements();
+        closeSteps();
+    };
+
+    window.deleteStep = async (id) => {
+        if (!confirm("Delete this task?")) return;
+        await supabase.from('steps').delete().eq('id', id);
+        refreshSteps();
+        rollupToRequirement();
+    };
+
     window.viewStepDetails = async (id) => {
         const { data: step } = await supabase.from('steps').select(`*, user_profiles:assigned_to(full_name, email)`).eq('id', id).single();
         document.getElementById('modal-title').innerText = step.title;
         document.getElementById('modal-user').innerText = step.user_profiles?.full_name || step.user_profiles?.email;
         document.getElementById('modal-cost').innerText = `$${step.cost.toLocaleString()} (${step.estimated_hours}h)`;
-        document.getElementById('modal-desc').innerText = step.description || "No specific notes provided for this task.";
-        document.getElementById('step-detail-modal').classList.remove('hidden');
-        document.getElementById('step-detail-modal').classList.add('flex');
+        document.getElementById('modal-desc').innerText = step.description || "No notes.";
+        document.getElementById('step-detail-modal').classList.replace('hidden', 'flex');
     };
 
-    window.closeModal = () => {
-        document.getElementById('step-detail-modal').classList.add('hidden');
-        document.getElementById('step-detail-modal').classList.remove('flex');
-    };
+    window.closeModal = () => document.getElementById('step-detail-modal').classList.replace('flex', 'hidden');
 
     function initSortable() {
-        const containers = [
-            { id: 'req-list', table: 'requirements' },
-            { id: 'step-list', table: 'steps' }
-        ];
-        containers.forEach(c => {
+        [{ id: 'req-list', table: 'requirements' }, { id: 'step-list', table: 'steps' }].forEach(c => {
             const el = document.getElementById(c.id);
             if (el) new Sortable(el, {
-                handle: '.cursor-move',
-                animation: 150,
+                handle: '.cursor-move', animation: 150,
                 onEnd: async () => {
                     const items = Array.from(el.children);
-                    const updates = items.map((li, i) => 
-                        supabase.from(c.table).update({ sequence_order: i }).eq('id', li.dataset.id)
-                    );
+                    const updates = items.map((li, i) => supabase.from(c.table).update({ sequence_order: i }).eq('id', li.dataset.id));
                     await Promise.all(updates);
                 }
             });
         });
     }
+
+    document.addEventListener('click', (e) => {
+        if (!e.target.closest('.kebab-container')) {
+            document.querySelectorAll('[id^="kebab-"]').forEach(el => el.classList.add('hidden'));
+        }
+    });
 </script>
 </body>
 </html>

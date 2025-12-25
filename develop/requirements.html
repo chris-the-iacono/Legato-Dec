@@ -240,12 +240,8 @@ window.openSteps = (rowElement, title) => {
     };
 
 window.submitStep = async () => {
-    // Read the ID directly from the panel attribute
     const panelId = document.getElementById('steps-panel').getAttribute('data-selected-id');
-    
-    if (!panelId || panelId === "undefined") {
-        return alert("Error: No requirement selected. Please click a requirement in the list again.");
-    }
+    if (!panelId || panelId === "undefined") return alert("Select a requirement first.");
 
     const titleInput = document.getElementById('step-title-input');
     const assignedSelect = document.getElementById('step-assign-select');
@@ -258,30 +254,36 @@ window.submitStep = async () => {
     const hours = parseFloat(hoursInput.value) || 0;
     const cost = parseFloat(costInput.value) || 0;
 
-    if (!title || !assignedId || hours <= 0) return alert("Please fill all required fields.");
+    if (!title || !assignedId || hours <= 0) return alert("Fill all fields.");
 
+    // 1. Get the current count of steps to determine the next sequence order
+    const { count } = await supabase
+        .from('steps')
+        .select('*', { count: 'exact', head: true })
+        .eq('requirement_id', panelId);
+
+    const nextOrder = (count || 0) + 1;
+
+    // 2. Insert with the dynamic sequence order
     const { error } = await supabase.from('steps').insert([{
-        requirement_id: panelId, // Correctly using the panel ID
+        requirement_id: panelId,
         title,
         assigned_to: assignedId,
         estimated_hours: hours,
         cost,
         description: descInput.value.trim(),
-        sequence_order: 999
+        sequence_order: nextOrder // Use dynamic order instead of 999
     }]);
 
     if (error) {
         alert(`Save failed: ${error.message}`);
     } else {
-        // Reset form
         titleInput.value = '';
         hoursInput.value = '';
         costInput.value = '';
         descInput.value = '';
-        
-        // Refresh data
-        await refreshSteps();
-        await rollupToRequirement();
+        refreshSteps();
+        rollupToRequirement();
     }
 };
 async function refreshSteps() {
@@ -316,23 +318,30 @@ async function refreshSteps() {
 }
 
 async function rollupToRequirement() {
-    // Apply the same fix here to ensure rollups work
     const panelId = document.getElementById('steps-panel').getAttribute('data-selected-id');
-    if (!panelId) return;
+    if (!panelId || panelId === "undefined") return;
 
+    // 1. Fetch all steps for this requirement
+    // Using 'requirement_id' (the foreign key in the steps table)
     const { data: steps } = await supabase.from('steps')
         .select('cost, estimated_hours')
         .eq('requirement_id', panelId);
 
-    const totalCost = steps.reduce((sum, s) => sum + (s.cost || 0), 0);
-    const totalHours = steps.reduce((sum, s) => sum + (s.estimated_hours || 0), 0);
+    const totalCost = (steps || []).reduce((sum, s) => sum + (s.cost || 0), 0);
+    const totalHours = (steps || []).reduce((sum, s) => sum + (s.estimated_hours || 0), 0);
 
-    await supabase.from('requirements').update({ 
+    // 2. Update the parent requirement
+    // Using 'req_id' (the primary key in the requirements table)
+    const { error } = await supabase.from('requirements').update({ 
         estimated_hours: totalHours, 
         custom_rate: totalHours > 0 ? (totalCost / totalHours) : 0 
-    }).eq('id', panelId);
+    }).eq('req_id', panelId); // CHANGED FROM 'id' TO 'req_id'
 
-    loadRequirements();
+    if (error) {
+        console.error("Rollup failed:", error.message);
+    } else {
+        loadRequirements(); // Refresh the left-side list to show new totals
+    }
 }
 
     window.updateStatus = async (id, status) => {

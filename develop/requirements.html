@@ -6,10 +6,9 @@
     <title>Requirements | Project Manager</title>
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
-    /* <link rel="stylesheet" href="../../Projects/_Legato_/css/style.css"> */
-	<link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/style.css">
 <style>
-    /* 1. Layout & Scrollbars (Aligns with your style.css) */
+    /* 1. Layout & Scrollbars */
     .app-container { height: calc(100vh - 140px); }
     .list-viewport { 
         overflow-y: auto; 
@@ -17,8 +16,7 @@
         position: relative; 
     }
     
-    /* 2. THE ACTIVATION LOGIC */
-    /* Default state: Visual cue that it is "locked" */
+    /* 2. PANEL ACTIVATION LOGIC */
     #steps-panel {
         opacity: 0.4;
         pointer-events: none;
@@ -26,7 +24,6 @@
         transition: all 0.2s ease-in-out;
     }
 
-    /* Active state: Triggered via JS classList.add('active-panel') */
     #steps-panel.active-panel {
         opacity: 1;
         pointer-events: auto;
@@ -40,9 +37,9 @@
     }
 
     /* 4. STATUS COLOR BADGES */
-    .status-pending { background-color: #fef3c7; color: #b45309; }     /* Amber */
-    .status-inprogress { background-color: #dbeafe; color: #1d4ed8; }  /* Blue */
-    .status-complete { background-color: #dcfce7; color: #15803d; }    /* Green */
+    .status-pending { background-color: #fef3c7; color: #b45309; }
+    .status-inprogress { background-color: #dbeafe; color: #1d4ed8; }
+    .status-complete { background-color: #dcfce7; color: #15803d; }
 </style>
 </head>
 <body class="bg-gray-100 min-h-screen overflow-hidden">
@@ -79,7 +76,7 @@
                 <ul id="req-list" class="list-viewport divide-y divide-gray-100"></ul>
             </section>
 
-			<section id="steps-panel" class="bg-white rounded-xl shadow-sm border border-gray-200 flex flex-col overflow-hidden transition-all duration-300">
+            <section id="steps-panel" class="bg-white rounded-xl shadow-sm border border-gray-200 flex flex-col overflow-hidden transition-all duration-300">
                 <div class="px-4 py-4 border-b bg-indigo-50/50 flex justify-between items-center">
                     <div>
                         <h3 id="selected-req-title" class="font-bold text-indigo-900">2. Task Breakdown</h3>
@@ -192,145 +189,117 @@
     };
 
     async function loadRequirements() {
-    const { data: reqs, error } = await supabase.from('requirements')
-        .select(`*, user_profiles:assigned_to(full_name, email)`)
-        .eq('project_id', projectId).order('sequence_order');
+        const { data: reqs, error } = await supabase.from('requirements')
+            .select(`*, user_profiles:assigned_to(full_name, email)`)
+            .eq('project_id', projectId).order('sequence_order');
 
-    if (error) return console.error(error);
+        if (error) return console.error(error);
 
-    document.getElementById('req-count').innerText = `${reqs.length} ITEMS`;
-    const list = document.getElementById('req-list');
-    
-    list.innerHTML = reqs.map(req => {
-        const name = req.user_profiles?.full_name || req.user_profiles?.email || 'Unassigned';
-        const status = req.status || 'Pending';
+        document.getElementById('req-count').innerText = `${reqs.length} ITEMS`;
+        const list = document.getElementById('req-list');
         
-        // Status Color Mapping using the classes from your style block
-        let statusClass = "status-pending"; 
-        if (status === 'In Progress') statusClass = "status-inprogress";
-        if (status === 'Complete') statusClass = "status-complete";
+        list.innerHTML = reqs.map(req => {
+            const name = req.user_profiles?.full_name || req.user_profiles?.email || 'Unassigned';
+            const status = req.status || 'Pending';
+            
+            let statusClass = "status-pending"; 
+            if (status === 'In Progress') statusClass = "status-inprogress";
+            if (status === 'Complete') statusClass = "status-complete";
 
-        return `
-            <li class="req-row p-4 hover:bg-gray-50 flex justify-between items-center cursor-pointer border-l-4 border-transparent" 
-                data-id="${req.id}" 
-                onclick="openSteps(this, \`${req.title.replace(/`/g, '\\`')}\`)">
-                
-                <div class="flex items-center gap-3 pointer-events-none">
-                    <span class="cursor-move text-gray-300 font-bold p-1">::</span>
-                    <div>
-                        <div class="flex items-center gap-2">
-                            <p class="text-sm font-bold text-gray-800">${req.title}</p>
-                            <span class="text-[8px] px-1.5 py-0.5 rounded font-black uppercase ${statusClass}">${status}</span>
-                        </div>
-                        <p class="text-[10px] text-gray-400 font-bold uppercase">${name} | ${req.estimated_hours}h</p>
-                    </div>
-                </div>
-
-                <div class="flex items-center gap-2">
-                    <p class="text-sm font-mono font-bold text-indigo-600 pointer-events-none">$${((req.estimated_hours || 0) * (req.custom_rate || 0)).toLocaleString()}</p>
+            return `
+                <li class="req-row p-4 hover:bg-gray-50 flex justify-between items-center cursor-pointer border-l-4 border-transparent" 
+                    data-id="${req.id}" 
+                    onclick="openSteps(this, \`${req.title.replace(/`/g, '\\`')}\`)">
                     
-                    <div class="relative kebab-container">
-                        <button onclick="event.stopPropagation(); toggleKebab('req-${req.id}')" class="p-2 text-gray-400 hover:text-indigo-600 font-bold text-lg">?</button>
-                        <div id="kebab-req-${req.id}" class="hidden absolute right-0 top-8 w-40 bg-white border shadow-xl rounded z-[100] p-1">
-                            <p class="text-[9px] font-bold text-gray-400 uppercase px-2 py-1 border-b mb-1">Set Status</p>
-                            <button onclick="event.stopPropagation(); updateStatus('${req.id}', 'Pending')" class="w-full text-left p-2 text-xs hover:bg-gray-50">Pending</button>
-                            <button onclick="event.stopPropagation(); updateStatus('${req.id}', 'In Progress')" class="w-full text-left p-2 text-xs text-blue-600 hover:bg-blue-50">In Progress</button>
-                            <button onclick="event.stopPropagation(); updateStatus('${req.id}', 'Complete')" class="w-full text-left p-2 text-xs text-green-600 hover:bg-green-50">Complete</button>
-                            <hr class="my-1">
-                            <button onclick="event.stopPropagation(); deleteReq('${req.id}')" class="w-full text-left p-2 text-xs text-red-600 hover:bg-red-50">Delete</button>
+                    <div class="flex items-center gap-3 pointer-events-none">
+                        <span class="cursor-move text-gray-300 font-bold p-1">::</span>
+                        <div>
+                            <div class="flex items-center gap-2">
+                                <p class="text-sm font-bold text-gray-800">${req.title}</p>
+                                <span class="text-[8px] px-1.5 py-0.5 rounded font-black uppercase ${statusClass}">${status}</span>
+                            </div>
+                            <p class="text-[10px] text-gray-400 font-bold uppercase">${name} | ${req.estimated_hours}h</p>
                         </div>
                     </div>
-                </div>
-            </li>`;
-    }).join('');
-}
-// 1. THIS OPENS/UNLOCKS THE PANEL
-window.openSteps = (element, title) => {
-    // Safely find the ID even if a child element was clicked
-    const row = element.closest('.req-row');
-    const id = row ? row.getAttribute('data-id') : null;
-    
-    if (!id || id === "undefined") {
-        console.error("Critical Error: UUID is missing from element attributes.");
-        alert("Could not load tasks: Requirement ID missing.");
-        return;
+
+                    <div class="flex items-center gap-2">
+                        <p class="text-sm font-mono font-bold text-indigo-600 pointer-events-none">$${((req.estimated_hours || 0) * (req.custom_rate || 0)).toLocaleString()}</p>
+                        <div class="relative kebab-container">
+                            <button onclick="event.stopPropagation(); toggleKebab('req-${req.id}')" class="p-2 text-gray-400 hover:text-indigo-600 font-bold text-lg">?</button>
+                            <div id="kebab-req-${req.id}" class="hidden absolute right-0 top-8 w-40 bg-white border shadow-xl rounded z-[100] p-1">
+                                <p class="text-[9px] font-bold text-gray-400 uppercase px-2 py-1 border-b mb-1">Set Status</p>
+                                <button onclick="event.stopPropagation(); updateStatus('${req.id}', 'Pending')" class="w-full text-left p-2 text-xs hover:bg-gray-50">Pending</button>
+                                <button onclick="event.stopPropagation(); updateStatus('${req.id}', 'In Progress')" class="w-full text-left p-2 text-xs text-blue-600 hover:bg-blue-50">In Progress</button>
+                                <button onclick="event.stopPropagation(); updateStatus('${req.id}', 'Complete')" class="w-full text-left p-2 text-xs text-green-600 hover:bg-green-50">Complete</button>
+                                <hr class="my-1">
+                                <button onclick="event.stopPropagation(); deleteReq('${req.id}')" class="w-full text-left p-2 text-xs text-red-600 hover:bg-red-50">Delete</button>
+                            </div>
+                        </div>
+                    </div>
+                </li>`;
+        }).join('');
     }
 
-    selectedReqId = id; 
-    console.log("Requirement Selected:", selectedReqId);
+    window.openSteps = (element, title) => {
+        const row = element.closest('.req-row');
+        const id = row ? row.getAttribute('data-id') : null;
+        
+        if (!id || id === "undefined") {
+            alert("Could not load tasks: Requirement ID missing.");
+            return;
+        }
 
-    // Toggle the Panel Visibility
-    document.querySelectorAll('.req-row').forEach(el => el.classList.remove('active-req'));
-    row.classList.add('active-req');
+        selectedReqId = id; 
+        document.querySelectorAll('.req-row').forEach(el => el.classList.remove('active-req'));
+        row.classList.add('active-req');
 
-    const panel = document.getElementById('steps-panel');
-    panel.classList.add('active-panel');
-    
-    document.getElementById('selected-req-title').innerText = title;
-    refreshSteps();
-};
+        document.getElementById('steps-panel').classList.add('active-panel');
+        document.getElementById('selected-req-title').innerText = title;
+        refreshSteps();
+    };
 
-// 2. THIS CLOSES/LOCKS THE PANEL
-window.closeSteps = () => {
-    selectedReqId = null;
-
-    // UI: DEACTIVATE the panel by removing the class
-    document.getElementById('steps-panel').classList.remove('active-panel');
-    
-    document.querySelectorAll('.req-row').forEach(el => el.classList.remove('active-req'));
-};
+    window.closeSteps = () => {
+        selectedReqId = null;
+        document.getElementById('steps-panel').classList.remove('active-panel');
+        document.querySelectorAll('.req-row').forEach(el => el.classList.remove('active-req'));
+    };
 
     window.submitStep = async () => {
-    const titleInput = document.getElementById('step-title-input');
-    const assignedSelect = document.getElementById('step-assign-select');
-    const hoursInput = document.getElementById('step-hours-input');
-    const costInput = document.getElementById('step-cost-input');
-    const descInput = document.getElementById('step-desc-input');
+        const titleInput = document.getElementById('step-title-input');
+        const assignedSelect = document.getElementById('step-assign-select');
+        const hoursInput = document.getElementById('step-hours-input');
+        const costInput = document.getElementById('step-cost-input');
+        const descInput = document.getElementById('step-desc-input');
 
-    const title = titleInput.value.trim();
-    const assignedId = assignedSelect.value;
-    const hours = parseFloat(hoursInput.value) || 0;
-    const cost = parseFloat(costInput.value) || 0;
-    const description = descInput.value.trim();
+        const title = titleInput.value.trim();
+        const assignedId = assignedSelect.value;
+        const hours = parseFloat(hoursInput.value) || 0;
+        const cost = parseFloat(costInput.value) || 0;
 
-    // Debugging: Check if we actually have a Requirement selected
-    if (!selectedReqId) {
-        return alert("Error: No Requirement selected. Please click a requirement on the left first.");
-    }
+        if (!selectedReqId) return alert("Select a requirement first.");
+        if (!title || !assignedId || hours <= 0) return alert("Fill all fields.");
 
-    if (!title || !assignedId || hours <= 0) {
-        return alert("Please provide a title, resource, and hours.");
-    }
+        const { error } = await supabase.from('steps').insert([{
+            requirement_id: selectedReqId,
+            title,
+            assigned_to: assignedId,
+            estimated_hours: hours,
+            cost,
+            description: descInput.value.trim(),
+            sequence_order: 999
+        }]);
 
-    console.log("Attempting to save step for Req ID:", selectedReqId);
-
-    const { data, error } = await supabase.from('steps').insert([{
-        requirement_id: selectedReqId, // Ensure this column name matches your DB exactly
-        title: title,
-        assigned_to: assignedId,
-        estimated_hours: hours,
-        cost: cost,
-        description: description,
-        sequence_order: 999
-    }]).select(); // Adding .select() helps confirm the row was actually created
-
-    if (error) {
-        console.error("Supabase Error:", error);
-        alert(`Save failed: ${error.message} (${error.code})`);
-    } else {
-        console.log("Success! Row created:", data);
-        
-        // Clear inputs
-        titleInput.value = '';
-        hoursInput.value = '';
-        costInput.value = '';
-        descInput.value = '';
-        
-        // Refresh the list immediately
-        await refreshSteps();
-        await rollupToRequirement();
-    }
-};
+        if (error) {
+            alert(`Save failed: ${error.message}`);
+        } else {
+            titleInput.value = '';
+            hoursInput.value = '';
+            costInput.value = '';
+            descInput.value = '';
+            refreshSteps();
+            rollupToRequirement();
+        }
+    };
 
     async function refreshSteps() {
         const { data: steps } = await supabase.from('steps')
@@ -369,29 +338,11 @@ window.closeSteps = () => {
         loadRequirements();
     }
 
-window.updateStatus = async (id, status) => {
-    console.log(`Updating Requirement ${id} to ${status}...`);
-    
-    const { error } = await supabase
-        .from('requirements')
-        .update({ status: status })
-        .eq('id', id);
-
-    if (error) {
-        console.error("Status Update Failed:", error);
-        alert(`Failed to update status: ${error.message}`);
-    } else {
-        // Refresh the list to show the new colored badge
-        await loadRequirements();
-        
-        // If this requirement is currently open in the right panel, 
-        // we should update the meta text there too
-        if (selectedReqId === id) {
-            // Optional: You could update the UI here without a full refresh
-            console.log("Active requirement status updated.");
-        }
-    }
-};
+    window.updateStatus = async (id, status) => {
+        const { error } = await supabase.from('requirements').update({ status }).eq('id', id);
+        if (error) alert(error.message);
+        else loadRequirements();
+    };
 
     window.toggleKebab = (id) => {
         const menu = document.getElementById(`kebab-${id}`);

@@ -10,9 +10,21 @@
     <style>
         .app-container { height: calc(100vh - 140px); }
         .list-viewport { overflow-y: auto; flex-grow: 1; position: relative; }
-        .list-viewport::-webkit-scrollbar { width: 6px; }
-        .list-viewport::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
         .active-req { border-left: 4px solid #4f46e5 !important; background-color: #f5f3ff !important; }
+        
+        /* THE ACTIVATION FIX */
+        /* We use a data-attribute to force the panel to be 'live' or 'dead' */
+        #steps-panel[data-locked="true"] {
+            opacity: 0.4 !important;
+            pointer-events: none !important;
+            filter: grayscale(1);
+            user-select: none;
+        }
+        #steps-panel[data-locked="false"] {
+            opacity: 1 !important;
+            pointer-events: auto !important;
+            filter: grayscale(0);
+        }
     </style>
 </head>
 <body class="bg-gray-100 min-h-screen overflow-hidden">
@@ -49,11 +61,11 @@
                 <ul id="req-list" class="list-viewport divide-y divide-gray-100"></ul>
             </section>
 
-            <section id="steps-panel" style="opacity: 0.4; pointer-events: none;" class="bg-white rounded-xl shadow-sm border border-gray-200 flex flex-col overflow-hidden transition-all duration-300">
+            <section id="steps-panel" data-locked="true" class="bg-white rounded-xl shadow-sm border border-gray-200 flex flex-col overflow-hidden transition-all duration-300">
                 <div class="px-4 py-4 border-b bg-indigo-50/50 flex justify-between items-center">
                     <div>
                         <h3 id="selected-req-title" class="font-bold text-indigo-900">2. Task Breakdown</h3>
-                        <p id="selected-req-meta" class="text-[10px] text-indigo-500 font-bold uppercase"></p>
+                        <p id="selected-req-meta" class="text-[10px] text-indigo-500 font-bold uppercase">Select a requirement to add tasks</p>
                     </div>
                     <button onclick="closeSteps()" class="text-gray-400 hover:text-indigo-600 text-2xl leading-none">&times;</button>
                 </div>
@@ -90,7 +102,6 @@
     import { checkAccess } from './js/auth.js';
     import { renderProjectHeader } from './js/components.js';
 
-    // GLOBAL SCOPE
     let session, projectId;
     let selectedReqId = null; 
     let projectBlendedRate = 0;
@@ -100,8 +111,7 @@
         session = await checkAccess(MODULES.REQUIREMENTS);
         projectId = localStorage.getItem('selected_project_id');
         
-        if (!projectId || projectId === "undefined") {
-            alert("No project selected.");
+        if (!projectId) {
             window.location.href = 'index.html';
             return;
         }
@@ -153,17 +163,14 @@
 
         if (!title || !assignedId || hours <= 0) return alert("Please fill all fields");
 
-        const { error } = await supabase.from('requirements').insert([{ 
+        await supabase.from('requirements').insert([{ 
             title, project_id: projectId, status: 'Pending', sequence_order: 999, 
             estimated_hours: hours, assigned_to: assignedId, custom_rate: rate 
         }]);
 
-        if (error) alert(error.message);
-        else {
-            document.getElementById('req-title-input').value = '';
-            document.getElementById('req-hours-input').value = '';
-            loadRequirements();
-        }
+        document.getElementById('req-title-input').value = '';
+        document.getElementById('req-hours-input').value = '';
+        loadRequirements();
     };
 
     async function loadRequirements() {
@@ -177,15 +184,18 @@
         list.innerHTML = reqs.map(req => {
             const name = req.user_profiles?.full_name || req.user_profiles?.email || 'Unassigned';
             const status = req.status || 'Pending';
-            const statusColor = status === 'Pending' ? 'bg-amber-100 text-amber-700' : 'bg-green-100 text-green-700';
-            const total = (req.estimated_hours || 0) * (req.custom_rate || 0);
             
+            // Status Styling
+            let statusColor = "bg-amber-100 text-amber-700";
+            if (status === 'In Progress') statusColor = "bg-blue-100 text-blue-700";
+            if (status === 'Complete') statusColor = "bg-green-100 text-green-700";
+
             return `
                 <li class="req-row p-4 hover:bg-gray-50 flex justify-between items-center cursor-pointer border-l-4 border-transparent" 
                     data-id="${req.id}" 
                     onclick="openSteps('${req.id}', \`${req.title.replace(/`/g, '\\`')}\`)">
                     <div class="flex items-center gap-3">
-                        <span class="cursor-move text-gray-300">::</span>
+                        <span class="cursor-move text-gray-300 font-bold p-1">::</span>
                         <div>
                             <div class="flex items-center gap-2">
                                 <p class="text-sm font-bold text-gray-800">${req.title}</p>
@@ -195,11 +205,15 @@
                         </div>
                     </div>
                     <div class="flex items-center gap-2">
-                        <p class="text-sm font-mono font-bold text-indigo-600">$${total.toLocaleString()}</p>
+                        <p class="text-sm font-mono font-bold text-indigo-600">$${((req.estimated_hours || 0) * (req.custom_rate || 0)).toLocaleString()}</p>
                         <div class="relative kebab-container">
-                            <button onclick="event.stopPropagation(); toggleKebab('req-${req.id}')" class="p-2 text-gray-400 hover:text-indigo-600 font-bold">?</button>
-                            <div id="kebab-req-${req.id}" class="hidden absolute right-0 top-10 w-32 bg-white border shadow-xl rounded z-[100]">
-                                <button onclick="event.stopPropagation(); updateStatus('${req.id}', 'Complete')" class="w-full text-left p-2 text-xs hover:bg-gray-50">Mark Complete</button>
+                            <button onclick="event.stopPropagation(); toggleKebab('req-${req.id}')" class="p-2 text-gray-400 hover:text-indigo-600 font-bold text-lg">?</button>
+                            <div id="kebab-req-${req.id}" class="hidden absolute right-0 top-8 w-40 bg-white border shadow-xl rounded z-[100] p-1">
+                                <p class="text-[9px] font-bold text-gray-400 uppercase px-2 py-1">Set Status</p>
+                                <button onclick="event.stopPropagation(); updateStatus('${req.id}', 'Pending')" class="w-full text-left p-2 text-xs hover:bg-gray-50">Pending</button>
+                                <button onclick="event.stopPropagation(); updateStatus('${req.id}', 'In Progress')" class="w-full text-left p-2 text-xs text-blue-600 hover:bg-blue-50">In Progress</button>
+                                <button onclick="event.stopPropagation(); updateStatus('${req.id}', 'Complete')" class="w-full text-left p-2 text-xs text-green-600 hover:bg-green-50">Complete</button>
+                                <hr class="my-1">
                                 <button onclick="event.stopPropagation(); deleteReq('${req.id}')" class="w-full text-left p-2 text-xs text-red-600 hover:bg-red-50">Delete</button>
                             </div>
                         </div>
@@ -209,38 +223,25 @@
     }
 
     window.openSteps = (id, title) => {
-        if (!id || id === "undefined") return;
-        
         selectedReqId = id;
-
-        // Visual feedback
         document.querySelectorAll('.req-row').forEach(el => el.classList.remove('active-req'));
         const activeEl = document.querySelector(`[data-id="${id}"]`);
         if (activeEl) activeEl.classList.add('active-req');
 
-        // FORCE ACTIVATE PANEL
-        const panel = document.getElementById('steps-panel');
-        panel.style.opacity = "1";
-        panel.style.pointerEvents = "auto";
-        
+        // ACTIVATE THE PANEL
+        document.getElementById('steps-panel').setAttribute('data-locked', 'false');
         document.getElementById('selected-req-title').innerText = title;
+        document.getElementById('selected-req-meta').innerText = "Loading tasks...";
         refreshSteps();
     };
 
     window.closeSteps = () => {
-        const panel = document.getElementById('steps-panel');
-        panel.style.opacity = "0.4";
-        panel.style.pointerEvents = "none";
+        document.getElementById('steps-panel').setAttribute('data-locked', 'true');
         document.querySelectorAll('.req-row').forEach(el => el.classList.remove('active-req'));
         selectedReqId = null;
     };
 
     window.submitStep = async () => {
-        if (!selectedReqId || selectedReqId === "undefined") {
-            alert("Please select a requirement first.");
-            return;
-        }
-
         const title = document.getElementById('step-title-input').value.trim();
         const assignedId = document.getElementById('step-assign-select').value;
         const hours = parseFloat(document.getElementById('step-hours-input').value) || 0;
@@ -249,17 +250,14 @@
 
         if (!title || !assignedId || hours <= 0) return alert("Fill all fields");
 
-        const { error } = await supabase.from('steps').insert([{
+        await supabase.from('steps').insert([{
             requirement_id: selectedReqId, title, assigned_to: assignedId,
             estimated_hours: hours, cost, description, sequence_order: 999
         }]);
 
-        if (error) alert(error.message);
-        else {
-            ['step-title-input', 'step-hours-input', 'step-cost-input', 'step-desc-input'].forEach(i => document.getElementById(i).value = '');
-            refreshSteps();
-            rollupToRequirement();
-        }
+        ['step-title-input', 'step-hours-input', 'step-cost-input', 'step-desc-input'].forEach(i => document.getElementById(i).value = '');
+        refreshSteps();
+        rollupToRequirement();
     };
 
     async function refreshSteps() {
@@ -267,9 +265,10 @@
             .select(`*, user_profiles:assigned_to(full_name, email)`)
             .eq('requirement_id', selectedReqId).order('sequence_order');
 
+        document.getElementById('selected-req-meta').innerText = `${steps?.length || 0} tasks identified`;
         const list = document.getElementById('step-list');
         list.innerHTML = (steps || []).map(s => `
-            <li class="px-4 py-3 flex justify-between items-center group relative transition" data-id="${s.id}">
+            <li class="px-4 py-3 flex justify-between items-center group relative" data-id="${s.id}">
                 <div class="flex items-center gap-3">
                     <span class="cursor-move text-gray-200 group-hover:text-indigo-300 font-bold">::</span>
                     <div>
@@ -282,22 +281,19 @@
                         <p class="text-[11px] font-bold text-gray-900">$${s.cost.toLocaleString()}</p>
                         <p class="text-[9px] text-gray-400">${s.estimated_hours}h</p>
                     </div>
-                    <div class="relative kebab-container">
-                        <button onclick="toggleKebab('step-${s.id}')" class="p-2 text-gray-300 hover:text-indigo-600 text-lg">?</button>
-                        <div id="kebab-step-${s.id}" class="hidden absolute right-0 top-10 w-32 bg-white border shadow-xl rounded z-[100]">
-                            <button onclick="deleteStep('${s.id}')" class="w-full text-left p-2 text-xs text-red-600 hover:bg-red-50">Delete</button>
-                        </div>
-                    </div>
+                    <button onclick="deleteStep('${s.id}')" class="opacity-0 group-hover:opacity-100 p-2 text-red-300 hover:text-red-600 transition">&times;</button>
                 </div>
             </li>`).join('');
     }
 
     async function rollupToRequirement() {
-        if (!selectedReqId) return;
         const { data: steps } = await supabase.from('steps').select('cost, estimated_hours').eq('requirement_id', selectedReqId);
         const totalCost = steps.reduce((sum, s) => sum + (s.cost || 0), 0);
         const totalHours = steps.reduce((sum, s) => sum + (s.estimated_hours || 0), 0);
-        await supabase.from('requirements').update({ estimated_hours: totalHours, custom_rate: totalHours > 0 ? (totalCost / totalHours) : 0 }).eq('id', selectedReqId);
+        await supabase.from('requirements').update({ 
+            estimated_hours: totalHours, 
+            custom_rate: totalHours > 0 ? (totalCost / totalHours) : 0 
+        }).eq('id', selectedReqId);
         loadRequirements();
     }
 
@@ -313,17 +309,19 @@
     };
 
     window.deleteReq = async (id) => {
-        if (!confirm("Delete Requirement?")) return;
-        await supabase.from('requirements').delete().eq('id', id);
-        loadRequirements();
-        closeSteps();
+        if (confirm("Delete Requirement?")) {
+            await supabase.from('requirements').delete().eq('id', id);
+            loadRequirements();
+            closeSteps();
+        }
     };
 
     window.deleteStep = async (id) => {
-        if (!confirm("Delete Task?")) return;
-        await supabase.from('steps').delete().eq('id', id);
-        refreshSteps();
-        rollupToRequirement();
+        if (confirm("Delete Task?")) {
+            await supabase.from('steps').delete().eq('id', id);
+            refreshSteps();
+            rollupToRequirement();
+        }
     };
 
     function initSortable() {

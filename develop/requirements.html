@@ -174,66 +174,75 @@
     };
 
     async function loadRequirements() {
-        const { data: reqs } = await supabase.from('requirements')
-            .select(`*, user_profiles:assigned_to(full_name, email)`)
-            .eq('project_id', projectId).order('sequence_order');
+    const { data: reqs, error } = await supabase.from('requirements')
+        .select(`*, user_profiles:assigned_to(full_name, email)`)
+        .eq('project_id', projectId).order('sequence_order');
 
-        document.getElementById('req-count').innerText = `${reqs.length} ITEMS`;
-        const list = document.getElementById('req-list');
+    if (error) return console.error(error);
+
+    document.getElementById('req-count').innerText = `${reqs.length} ITEMS`;
+    const list = document.getElementById('req-list');
+    
+    list.innerHTML = reqs.map(req => {
+        const name = req.user_profiles?.full_name || req.user_profiles?.email || 'Unassigned';
+        const status = req.status || 'Pending';
         
-        list.innerHTML = reqs.map(req => {
-            const name = req.user_profiles?.full_name || req.user_profiles?.email || 'Unassigned';
-            const status = req.status || 'Pending';
-            
-            // Status Styling
-            let statusColor = "bg-amber-100 text-amber-700";
-            if (status === 'In Progress') statusColor = "bg-blue-100 text-blue-700";
-            if (status === 'Complete') statusColor = "bg-green-100 text-green-700";
+        let statusColor = "bg-amber-100 text-amber-700";
+        if (status === 'In Progress') statusColor = "bg-blue-100 text-blue-700";
+        if (status === 'Complete') statusColor = "bg-green-100 text-green-700";
 
-            return `
-                <li class="req-row p-4 hover:bg-gray-50 flex justify-between items-center cursor-pointer border-l-4 border-transparent" 
-                    data-id="${req.id}" 
-                    onclick="openSteps('${req.id}', \`${req.title.replace(/`/g, '\\`')}\`)">
-                    <div class="flex items-center gap-3">
-                        <span class="cursor-move text-gray-300 font-bold p-1">::</span>
-                        <div>
-                            <div class="flex items-center gap-2">
-                                <p class="text-sm font-bold text-gray-800">${req.title}</p>
-                                <span class="text-[8px] px-1.5 py-0.5 rounded font-black uppercase ${statusColor}">${status}</span>
-                            </div>
-                            <p class="text-[10px] text-gray-400 font-bold uppercase">${name} | ${req.estimated_hours}h</p>
+        // IMPORTANT: We use data-id to hold the UUID safely
+        return `
+            <li class="req-row p-4 hover:bg-gray-50 flex justify-between items-center cursor-pointer border-l-4 border-transparent" 
+                data-id="${req.id}" 
+                onclick="openSteps(this, \`${req.title.replace(/`/g, '\\`')}\`)">
+                <div class="flex items-center gap-3 pointer-events-none">
+                    <span class="cursor-move text-gray-300 font-bold p-1">::</span>
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <p class="text-sm font-bold text-gray-800">${req.title}</p>
+                            <span class="text-[8px] px-1.5 py-0.5 rounded font-black uppercase ${statusColor}">${status}</span>
+                        </div>
+                        <p class="text-[10px] text-gray-400 font-bold uppercase">${name} | ${req.estimated_hours}h</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2">
+                    <p class="text-sm font-mono font-bold text-indigo-600 pointer-events-none">$${((req.estimated_hours || 0) * (req.custom_rate || 0)).toLocaleString()}</p>
+                    <div class="relative kebab-container">
+                        <button onclick="event.stopPropagation(); toggleKebab('req-${req.id}')" class="p-2 text-gray-400 hover:text-indigo-600 font-bold text-lg">?</button>
+                        <div id="kebab-req-${req.id}" class="hidden absolute right-0 top-8 w-40 bg-white border shadow-xl rounded z-[100] p-1">
+                            <p class="text-[9px] font-bold text-gray-400 uppercase px-2 py-1">Set Status</p>
+                            <button onclick="event.stopPropagation(); updateStatus('${req.id}', 'Pending')" class="w-full text-left p-2 text-xs hover:bg-gray-50">Pending</button>
+                            <button onclick="event.stopPropagation(); updateStatus('${req.id}', 'In Progress')" class="w-full text-left p-2 text-xs text-blue-600 hover:bg-blue-50">In Progress</button>
+                            <button onclick="event.stopPropagation(); updateStatus('${req.id}', 'Complete')" class="w-full text-left p-2 text-xs text-green-600 hover:bg-green-50">Complete</button>
+                            <hr class="my-1">
+                            <button onclick="event.stopPropagation(); deleteReq('${req.id}')" class="w-full text-left p-2 text-xs text-red-600 hover:bg-red-50">Delete</button>
                         </div>
                     </div>
-                    <div class="flex items-center gap-2">
-                        <p class="text-sm font-mono font-bold text-indigo-600">$${((req.estimated_hours || 0) * (req.custom_rate || 0)).toLocaleString()}</p>
-                        <div class="relative kebab-container">
-                            <button onclick="event.stopPropagation(); toggleKebab('req-${req.id}')" class="p-2 text-gray-400 hover:text-indigo-600 font-bold text-lg">?</button>
-                            <div id="kebab-req-${req.id}" class="hidden absolute right-0 top-8 w-40 bg-white border shadow-xl rounded z-[100] p-1">
-                                <p class="text-[9px] font-bold text-gray-400 uppercase px-2 py-1">Set Status</p>
-                                <button onclick="event.stopPropagation(); updateStatus('${req.id}', 'Pending')" class="w-full text-left p-2 text-xs hover:bg-gray-50">Pending</button>
-                                <button onclick="event.stopPropagation(); updateStatus('${req.id}', 'In Progress')" class="w-full text-left p-2 text-xs text-blue-600 hover:bg-blue-50">In Progress</button>
-                                <button onclick="event.stopPropagation(); updateStatus('${req.id}', 'Complete')" class="w-full text-left p-2 text-xs text-green-600 hover:bg-green-50">Complete</button>
-                                <hr class="my-1">
-                                <button onclick="event.stopPropagation(); deleteReq('${req.id}')" class="w-full text-left p-2 text-xs text-red-600 hover:bg-red-50">Delete</button>
-                            </div>
-                        </div>
-                    </div>
-                </li>`;
-        }).join('');
+                </div>
+            </li>`;
+    }).join('');
+}
+
+window.openSteps = (element, title) => {
+    // Instead of passing the ID as a string, we grab it from the element's data attribute
+    const id = element.getAttribute('data-id');
+    
+    if (!id || id === "undefined") {
+        console.error("Critical Error: UUID is missing from the element attribute.");
+        return;
     }
 
-    window.openSteps = (id, title) => {
-        selectedReqId = id;
-        document.querySelectorAll('.req-row').forEach(el => el.classList.remove('active-req'));
-        const activeEl = document.querySelector(`[data-id="${id}"]`);
-        if (activeEl) activeEl.classList.add('active-req');
+    selectedReqId = id; // Update the global variable
+    console.log("Requirement Selected (ID Locked):", selectedReqId);
 
-        // ACTIVATE THE PANEL
-        document.getElementById('steps-panel').setAttribute('data-locked', 'false');
-        document.getElementById('selected-req-title').innerText = title;
-        document.getElementById('selected-req-meta').innerText = "Loading tasks...";
-        refreshSteps();
-    };
+    document.querySelectorAll('.req-row').forEach(el => el.classList.remove('active-req'));
+    element.classList.add('active-req');
+
+    document.getElementById('steps-panel').setAttribute('data-locked', 'false');
+    document.getElementById('selected-req-title').innerText = title;
+    refreshSteps();
+};
 
     window.closeSteps = () => {
         document.getElementById('steps-panel').setAttribute('data-locked', 'true');

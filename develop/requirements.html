@@ -229,6 +229,48 @@
     refreshSteps();
 };
 
+window.submitStep = async () => {
+    // FINAL GUARD: Prevent the UUID error
+    if (!selectedReqId || selectedReqId === "undefined") {
+        alert("Error: No requirement selected. Please click a requirement on the left again.");
+        return;
+    }
+
+    const title = document.getElementById('step-title-input').value.trim();
+    const assignedId = document.getElementById('step-assign-select').value;
+    const hours = parseFloat(document.getElementById('step-hours-input').value) || 0;
+    const cost = parseFloat(document.getElementById('step-cost-input').value) || 0;
+    const description = document.getElementById('step-desc-input').value.trim();
+
+    if (!title || !assignedId || hours <= 0) {
+        alert("Please fill all Task fields (Title, Resource, and Hours).");
+        return;
+    }
+
+    // Attempt the insert
+    const { data, error } = await supabase.from('steps').insert([{
+        requirement_id: selectedReqId, // This is where the UUID goes
+        title, 
+        assigned_to: assignedId,
+        estimated_hours: hours, 
+        cost, 
+        description, 
+        sequence_order: 999
+    }]).select();
+
+    if (error) {
+        console.error("Supabase Error:", error);
+        alert("Database Error: " + error.message);
+    } else {
+        // Clear inputs on success
+        ['step-title-input', 'step-hours-input', 'step-cost-input', 'step-desc-input'].forEach(i => {
+            document.getElementById(i).value = '';
+        });
+        refreshSteps();
+        rollupToRequirement();
+    }
+};
+
     window.closeSteps = () => {
         const panel = document.getElementById('steps-panel');
         panel.style.opacity = "0.4";

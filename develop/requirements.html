@@ -184,7 +184,7 @@ document.getElementById('req-list').addEventListener('click', (e) => {
             let statusClass = (status === 'In Progress') ? "status-inprogress" : (status === 'Complete' ? "status-complete" : "status-pending");
             return `
                 <li class="req-row p-4 hover:bg-gray-50 flex justify-between items-center cursor-pointer border-l-4 border-transparent" 
-                    data-id="${req.id}" data-title="${(req.title || '').replace(/"/g, '&quot;')}">
+                    data-id="${req.req_id}" data-title="${(req.title || '').replace(/"/g, '&quot;')}">
                     <div class="flex items-center gap-3">
                         <span class="cursor-move text-gray-300 font-bold p-1">::</span>
                         <div>
@@ -198,12 +198,12 @@ document.getElementById('req-list').addEventListener('click', (e) => {
                     <div class="flex items-center gap-2">
                         <p class="text-sm font-mono font-bold text-indigo-600">$${((req.estimated_hours || 0) * (req.custom_rate || 0)).toLocaleString()}</p>
                         <div class="relative kebab-container">
-                            <button onclick="event.stopPropagation(); toggleKebab('req-${req.id}')" class="p-2 text-gray-400 hover:text-indigo-600 font-bold text-lg">?</button>
+                            <button onclick="event.stopPropagation(); toggleKebab('req-${req.req_id}')" class="p-2 text-gray-400 hover:text-indigo-600 font-bold text-lg">?</button>
                             <div id="kebab-req-${req.id}" class="hidden absolute right-0 top-8 w-40 bg-white border shadow-xl rounded z-[100] p-1">
-                                <button onclick="event.stopPropagation(); updateStatus('${req.id}', 'Pending')" class="w-full text-left p-2 text-xs hover:bg-gray-50">Pending</button>
-                                <button onclick="event.stopPropagation(); updateStatus('${req.id}', 'In Progress')" class="w-full text-left p-2 text-xs text-blue-600 hover:bg-blue-50">In Progress</button>
-                                <button onclick="event.stopPropagation(); updateStatus('${req.id}', 'Complete')" class="w-full text-left p-2 text-xs text-green-600 hover:bg-green-50">Complete</button>
-                                <hr class="my-1"><button onclick="event.stopPropagation(); deleteReq('${req.id}')" class="w-full text-left p-2 text-xs text-red-600 hover:bg-red-50">Delete</button>
+                                <button onclick="event.stopPropagation(); updateStatus('${req.req_id}', 'Pending')" class="w-full text-left p-2 text-xs hover:bg-gray-50">Pending</button>
+                                <button onclick="event.stopPropagation(); updateStatus('${req.req_id}', 'In Progress')" class="w-full text-left p-2 text-xs text-blue-600 hover:bg-blue-50">In Progress</button>
+                                <button onclick="event.stopPropagation(); updateStatus('${req.req_id}', 'Complete')" class="w-full text-left p-2 text-xs text-green-600 hover:bg-green-50">Complete</button>
+                                <hr class="my-1"><button onclick="event.stopPropagation(); deleteReq('${req.req_id}')" class="w-full text-left p-2 text-xs text-red-600 hover:bg-red-50">Delete</button>
                             </div>
                         </div>
                     </div>

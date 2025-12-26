@@ -402,7 +402,7 @@ async function rollupToRequirement() {
 }
 
     window.updateStatus = async (id, status) => {
-        const { error } = await supabase.from('requirements').update({ status }).eq('id', id);
+        const { error } = await supabase.from('requirements').update({ status }).eq('id', id).eq('tenant_id', tenantId); // THE SECURITY LOCK;
         if (error) alert(error.message);
         else loadRequirements();
     };
@@ -415,7 +415,7 @@ async function rollupToRequirement() {
 
     window.deleteReq = async (id) => {
         if (confirm("Delete Requirement?")) {
-            await supabase.from('requirements').delete().eq('id', id);
+            await supabase.from('requirements').delete().eq('id', id).eq('tenant_id', tenantId); // THE SECURITY LOCK;
             loadRequirements(); closeSteps();
         }
     };

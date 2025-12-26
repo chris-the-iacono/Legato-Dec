@@ -207,58 +207,73 @@ window.addRequirement = async () => {
 };
 
 async function loadRequirements() {
-        // 1. Safety Guard: Don't fetch if we don't have a Project or Tenant ID yet
-        if (!projectId || !tenantId) {
-            console.warn("loadRequirements blocked: Missing projectId or tenantId");
-            return;
-        }
-
-        // 2. The Fetch: Added the tenant_id filter here
-        const { data: reqs, error } = await supabase.from('requirements')
-            .select(`*, user_profiles:assigned_to(full_name, email)`)
-            .eq('project_id', projectId)
-            .eq('tenant_id', tenantId) // <--- THIS SECURES YOUR DATA
-            .order('sequence_order');
-
-        if (error) return console.error(error);
-
-        document.getElementById('req-count').innerText = `${reqs.length} ITEMS`;
-        const list = document.getElementById('req-list');
-        
-        list.innerHTML = reqs.map(req => {
-            const name = req.user_profiles?.full_name || req.user_profiles?.email || 'Unassigned';
-            const status = req.status || 'Pending';
-            let statusClass = (status === 'In Progress') ? "status-inprogress" : (status === 'Complete' ? "status-complete" : "status-pending");
-            
-            return `
-                <li class="req-row p-4 hover:bg-gray-50 flex justify-between items-center cursor-pointer border-l-4 border-transparent" 
-                    data-id="${req.req_id}" data-title="${(req.title || '').replace(/"/g, '&quot;')}">
-                    <div class="flex items-center gap-3">
-                        <span class="cursor-move text-gray-300 font-bold p-1">::</span>
-                        <div>
-                            <div class="flex items-center gap-2">
-                                <p class="text-sm font-bold text-gray-800">${req.title}</p>
-                                <span class="text-[8px] px-1.5 py-0.5 rounded font-black uppercase ${statusClass}">${status}</span>
-                            </div>
-                            <p class="text-[10px] text-gray-400 font-bold uppercase">${name} | ${req.estimated_hours}h</p>
-                        </div>
-                    </div>
-                    <div class="flex items-center gap-2">
-                        <p class="text-sm font-mono font-bold text-indigo-600">$${((req.estimated_hours || 0) * (req.custom_rate || 0)).toLocaleString()}</p>
-                        <div class="relative kebab-container">
-                            <button onclick="event.stopPropagation(); toggleKebab('req-${req.req_id}')" class="p-2 text-gray-400 hover:text-indigo-600 font-bold text-lg">?</button>
-                            <div id="kebab-req-${req.req_id}" class="hidden absolute right-0 top-8 w-40 bg-white border shadow-xl rounded z-[100] p-1">
-                                <button onclick="event.stopPropagation(); updateStatus('${req.req_id}', 'Pending')" class="w-full text-left p-2 text-xs hover:bg-gray-50">Pending</button>
-                                <button onclick="event.stopPropagation(); updateStatus('${req.req_id}', 'In Progress')" class="w-full text-left p-2 text-xs text-blue-600 hover:bg-blue-50">In Progress</button>
-                                <button onclick="event.stopPropagation(); updateStatus('${req.req_id}', 'Complete')" class="w-full text-left p-2 text-xs text-green-600 hover:bg-green-50">Complete</button>
-                                <hr class="my-1">
-                                <button onclick="event.stopPropagation(); deleteReq('${req.req_id}')" class="w-full text-left p-2 text-xs text-red-600 hover:bg-red-50">Delete</button>
-                            </div>
-                        </div>
-                    </div>
-                </li>`;
-        }).join('');
+    // 1. Safety Guard
+    if (!projectId || !tenantId) {
+        console.warn("loadRequirements blocked: Missing projectId or tenantId");
+        return;
     }
+
+    // 2. The Fetch: We now join user_profiles TWICE using aliases
+    const { data: reqs, error } = await supabase.from('requirements')
+        .select(`
+            *,
+            assignee:assigned_to(full_name, email),
+            editor:updated_by(full_name)
+        `)
+        .eq('project_id', projectId)
+        .eq('tenant_id', tenantId)
+        .order('sequence_order');
+
+    if (error) return console.error(error);
+
+    document.getElementById('req-count').innerText = `${reqs.length} ITEMS`;
+    const list = document.getElementById('req-list');
+    
+    list.innerHTML = reqs.map(req => {
+        // Use the new aliases 'assignee' and 'editor'
+        const assignedName = req.assignee?.full_name || req.assignee?.email || 'Unassigned';
+        const editorName = req.editor?.full_name || 'System';
+        
+        // Format the date for the UI
+        const lastUpdate = req.updated_at 
+            ? new Date(req.updated_at).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+            : 'N/A';
+
+        const status = req.status || 'Pending';
+        let statusClass = (status === 'In Progress') ? "status-inprogress" : (status === 'Complete' ? "status-complete" : "status-pending");
+        
+        return `
+            <li class="req-row p-4 hover:bg-gray-50 flex justify-between items-center cursor-pointer border-l-4 border-transparent" 
+                data-id="${req.req_id}" data-title="${(req.title || '').replace(/"/g, '&quot;')}">
+                <div class="flex items-center gap-3">
+                    <span class="cursor-move text-gray-300 font-bold p-1">::</span>
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <p class="text-sm font-bold text-gray-800">${req.title}</p>
+                            <span class="text-[8px] px-1.5 py-0.5 rounded font-black uppercase ${statusClass}">${status}</span>
+                        </div>
+                        <p class="text-[10px] text-gray-400 font-bold uppercase">
+                            ${assignedName} | ${req.estimated_hours}h
+                            <span class="text-indigo-400 ml-2">? Edited by ${editorName} (${lastUpdate})</span>
+                        </p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2">
+                    <p class="text-sm font-mono font-bold text-indigo-600">$${((req.estimated_hours || 0) * (req.custom_rate || 0)).toLocaleString()}</p>
+                    <div class="relative kebab-container">
+                        <button onclick="event.stopPropagation(); toggleKebab('req-${req.req_id}')" class="p-2 text-gray-400 hover:text-indigo-600 font-bold text-lg">?</button>
+                        <div id="kebab-req-${req.req_id}" class="hidden absolute right-0 top-8 w-40 bg-white border shadow-xl rounded z-[100] p-1">
+                            <button onclick="event.stopPropagation(); updateStatus('${req.req_id}', 'Pending')" class="w-full text-left p-2 text-xs hover:bg-gray-50">Pending</button>
+                            <button onclick="event.stopPropagation(); updateStatus('${req.req_id}', 'In Progress')" class="w-full text-left p-2 text-xs text-blue-600 hover:bg-blue-50">In Progress</button>
+                            <button onclick="event.stopPropagation(); updateStatus('${req.req_id}', 'Complete')" class="w-full text-left p-2 text-xs text-green-600 hover:bg-green-50">Complete</button>
+                            <hr class="my-1">
+                            <button onclick="event.stopPropagation(); deleteReq('${req.req_id}')" class="w-full text-left p-2 text-xs text-red-600 hover:bg-red-50">Delete</button>
+                        </div>
+                    </div>
+                </div>
+            </li>`;
+    }).join('');
+}
 window.openSteps = (rowElement, title) => {
     const id = rowElement.getAttribute('data-id');
     if (!id) return;
@@ -291,6 +306,10 @@ window.submitStep = async () => {
     const panelId = document.getElementById('steps-panel').getAttribute('data-selected-id');
     if (!panelId || panelId === "undefined") return alert("Select a requirement first.");
 
+    // Get the current user ID for the audit log
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return alert("You must be logged in to add steps.");
+
     const titleInput = document.getElementById('step-title-input');
     const assignedSelect = document.getElementById('step-assign-select');
     const hoursInput = document.getElementById('step-hours-input');
@@ -312,20 +331,22 @@ window.submitStep = async () => {
         .from('steps')
         .select('*', { count: 'exact', head: true })
         .eq('requirement_id', panelId)
-        .eq('tenant_id', tenantId); // Added tenant filter
+        .eq('tenant_id', tenantId);
 
     const nextOrder = (count || 0) + 1;
 
-    // 2. Insert with the tenant_id included
+    // 2. Insert with the tenant_id AND Audit Columns included
     const { error } = await supabase.from('steps').insert([{
         requirement_id: panelId,
-        tenant_id: tenantId, // <--- THE CRITICAL FIX
+        tenant_id: tenantId, 
         title,
         assigned_to: assignedId,
         estimated_hours: hours,
         cost,
         description: descInput.value.trim(),
-        sequence_order: nextOrder
+        sequence_order: nextOrder,
+        created_by: user.id,   // Tracks who created the step
+        updated_by: user.id    // Tracks who last modified the step
     }]);
 
     if (error) {

@@ -16,7 +16,7 @@ export function renderProjectHeader(session, activeTab, projectName = "Select Pr
     const currentPath = window.location.pathname;
     let envBadge = '';
     if (currentPath.includes('/develop/')) {
-        envBadge = '<span class="bg-yellow-500 text-black px-2 py-0.5 text-[10px] font-bold rounded ml-2 shadow-sm animate-pulse">TEST</span>';
+        envBadge = '<span class="bg-yellow-500 text-black px-2 py-0.5 text-[10px] font-bold rounded ml-2 shadow-sm animate-pulse">DEV</span>';
     } else if (currentPath.includes('/test/')) {
         envBadge = '<span class="bg-blue-500 text-white px-2 py-0.5 text-[10px] font-bold rounded ml-2 shadow-sm animate-pulse">STAGE</span>';
     }

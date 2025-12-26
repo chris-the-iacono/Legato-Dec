@@ -349,7 +349,7 @@ async function refreshSteps() {
     const { data: steps } = await supabase.from('steps')
         .select(`*, user_profiles:assigned_to(full_name, email)`)
         .eq('requirement_id', panelId)
-		.eq('tenant_id', tenantId);
+		.eq('tenant_id', tenantId)
         .order('sequence_order');
 
     document.getElementById('selected-req-meta').innerText = `${steps?.length || 0} tasks identified`;

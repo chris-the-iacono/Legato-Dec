@@ -302,34 +302,42 @@ window.submitStep = async () => {
     const hours = parseFloat(hoursInput.value) || 0;
     const cost = parseFloat(costInput.value) || 0;
 
-    if (!title || !assignedId || hours <= 0) return alert("Fill all fields.");
+    // Added tenantId to the validation check
+    if (!title || !assignedId || hours <= 0 || !tenantId) {
+        return alert("Fill all fields and ensure you are logged in correctly.");
+    }
 
-    // 1. Get the current count of steps to determine the next sequence order
+    // 1. Get current count (Filtered by requirement AND tenant for accuracy)
     const { count } = await supabase
         .from('steps')
         .select('*', { count: 'exact', head: true })
-        .eq('requirement_id', panelId);
+        .eq('requirement_id', panelId)
+        .eq('tenant_id', tenantId); // Added tenant filter
 
     const nextOrder = (count || 0) + 1;
 
-    // 2. Insert with the dynamic sequence order
+    // 2. Insert with the tenant_id included
     const { error } = await supabase.from('steps').insert([{
         requirement_id: panelId,
+        tenant_id: tenantId, // <--- THE CRITICAL FIX
         title,
         assigned_to: assignedId,
         estimated_hours: hours,
         cost,
         description: descInput.value.trim(),
-        sequence_order: nextOrder // Use dynamic order instead of 999
+        sequence_order: nextOrder
     }]);
 
     if (error) {
         alert(`Save failed: ${error.message}`);
     } else {
+        // Clear inputs
         titleInput.value = '';
         hoursInput.value = '';
         costInput.value = '';
         descInput.value = '';
+        
+        // Refresh UI
         refreshSteps();
         rollupToRequirement();
     }
@@ -341,6 +349,7 @@ async function refreshSteps() {
     const { data: steps } = await supabase.from('steps')
         .select(`*, user_profiles:assigned_to(full_name, email)`)
         .eq('requirement_id', panelId)
+		.eq('tenant_id', tenantId);
         .order('sequence_order');
 
     document.getElementById('selected-req-meta').innerText = `${steps?.length || 0} tasks identified`;

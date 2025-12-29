@@ -1,0 +1,21 @@
+name: Multi-Branch Deploy
+on:
+  push:
+    branches: [main, test, develop] # Triggers on any of these branches
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Deploy to GitHub Pages
+        uses: JamesIves/github-pages-deploy-action@v4
+        with:
+          folder: . # Deploy the root of the repo
+          branch: gh-pages # The hidden hosting branch
+          target-folder: ${{ github.ref_name == 'main' && '/' || github.ref_name }}
+          # Result: 'main' branch goes to root, 'test' goes to /test, 'develop' goes to /develop

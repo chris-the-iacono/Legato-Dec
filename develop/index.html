@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Project Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50">
+
+    <div id="main-header"></div>
+
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div class="flex justify-between items-center mb-8">
+            <h1 class="text-3xl font-bold text-gray-900">Project Dashboard</h1>
+            <button onclick="toggleProjectModal()" 
+                    class="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 transition">
+                + New Project
+            </button>
+        </div>
+
+        <div id="project-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            </div>
+    </main>
+
+    <div id="project-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden flex items-center justify-center z-50">
+        <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
+            <h2 class="text-xl font-bold mb-4">Create New Project</h2>
+            
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Project Name</label>
+                    <input type="text" id="new-project-name" placeholder="e.g. Q4 Audit"
+                           class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2">
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Project Title (Description)</label>
+                    <input type="text" id="new-project-title" placeholder="e.g. Annual Financial Review"
+                           class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2">
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Applied Rate ($/hr)</label>
+                        <input type="number" id="new-project-rate" 
+                               class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Priority (1-100)</label>
+                        <input type="number" id="new-project-priority" min="1" max="100" value="50"
+                               class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2">
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-6 flex justify-end space-x-3">
+                <button onclick="toggleProjectModal()" class="text-gray-600 hover:text-gray-800">Cancel</button>
+                <button onclick="saveNewProject()" class="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700">
+                    Save Project
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { supabase } from './js/config.js';
+        import { checkAccess } from './js/auth.js';
+        import { renderProjectHeader } from './js/components.js';
+
+        let sessionData = null;
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            console.log("?? App Initializing...");
+            
+            try {
+                sessionData = await checkAccess();
+                
+                if (!sessionData) {
+                    console.error("? No session data returned");
+                    return; 
+                }
+
+                console.log("? Session Loaded for Tenant:", sessionData.tenantId);
+                window.sessionData = sessionData;
+
+                const headerElement = document.getElementById('main-header');
+                if (headerElement) {
+                    renderProjectHeader(sessionData, 'dashboard', 'Project Selection');
+                }
+
+                const dashboardTitle = document.querySelector('h1');
+                if (dashboardTitle) {
+                    dashboardTitle.textContent = `${sessionData.tenantName} - Project Dashboard`;
+                }
+
+                await loadProjects();
+
+            } catch (err) {
+                console.error("? Init Error:", err);
+            }
+        });
+
+        async function loadProjects() {
+            const projectContainer = document.getElementById('project-list');
+            if (!projectContainer) return;
+
+            const { data: projects, error } = await supabase
+                .from('projects')
+                .select(`
+                    id, name, status,
+                    requirements (steps (cost, is_active))
+                `)
+                .eq('tenant_id', sessionData.tenantId);
+
+            if (error) {
+                projectContainer.innerHTML = `<p class="text-red-500">Error: ${error.message}</p>`;
+                return;
+            }
+
+            if (!projects || projects.length === 0) {
+                projectContainer.innerHTML = `<div class="col-span-full text-center py-12 bg-white rounded-lg border-2 border-dashed border-gray-300 text-gray-500 italic">No projects found.</div>`;
+                return;
+            }
+
+            renderProjectCards(projects);
+        }
+
+        function renderProjectCards(projects) {
+            const projectContainer = document.getElementById('project-list');
+            projectContainer.innerHTML = projects.map(project => {
+                const totalCost = project.requirements?.reduce((acc, req) => {
+                    const stepSum = req.steps?.filter(s => s.is_active).reduce((sum, s) => sum + (s.cost || 0), 0);
+                    return acc + (stepSum || 0);
+                }, 0) || 0;
+
+                return `
+                    <div class="bg-white shadow rounded-lg border border-gray-200 hover:shadow-md transition cursor-pointer" 
+                         onclick="openProject('${project.id}', '${project.name}')">
+                        <div class="px-4 py-5 sm:p-6">
+                            <div class="flex items-center justify-between mb-2">
+                                <h3 class="text-lg font-bold text-gray-900">${project.name}</h3>
+                                <span class="px-2 py-0.5 text-xs font-bold rounded-full bg-indigo-50 text-indigo-700 uppercase border border-indigo-100">
+                                    ${project.status}
+                                </span>
+                            </div>
+                            <p class="text-sm text-gray-500 mb-4">Total Estimate</p>
+                            <p class="text-2xl font-black text-indigo-600">$${totalCost.toLocaleString()}</p>
+                        </div>
+                    </div>`;
+            }).join('');
+        }
+
+        window.toggleProjectModal = () => {
+            const modal = document.getElementById('project-modal');
+            if (!modal) return;
+            modal.classList.toggle('hidden');
+
+            if (!modal.classList.contains('hidden')) {
+                const rateInput = document.getElementById('new-project-rate');
+                if (rateInput && window.sessionData) {
+                    rateInput.value = window.sessionData.hourlyRate || 0;
+                }
+            }
+        };
+
+        window.openProject = (id, name) => {
+            localStorage.setItem('selected_project_id', id);
+            localStorage.setItem('selected_project_name', name);
+            window.location.href = 'requirements.html';
+        };
+
+        window.saveNewProject = async () => {
+            try {
+                const name = document.getElementById('new-project-name').value.trim();
+                const title = document.getElementById('new-project-title').value.trim();
+                const rate = parseFloat(document.getElementById('new-project-rate').value) || 0;
+                const priority = parseInt(document.getElementById('new-project-priority').value) || 50;
+
+                if (!name || !title) return alert("Please fill in Name and Title.");
+
+                const { error } = await supabase.from('projects').insert([{
+                    name: name,
+                    title: title,
+                    tenant_id: sessionData.tenantId,
+                    blended_rate: rate,
+                    status: 'Active',
+                    priority_value: priority 
+                }]);
+
+                if (error) throw error;
+
+                window.toggleProjectModal();
+                await loadProjects();
+                
+                document.getElementById('new-project-name').value = '';
+                document.getElementById('new-project-title').value = '';
+
+            } catch (err) {
+                console.error("Save Error:", err);
+                alert("Save failed: " + err.message);
+            }
+        };
+    </script>
+</body>
+</html>

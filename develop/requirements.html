@@ -270,7 +270,7 @@
     if (id) {
         titleEl.innerText = "Edit Task";
         btnEl.innerText = "Update Task";
-        const { data: step } = await supabase.from('steps').select('*').eq('id', id).single();
+        const { data: step } = await supabase.from('steps').select('*').eq('step_id', id).single();
         if (step) {
             document.getElementById('step-title-input').value = step.title;
             document.getElementById('step-assign-select').value = step.assigned_to;
@@ -332,7 +332,7 @@ window.deleteReq = async (id) => {
 
 window.deleteStep = async (id) => {
     if (!confirm("Delete this task?")) return;
-    await supabase.from('steps').delete().eq('id', id);
+    await supabase.from('steps').delete().eq('step_id', id);
     refreshSteps();
     rollupToRequirement();
 };
@@ -344,7 +344,7 @@ window.updateStep = async (id) => {
         estimated_hours: parseFloat(document.getElementById('step-hours-input').value) || 0,
         cost: parseFloat(document.getElementById('step-cost-input').value) || 0
     };
-    await supabase.from('steps').update(updates).eq('id', id);
+    await supabase.from('steps').update(updates).eq('step_id', id);
     closeTaskSlider();
     refreshSteps();
     rollupToRequirement();
@@ -513,14 +513,17 @@ window.updateStep = async (id) => {
 async function refreshSteps() {
     const { data: steps } = await supabase.from('steps')
         .select(`*, user_profiles:assigned_to(full_name, email)`)
-        .eq('requirement_id', selectedReqId).order('sequence_order');
+        .eq('requirement_id', selectedReqId)
+        .order('sequence_order');
 
     document.getElementById('task-count').innerText = `${steps?.length || 0} TASKS`;
     document.getElementById('selected-req-meta').innerText = `${steps?.length || 0} tasks identified`;
     
     const list = document.getElementById('step-list');
+    
+    // Using .map() to build the list with the confirmed step_id column
     list.innerHTML = (steps || []).map(s => `
-        <li class="px-4 py-3 flex justify-between items-center group active-task-row transition-all" data-id="${s.id}">
+        <li class="px-4 py-3 flex justify-between items-center group active-task-row transition-all" data-id="${s.step_id}">
             <div class="flex items-center gap-3">
                 <span class="cursor-move text-gray-200 group-hover:text-blue-300 font-bold">::</span>
                 <div>
@@ -536,23 +539,22 @@ async function refreshSteps() {
                 </div>
                 
                 <div class="relative kebab-container">
-                    <button onclick="event.stopPropagation(); toggleKebab('task-${s.id}')" class="p-1 text-gray-400 hover:text-blue-600 transition-colors">
+                    <button onclick="event.stopPropagation(); toggleKebab('task-${s.step_id}')" class="p-1 text-gray-400 hover:text-blue-600 transition-colors">
                         <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
                         </svg>
                     </button>
-                    <div id="kebab-task-${s.id}" class="hidden absolute right-0 mt-1 w-40 bg-white border border-gray-100 shadow-xl rounded-lg z-[110] py-1 ring-1 ring-black ring-opacity-5">
-                        <button onclick="event.stopPropagation(); openTaskSlider('${s.id}')" class="w-full text-left px-4 py-2 text-sm hover:bg-blue-50 flex items-center gap-2">
-                            <span>??</span> Edit / Sub-tasks
+                    <div id="kebab-task-${s.step_id}" class="hidden absolute right-0 mt-1 w-40 bg-white border border-gray-100 shadow-xl rounded-lg z-[110] py-1 ring-1 ring-black ring-opacity-5">
+                        <button onclick="event.stopPropagation(); openTaskSlider('${s.step_id}')" class="w-full text-left px-4 py-2 text-sm hover:bg-blue-50 flex items-center gap-2">
+                            <span>??</span> Edit
                         </button>
                         <div class="border-t border-gray-100 my-1"></div>
-                        <button onclick="event.stopPropagation(); deleteStep('${s.id}')" class="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50">Delete</button>
+                        <button onclick="event.stopPropagation(); deleteStep('${s.step_id}')" class="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50">Delete</button>
                     </div>
                 </div>
             </div>
         </li>`).join('');
 }
-
     async function rollupToRequirement() {
     if (!selectedReqId) return;
 

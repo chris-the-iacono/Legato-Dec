@@ -588,23 +588,26 @@ function initSortable() {
             new Sortable(reqList, {
                 handle: '.cursor-move',
                 animation: 150,
-                onEnd: async () => {
-                    const rows = Array.from(reqList.querySelectorAll('.req-row'));
-                    const updates = rows.map((row, index) => ({
-                        req_id: row.getAttribute('data-id'),
-                        sequence_order: (index + 1) * 10,
-                        project_id: projectId, 
-                        tenant_id: tenantId
-                    }));
+                // 1. Requirements Ordering (Right List)
+onEnd: async () => {
+    const rows = Array.from(reqList.querySelectorAll('.req-row'));
+    
+    // Perform updates individually to avoid "not-null" constraint issues
+    const promises = rows.map((row, index) => {
+        return supabase
+            .from('requirements')
+            .update({ sequence_order: (index + 1) * 10 })
+            .eq('req_id', row.getAttribute('data-id'));
+    });
 
-                    console.log("Saving Requirement Order...", updates);
-                    const { error } = await supabase
-                        .from('requirements')
-                        .upsert(updates, { onConflict: 'req_id' });
-
-                    if (error) console.error("Req Order Error:", error.message);
-                    else console.log("Requirement order synced!");
-                }
+    console.log("Syncing new requirement order...");
+    const results = await Promise.all(promises);
+    
+    // Check for any errors in the batch
+    const error = results.find(r => r.error);
+    if (error) console.error("Order Sync Error:", error.error.message);
+    else console.log("Requirement order synced!");
+}
             });
         }
 
@@ -614,23 +617,24 @@ function initSortable() {
             new Sortable(stepList, {
                 handle: '.cursor-move',
                 animation: 150,
-                onEnd: async () => {
-                    const rows = Array.from(stepList.querySelectorAll('li'));
-                    const updates = rows.map((row, index) => ({
-                        id: row.getAttribute('data-id'),
-                        sequence_order: (index + 1) * 10,
-                        requirement_id: selectedReqId,
-                        tenant_id: tenantId
-                    }));
+                // 2. Tasks Ordering (Left List)
+onEnd: async () => {
+    const rows = Array.from(stepList.querySelectorAll('li'));
+    
+    const promises = rows.map((row, index) => {
+        return supabase
+            .from('steps')
+            .update({ sequence_order: (index + 1) * 10 })
+            .eq('id', row.getAttribute('data-id'));
+    });
 
-                    console.log("Saving Task Order...", updates);
-                    const { error } = await supabase
-                        .from('steps')
-                        .upsert(updates, { onConflict: 'id' });
-
-                    if (error) console.error("Task Order Error:", error.message);
-                    else console.log("Task order synced!");
-                }
+    console.log("Syncing new task order...");
+    const results = await Promise.all(promises);
+    
+    const error = results.find(r => r.error);
+    if (error) console.error("Task Order Error:", error.error.message);
+    else console.log("Task order synced!");
+}
             });
         }
     }

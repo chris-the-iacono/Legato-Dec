@@ -312,19 +312,44 @@
             const status = req.status || 'Pending';
             const statusClass = (status === 'In Progress') ? "status-inprogress" : (status === 'Complete' ? "status-complete" : "status-pending");
             return `
-                <li class="req-row p-4 hover:bg-gray-50 flex justify-between items-center cursor-pointer border-l-4 border-transparent transition-all" data-id="${req.req_id}" data-title="${req.title.replace(/"/g, '&quot;')}">
-                    <div class="flex items-center gap-3">
-                        <span class="cursor-move text-gray-300 font-bold p-1">::</span>
-                        <div>
-                            <div class="flex items-center gap-2">
-                                <p class="text-sm font-bold text-gray-800">${req.title}</p>
-                                <span class="text-[8px] px-1.5 py-0.5 rounded font-black uppercase ${statusClass}">${status}</span>
-                            </div>
-                            <p class="text-[10px] text-gray-400 font-bold uppercase">${req.assignee?.full_name || 'Unassigned'} | ${req.estimated_hours}h</p>
-                        </div>
-                    </div>
-                    <p class="text-sm font-mono font-bold text-indigo-600">$${((req.estimated_hours || 0) * (req.custom_rate || 0)).toLocaleString()}</p>
-                </li>`;
+                // Inside loadRequirements() -> list.innerHTML = reqs.map(...)
+return `
+    <li class="req-row p-4 hover:bg-gray-50 flex justify-between items-center cursor-pointer border-l-4 border-transparent transition-all" 
+        data-id="${req.req_id}" data-title="${req.title.replace(/"/g, '&quot;')}">
+        <div class="flex items-center gap-3">
+            <span class="cursor-move text-gray-300 font-bold p-1">::</span>
+            <div>
+                <div class="flex items-center gap-2">
+                    <p class="text-sm font-bold text-gray-800">${req.title}</p>
+                    <span class="text-[8px] px-1.5 py-0.5 rounded font-black uppercase ${statusClass}">${status}</span>
+                </div>
+                <p class="text-[10px] text-gray-400 font-bold uppercase">${req.assignee?.full_name || 'Unassigned'} | ${req.estimated_hours}h</p>
+            </div>
+        </div>
+        
+        <div class="flex items-center gap-4">
+            <p class="text-sm font-mono font-bold text-indigo-600">$${((req.estimated_hours || 0) * (req.custom_rate || 0)).toLocaleString()}</p>
+            
+            <div class="relative kebab-container">
+                <button onclick="event.stopPropagation(); toggleKebab('req-${req.req_id}')" class="p-1 text-gray-400 hover:text-indigo-600 transition-colors">
+                    <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+                    </svg>
+                </button>
+                <div id="kebab-req-${req.req_id}" class="hidden absolute right-0 mt-1 w-40 bg-white border border-gray-100 shadow-xl rounded-lg z-[110] py-1 ring-1 ring-black ring-opacity-5">
+                    <button onclick="event.stopPropagation(); openReqSlider('${req.req_id}')" class="w-full text-left px-4 py-2 text-sm hover:bg-indigo-50 flex items-center gap-2">
+                        <span>??</span> Edit
+                    </button>
+                    <div class="border-t border-gray-100 my-1"></div>
+                    <button onclick="event.stopPropagation(); updateStatus('${req.req_id}', 'Pending')" class="w-full text-left px-4 py-2 text-sm hover:bg-gray-50">Pending</button>
+                    <button onclick="event.stopPropagation(); updateStatus('${req.req_id}', 'In Progress')" class="w-full text-left px-4 py-2 text-sm text-blue-600 hover:bg-blue-50">In Progress</button>
+                    <button onclick="event.stopPropagation(); updateStatus('${req.req_id}', 'Complete')" class="w-full text-left px-4 py-2 text-sm text-green-600 hover:bg-green-50">Complete</button>
+                    <div class="border-t border-gray-100 my-1"></div>
+                    <button onclick="event.stopPropagation(); deleteReq('${req.req_id}')" class="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50">Delete</button>
+                </div>
+            </div>
+        </div>
+    </li>`;
         }).join('');
     }
 
@@ -359,19 +384,39 @@
         
         const list = document.getElementById('step-list');
         list.innerHTML = (steps || []).map(s => `
-            <li class="px-4 py-3 flex justify-between items-center group active-task-row" data-id="${s.id}">
-                <div class="flex items-center gap-3">
-                    <span class="cursor-move text-gray-200 group-hover:text-blue-300 font-bold">::</span>
-                    <div>
-                        <p class="text-sm font-semibold text-gray-700">${s.title}</p>
-                        <p class="text-[10px] text-blue-400 font-bold uppercase">${s.user_profiles?.full_name || 'Unassigned'}</p>
-                    </div>
+            // Replace the entire list.innerHTML assignment in refreshSteps() with this:
+list.innerHTML = (steps || []).map(s => `
+    <li class="px-4 py-3 flex justify-between items-center group active-task-row transition-all" data-id="${s.id}">
+        <div class="flex items-center gap-3">
+            <span class="cursor-move text-gray-200 group-hover:text-blue-300 font-bold">::</span>
+            <div>
+                <p class="text-sm font-semibold text-gray-700">${s.title}</p>
+                <p class="text-[10px] text-blue-400 font-bold uppercase">${s.user_profiles?.full_name || 'Unassigned'}</p>
+            </div>
+        </div>
+        
+        <div class="flex items-center gap-4">
+            <div class="text-right">
+                <p class="text-[11px] font-bold text-gray-900">$${(s.cost || 0).toLocaleString()}</p>
+                <p class="text-[9px] text-gray-400">${s.estimated_hours}h</p>
+            </div>
+            
+            <div class="relative kebab-container">
+                <button onclick="event.stopPropagation(); toggleKebab('task-${s.id}')" class="p-1 text-gray-400 hover:text-blue-600 transition-colors">
+                    <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+                    </svg>
+                </button>
+                <div id="kebab-task-${s.id}" class="hidden absolute right-0 mt-1 w-40 bg-white border border-gray-100 shadow-xl rounded-lg z-[110] py-1 ring-1 ring-black ring-opacity-5">
+                    <button onclick="event.stopPropagation(); openTaskSlider('${s.id}')" class="w-full text-left px-4 py-2 text-sm hover:bg-blue-50 flex items-center gap-2">
+                        <span>??</span> Edit / Sub-tasks
+                    </button>
+                    <div class="border-t border-gray-100 my-1"></div>
+                    <button onclick="event.stopPropagation(); deleteStep('${s.id}')" class="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50">Delete</button>
                 </div>
-                <div class="text-right">
-                    <p class="text-[11px] font-bold text-gray-900">$${(s.cost || 0).toLocaleString()}</p>
-                    <p class="text-[9px] text-gray-400">${s.estimated_hours}h</p>
-                </div>
-            </li>`).join('');
+            </div>
+        </div>
+    </li>`).join(''); // <-- The essential join
     }
 
     async function rollupToRequirement() {
@@ -388,6 +433,28 @@
             if (el) new Sortable(el, { handle: '.cursor-move', animation: 150 });
         });
     }
+	// --- KEBAB MENU LOGIC ---
+    window.toggleKebab = (id) => {
+        const menu = document.getElementById(`kebab-${id}`);
+        if (!menu) return;
+
+        // Close all other open kebabs first to prevent overlap
+        document.querySelectorAll('[id^="kebab-"]').forEach(el => {
+            if (el !== menu) el.classList.add('hidden');
+        });
+
+        // Toggle the clicked one
+        menu.classList.toggle('hidden');
+    };
+
+    // Close kebabs automatically if user clicks anywhere else on the screen
+    document.addEventListener('click', (e) => {
+        if (!e.target.closest('.kebab-container')) {
+            document.querySelectorAll('[id^="kebab-"]').forEach(el => {
+                el.classList.add('hidden');
+            });
+        }
+    });
 </script>
 </body>
 </html>

@@ -60,42 +60,33 @@ body {
     display: none !important;
 }
 /* 7. SIDE PANELS (SLIDERS) */
-/* Shared styling for Requirement and Task editor panels */
-#req-editor-panel, 
-#task-editor-panel {
+.side-slider {
     position: fixed;
     top: 0;
-    right: 0;
+    width: 450px;
     height: 100vh;
-    width: 450px; /* Standard width for side editors */
     background: white;
-    box-shadow: -4px 0 15px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 0 40px rgba(0,0,0,0.15);
+    transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
     z-index: 1000;
-    
-    /* Animation: Moves it 100% to the right (off-screen) by default */
-    transform: translateX(100%);
-    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    display: flex;
+    flex-direction: column;
 }
 
-/* When the 'active' class is added via JavaScript, slide it in */
-#req-editor-panel.active, 
-#task-editor-panel.active {
-    transform: translateX(0);
+/* Requirement Slider (Slides from Right) */
+#req-editor-panel { 
+    right: 0; 
+    transform: translateX(100%); 
+}
+#req-editor-panel.active { 
+    transform: translateX(0); 
 }
 
-/* Optional Overlay: Darkens the background when a slider is open */
-.slider-overlay {
-    position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.3);
-    backdrop-filter: blur(2px);
-    z-index: 999;
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 0.3s ease;
+/* Task Slider (Slides from Left) */
+#task-editor-panel { 
+    left: 0; 
+    transform: translateX(-100%); 
 }
-
-.slider-overlay.active {
-    opacity: 1;
-    pointer-events: auto;
+#task-editor-panel.active { 
+    transform: translateX(0); 
 }

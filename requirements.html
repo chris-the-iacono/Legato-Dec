@@ -26,7 +26,7 @@
     .status-inprogress { background-color: #eff6ff; color: #2563eb; padding: 2px 8px; border-radius: 9999px; border: 1px solid #dbeafe; }
     .status-complete { background-color: #f0fdf4; color: #16a34a; padding: 2px 8px; border-radius: 9999px; border: 1px solid #dcfce7; }
 
-    /* SHARED SLIDER LOGIC */
+    /* SHARED SLIDER LOGIC 
     .side-slider {
         position: fixed;
         top: 0;
@@ -40,21 +40,21 @@
         flex-direction: column;
     }
 
-    /* Requirement Slider (Right) */
+    /* Requirement Slider (Right) 
     #req-editor-panel { right: 0; transform: translateX(100%); }
     #req-editor-panel.active { transform: translateX(0); }
 
-    /* Task Slider (Left) */
+    /* Task Slider (Left) 
     #task-editor-panel { left: 0; transform: translateX(-100%); }
     #task-editor-panel.active { transform: translateX(0); }
 
-    /* Prevent body scroll when sliders are open */
+    /* Prevent body scroll when sliders are open 
     body.panel-open { overflow: hidden; }
 
-    /* Kebab Menu Animation */
+    /* Kebab Menu Animation 
     [id^="kebab-req-"] { animation: slideIn 0.15s ease-out; }
     @keyframes slideIn { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
-</style>
+</style>*/
 </head>
 <body class="bg-gray-100 min-h-screen overflow-hidden">
     <div id="main-header"></div>
@@ -340,9 +340,23 @@
         estimated_hours: parseFloat(document.getElementById('req-hours-input').value) || 0,
         custom_rate: parseFloat(document.getElementById('req-applied-rate').value) || 0
     };
-    await supabase.from('requirements').update(updates).eq('req_id', id);
-    closeReqSlider();
-    loadRequirements();
+
+    // Added error handling to prevent "silent failures"
+    const { error } = await supabase
+        .from('requirements')
+        .update(updates)
+        .eq('req_id', id);
+
+    if (error) {
+        console.error("Requirement Update Error:", error.message);
+        alert("Failed to update requirement: " + error.message);
+    } else {
+        closeReqSlider();
+        loadRequirements();
+        
+        // If you have a total budget or progress bar on the page, 
+        // you might want to call a refresh for those here too.
+    }
 };
 
 window.updateStatus = async (id, newStatus) => {
@@ -369,12 +383,30 @@ window.updateStep = async (id) => {
         title: document.getElementById('step-title-input').value,
         assigned_to: document.getElementById('step-assign-select').value,
         estimated_hours: parseFloat(document.getElementById('step-hours-input').value) || 0,
-        cost: parseFloat(document.getElementById('step-cost-input').value) || 0
+        cost: parseFloat(document.getElementById('step-cost-input').value) || 0,
+        // ADDED: This ensures your "Notes / Sub-tasks" field actually saves
+        description: document.getElementById('step-desc-input').value 
     };
-    await supabase.from('steps').update(updates).eq('step_id', id);
-    closeTaskSlider();
-    refreshSteps();
-    rollupToRequirement();
+
+    // ADDED: Catching the error object
+    const { error } = await supabase
+        .from('steps')
+        .update(updates)
+        .eq('step_id', id);
+
+    if (error) {
+        console.error("Update Error:", error.message);
+        alert("Failed to update task: " + error.message);
+    } else {
+        console.log("Task updated successfully!");
+        closeTaskSlider();
+        refreshSteps();
+        
+        // Ensure this function exists in your script to update the parent requirement totals
+        if (typeof rollupToRequirement === 'function') {
+            rollupToRequirement();
+        }
+    }
 };
 
     function populateDropdowns() {

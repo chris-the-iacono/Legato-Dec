@@ -181,7 +181,7 @@
                     <textarea id="step-desc-input" placeholder="Additional details..." class="w-full border-gray-200 rounded-lg text-sm p-3 border" rows="3"></textarea>
                 </div>
                 <div class="pt-4">
-                    <button id="step-save-btn" onclick="submitStep()" class="w-full bg-blue-600 text-white py-3 rounded-lg text-sm font-bold hover:bg-blue-700 shadow-lg transition-all">Save Task</button>
+                    <button id="task-save-btn" onclick="submitStep()" class="w-full bg-blue-600 text-white py-3 rounded-lg text-sm font-bold hover:bg-blue-700 shadow-lg transition-all">Save Task</button>
                 </div>
             </div>
         </div>
@@ -266,10 +266,15 @@
     // 2. Element References
     const panel = document.getElementById('task-editor-panel');
     const titleEl = document.getElementById('task-editor-title');
-    const btnEl = document.getElementById('task-save-btn');
+    
+    // SYNCED ID: Changed 'task-save-btn' to 'step-save-btn' to match your HTML
+    const btnEl = document.getElementById('step-save-btn');
 
-    // Safety: Ensure the panel actually exists in the HTML
-    if (!panel) return console.error("Element #task-editor-panel not found.");
+    // Safety: Ensure the panel and elements exist
+    if (!panel || !titleEl || !btnEl) {
+        console.error("UI Elements missing:", { panel, titleEl, btnEl });
+        return;
+    }
 
     if (id) {
         // --- EDIT MODE ---
@@ -293,7 +298,11 @@
             document.getElementById('step-hours-input').value = step.estimated_hours || 0;
             document.getElementById('step-cost-input').value = step.cost || 0;
             
-            // Re-bind the click event to Update
+            // ADDED: Make sure the Notes field is updated too
+            if (document.getElementById('step-desc-input')) {
+                document.getElementById('step-desc-input').value = step.description || '';
+            }
+            
             btnEl.onclick = () => updateStep(id);
         }
     } else {
@@ -301,37 +310,20 @@
         titleEl.innerText = "Add New Task";
         btnEl.innerText = "Save Task";
         
-        // Reset all fields so data from a previous "Edit" doesn't linger
         document.getElementById('step-title-input').value = '';
         document.getElementById('step-assign-select').value = '';
         document.getElementById('step-hours-input').value = '';
         document.getElementById('step-cost-input').value = '0.00';
+        if (document.getElementById('step-desc-input')) {
+            document.getElementById('step-desc-input').value = '';
+        }
         
-        // Re-bind the click event to Submit
         btnEl.onclick = () => submitStep();
     }
 
     // 3. Final Step: Show the panel
     panel.classList.add('active');
 };
-    window.closeTaskSlider = () => document.getElementById('task-editor-panel').classList.remove('active');
-
-    function selectRequirement(rowElement) {
-        const id = rowElement.getAttribute('data-id');
-        const title = rowElement.getAttribute('data-title');
-        selectedReqId = id;
-
-        document.querySelectorAll('.req-row').forEach(el => el.classList.remove('active-req'));
-        rowElement.classList.add('active-req');
-
-        // Enable Add Task Button
-        const addTaskBtn = document.getElementById('add-task-btn');
-        addTaskBtn.disabled = false;
-        addTaskBtn.classList.remove('opacity-50', 'cursor-not-allowed');
-
-        document.getElementById('selected-req-title-display').innerText = title;
-        refreshSteps();
-    }
 	
 	window.updateRequirement = async (id) => {
     const updates = {

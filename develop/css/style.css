@@ -59,3 +59,43 @@ body {
 .hidden {
     display: none !important;
 }
+/* 7. SIDE PANELS (SLIDERS) */
+/* Shared styling for Requirement and Task editor panels */
+#req-editor-panel, 
+#task-editor-panel {
+    position: fixed;
+    top: 0;
+    right: 0;
+    height: 100vh;
+    width: 450px; /* Standard width for side editors */
+    background: white;
+    box-shadow: -4px 0 15px rgba(0, 0, 0, 0.1);
+    z-index: 1000;
+    
+    /* Animation: Moves it 100% to the right (off-screen) by default */
+    transform: translateX(100%);
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* When the 'active' class is added via JavaScript, slide it in */
+#req-editor-panel.active, 
+#task-editor-panel.active {
+    transform: translateX(0);
+}
+
+/* Optional Overlay: Darkens the background when a slider is open */
+.slider-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.3);
+    backdrop-filter: blur(2px);
+    z-index: 999;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+}
+
+.slider-overlay.active {
+    opacity: 1;
+    pointer-events: auto;
+}

@@ -589,31 +589,37 @@ window.updateStep = async (id) => {
     async function rollupToRequirement() {
     if (!selectedReqId) return;
 
-    const { data: steps } = await supabase.from('steps')
+    const { data: steps, error: fetchError } = await supabase.from('steps')
         .select('cost, estimated_hours')
         .eq('requirement_id', selectedReqId);
 
-    const totalCost = (steps || []).reduce((sum, s) => sum + (s.cost || 0), 0);
-    const totalHours = (steps || []).reduce((sum, s) => sum + (s.estimated_hours || 0), 0);
+    if (fetchError) {
+        console.error("Rollup Fetch Error:", fetchError.message);
+        return;
+    }
+
+    // Use parseFloat to ensure numbers stay numbers
+    const totalCost = (steps || []).reduce((sum, s) => sum + (parseFloat(s.cost) || 0), 0);
+    const totalHours = (steps || []).reduce((sum, s) => sum + (parseFloat(s.estimated_hours) || 0), 0);
     
-    // Calculate the new blended rate for this specific requirement
-    // If no hours exist, we default to the projectBlendedRate we fetched on load
+    // Maintain your Blended Rate logic
     const newRate = totalHours > 0 ? (totalCost / totalHours) : projectBlendedRate;
 
-    const { error } = await supabase.from('requirements')
+    const { error: updateError } = await supabase.from('requirements')
         .update({ 
             estimated_hours: totalHours, 
             custom_rate: newRate,
-            updated_at: new Date() 
+            updated_at: new Date().toISOString() // Use ISO string for Supabase timestamptz
         })
-        .eq('requirement_id', selectedReqId);
+        .eq('req_id', selectedReqId); // FIXED: Aligned with your 'req_id' column
 
-    if (error) console.error("Rollup failed:", error);
-    
-    // Refresh the UI to show the new totals in the right column
-    loadRequirements();
+    if (updateError) {
+        console.error("Rollup Update failed:", updateError.message);
+    } else {
+        // Only reload if the update actually worked
+        loadRequirements();
+    }
 }
-
 function initSortable() {
         // 1. Requirements Ordering (Right List)
         const reqList = document.getElementById('req-list');

@@ -6,55 +6,52 @@
     <title>Requirements | Project Manager</title>
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="../../Desktop/Legato%20backups/css/style.css">
-<style>
-    /* Layout & Viewport */
-    .app-container { 
-        height: calc(100vh - 140px); 
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 1.5rem;
-    }
-    .list-viewport { overflow-y: auto; flex-grow: 1; position: relative; }
     
-    /* Active State Highlights (Crucial without Dimmer) */
-    .active-req { background-color: #f5f3ff !important; border-left: 4px solid #6366f1 !important; }
-    .active-task { background-color: #eff6ff !important; border-left: 4px solid #3b82f6 !important; }
+    <link rel="stylesheet" href="../../_Legato_/css/style.css">
 
-    /* Modern Status Badges */
-    .status-pending { background-color: #f3f4f6; color: #374151; padding: 2px 8px; border-radius: 9999px; border: 1px solid #e5e7eb; }
-    .status-inprogress { background-color: #eff6ff; color: #2563eb; padding: 2px 8px; border-radius: 9999px; border: 1px solid #dbeafe; }
-    .status-complete { background-color: #f0fdf4; color: #16a34a; padding: 2px 8px; border-radius: 9999px; border: 1px solid #dcfce7; }
+    <style>
+        /* Layout & Viewport */
+        .app-container { 
+            height: calc(100vh - 140px); 
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+        }
+        .list-viewport { overflow-y: auto; flex-grow: 1; position: relative; }
+        
+        /* Active State Highlights */
+        .active-req { background-color: #f5f3ff !important; border-left: 4px solid #6366f1 !important; }
+        .active-task { background-color: #eff6ff !important; border-left: 4px solid #3b82f6 !important; }
 
-    /* SHARED SLIDER LOGIC 
-    .side-slider {
-        position: fixed;
-        top: 0;
-        width: 450px;
-        height: 100vh;
-        background: white;
-        box-shadow: 0 0 40px rgba(0,0,0,0.15);
-        transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-        z-index: 100;
-        display: flex;
-        flex-direction: column;
-    }
+        /* Status Badges */
+        .status-pending { background-color: #f3f4f6; color: #374151; padding: 2px 8px; border-radius: 9999px; border: 1px solid #e5e7eb; }
+        .status-inprogress { background-color: #eff6ff; color: #2563eb; padding: 2px 8px; border-radius: 9999px; border: 1px solid #dbeafe; }
+        .status-complete { background-color: #f0fdf4; color: #16a34a; padding: 2px 8px; border-radius: 9999px; border: 1px solid #dcfce7; }
 
-    /* Requirement Slider (Right) 
-    #req-editor-panel { right: 0; transform: translateX(100%); }
-    #req-editor-panel.active { transform: translateX(0); }
+        /* Slider Animations */
+        .side-slider {
+            position: fixed;
+            top: 0;
+            width: 450px;
+            height: 100vh;
+            background: white;
+            box-shadow: 0 0 40px rgba(0,0,0,0.15);
+            transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+        }
 
-    /* Task Slider (Left) 
-    #task-editor-panel { left: 0; transform: translateX(-100%); }
-    #task-editor-panel.active { transform: translateX(0); }
+        #req-editor-panel { right: 0; transform: translateX(100%); }
+        #req-editor-panel.active { transform: translateX(0); }
 
-    /* Prevent body scroll when sliders are open 
-    body.panel-open { overflow: hidden; }
+        #task-editor-panel { left: 0; transform: translateX(-100%); }
+        #task-editor-panel.active { transform: translateX(0); }
 
-    /* Kebab Menu Animation 
-    [id^="kebab-req-"] { animation: slideIn 0.15s ease-out; }
-    @keyframes slideIn { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
-</style>*/
+        /* Kebab Menu Animation */
+        [id^="kebab-req-"], [id^="kebab-task-"] { animation: slideIn 0.15s ease-out; }
+        @keyframes slideIn { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
 </head>
 <body class="bg-gray-100 min-h-screen overflow-hidden">
     <div id="main-header"></div>
@@ -228,7 +225,10 @@
     });
 
     // SLIDER CONTROLS
-    window.openReqSlider = async (id = null) => {
+window.closeTaskSlider = () => document.getElementById('task-editor-panel').classList.remove('active');
+window.closeReqSlider = () => document.getElementById('req-editor-panel').classList.remove('active');
+
+window.openReqSlider = async (id = null) => {
     const panel = document.getElementById('req-editor-panel');
     const titleEl = document.getElementById('req-editor-title');
     const btnEl = document.getElementById('req-save-btn');
@@ -485,10 +485,15 @@ window.updateStep = async (id) => {
     list.innerHTML = reqs.map(req => {
         const status = req.status || 'Pending';
         const statusClass = (status === 'In Progress') ? "status-inprogress" : (status === 'Complete' ? "status-complete" : "status-pending");
+        
         return `
             <li class="req-row p-4 hover:bg-gray-50 flex justify-between items-center cursor-pointer border-l-4 border-transparent transition-all" 
                 data-id="${req.req_id}" data-title="${req.title.replace(/"/g, '&quot;')}">
                 <div class="flex items-center gap-3">
+                    
+                    <input type="checkbox" class="req-checkbox w-4 h-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" 
+                        data-id="${req.req_id}" onclick="event.stopPropagation()">
+
                     <span class="cursor-move text-gray-300 font-bold p-1">::</span>
                     <div>
                         <div class="flex items-center gap-2">
@@ -508,7 +513,7 @@ window.updateStep = async (id) => {
                             </svg>
                         </button>
                         <div id="kebab-req-${req.req_id}" class="hidden absolute right-0 mt-1 w-40 bg-white border border-gray-100 shadow-xl rounded-lg z-[110] py-1 ring-1 ring-black ring-opacity-5">
-                            <button onclick="event.stopPropagation(); openReqSlider('${req.req_id}')" class="w-full text-left px-4 py-2 text-sm hover:bg-indigo-50 flex items-center gap-2">Edit                           </button>
+                            <button onclick="event.stopPropagation(); openReqSlider('${req.req_id}')" class="w-full text-left px-4 py-2 text-sm hover:bg-indigo-50 flex items-center gap-2">Edit</button>
                             <div class="border-t border-gray-100 my-1"></div>
                             <button onclick="event.stopPropagation(); updateStatus('${req.req_id}', 'Pending')" class="w-full text-left px-4 py-2 text-sm hover:bg-gray-50">Pending</button>
                             <button onclick="event.stopPropagation(); updateStatus('${req.req_id}', 'In Progress')" class="w-full text-left px-4 py-2 text-sm text-blue-600 hover:bg-blue-50">In Progress</button>
@@ -675,7 +680,7 @@ onEnd: async () => {
         return supabase
             .from('steps')
             .update({ sequence_order: (index + 1) * 10 })
-            .eq('id', row.getAttribute('data-id'));
+            .eq('step_id', row.getAttribute('data-id'));
     });
 
     console.log("Syncing new task order...");

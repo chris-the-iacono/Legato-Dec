@@ -37,7 +37,7 @@
             background: white;
             box-shadow: 0 0 40px rgba(0,0,0,0.15);
             transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-            z-index: 100;
+            z-index: 1000;
             display: flex;
             flex-direction: column;
         }
@@ -94,7 +94,7 @@
                     </div>
                     <div class="flex items-center gap-2">
                         <span id="task-count" class="text-[10px] bg-blue-100 text-blue-600 px-2 py-1 rounded-full font-bold">0 TASKS</span>
-                        <button id="add-task-btn" onclick="openTaskSlider()" class="bg-blue-600 text-white p-1.5 rounded-lg hover:bg-blue-700 transition shadow-md opacity-50 cursor-not-allowed" disabled>
+                        <button id="add-task-btn" onclick="window.openTaskSlider()" class="bg-blue-600 text-white p-1.5 rounded-lg hover:bg-blue-700 transition shadow-md opacity-50 cursor-not-allowed" disabled>
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
                         </button>
                     </div>

@@ -266,29 +266,33 @@ window.openReqSlider = async (id = null) => {
     const titleEl = document.getElementById('req-editor-title');
     const btnEl = document.getElementById('req-save-btn');
 
-    // Clear previous state
     if (id) {
         titleEl.innerText = "Edit Requirement";
         btnEl.innerText = "Update Requirement";
         
-        const { data: req, error } = await supabase
+        const { data: req } = await supabase
             .from('requirements')
             .select('*')
-            .eq('req_id', id)
+            .eq('req_id', id) // Verified Column Name
             .single();
 
         if (req) {
-            document.getElementById('req-title-input').value = req.title || '';
-            document.getElementById('req-assign-select').value = req.assigned_to || '';
-            document.getElementById('req-hours-input').value = req.estimated_hours || 0;
-            document.getElementById('req-rate-input').value = req.custom_rate || 0;
-            document.getElementById('req-desc-input').value = req.description || '';
+            if (document.getElementById('req-title-input')) 
+                document.getElementById('req-title-input').value = req.title || '';
+            if (document.getElementById('req-assign-select')) 
+                document.getElementById('req-assign-select').value = req.assigned_to || '';
+            if (document.getElementById('req-hours-input')) 
+                document.getElementById('req-hours-input').value = req.estimated_hours || 0;
+            
+            // Check for both common IDs for rate
+            const rateField = document.getElementById('req-applied-rate') || document.getElementById('req-rate-input');
+            if (rateField) rateField.value = req.custom_rate || 0;
+
             btnEl.onclick = () => updateRequirement(id);
         }
     } else {
         titleEl.innerText = "Add New Requirement";
         btnEl.innerText = "Save Requirement";
-        // Reset form...
         btnEl.onclick = () => submitRequirement();
     }
     panel.classList.add('active');
@@ -335,57 +339,49 @@ async function refreshSteps() {
     const { data: steps, error } = await supabase
         .from('steps')
         .select(`*, assignee:assigned_to(full_name)`)
-        .eq('req_id', selectedReqId)
+        .eq('requirement_id', selectedReqId) // Fixed: Database uses requirement_id
         .order('sequence_order');
 
-    if (error) return console.error(error);
+    if (error) {
+        console.error("Step Load Error:", error.message);
+        return;
+    }
 
     const list = document.getElementById('step-list');
-    list.innerHTML = steps.map(s => {
-        const statusClass = s.status === 'Complete' ? 'status-complete' : (s.status === 'In Progress' ? 'status-inprogress' : 'status-pending');
-        
+    list.innerHTML = (steps || []).map(s => {
         return `
-            <li class="active-task-row p-3 hover:bg-blue-50 border-b flex justify-between items-center group transition-colors" data-id="${s.step_id}">
+            <li class="active-task-row p-3 hover:bg-blue-50 border-b flex justify-between items-center group" data-id="${s.step_id}">
                 <div class="flex items-center gap-3">
                     <span class="cursor-move text-gray-300 font-bold p-1">::</span>
                     <div>
                         <p class="text-sm font-semibold text-gray-700">${s.title}</p>
-                        <div class="flex items-center gap-2 text-[10px] text-gray-400 font-bold uppercase">
-                            <span>${s.assignee?.full_name || 'Unassigned'}</span>
-                            <span>•</span>
-                            <span>${s.estimated_hours}h</span>
-                            <span class="${statusClass} px-1.5 py-0.5 rounded text-[8px]">${s.status || 'Pending'}</span>
-                        </div>
+                        <p class="text-[10px] text-gray-400 uppercase">${s.assignee?.full_name || 'Unassigned'} | ${s.estimated_hours}h</p>
                     </div>
                 </div>
                 
-                <!-- KEBAB MENU FOR TASK -->
                 <div class="relative kebab-container">
-                    <button onclick="event.stopPropagation(); toggleKebab('task-${s.step_id}')" class="p-1 text-gray-400 hover:text-blue-600">
-                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
-                        </svg>
+                    <button onclick="event.stopPropagation(); toggleKebab('task-${s.step_id}')" class="p-1 text-gray-400">
+                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
                     </button>
                     <div id="kebab-task-${s.step_id}" class="hidden absolute right-0 mt-1 w-32 bg-white border shadow-lg rounded-md z-[110] py-1">
                         <button onclick="event.stopPropagation(); openTaskSlider('${s.step_id}')" class="w-full text-left px-4 py-2 text-xs hover:bg-blue-50">Edit</button>
-                        <button onclick="event.stopPropagation(); deleteStep('${s.step_id}')" class="w-full text-left px-4 py-2 text-xs text-red-600 hover:bg-red-50">Delete</button>
+                        <button onclick="event.stopPropagation(); deleteStep('${s.step_id}')" class="w-full text-left px-4 py-2 text-xs text-red-600">Delete</button>
                     </div>
                 </div>
             </li>`;
     }).join('');
     
-    initSortable(); // Re-init sortable after DOM update
+    if (typeof initSortable === 'function') initSortable();
 }
-
 window.updateStatus = async (id, newStatus) => {
-    await supabase.from('requirements').update({ status: newStatus }).eq('req_id', id);
+    await supabase.from('requirements').update({ status: newStatus }).eq('requirement_id', id);
     loadRequirements();
 };
 
 window.deleteReq = async (id) => {
     if (!confirm("Delete this requirement and all associated tasks?")) return;
     await supabase.from('steps').delete().eq('requirement_id', id); // Clean up tasks first
-    await supabase.from('requirements').delete().eq('req_id', id);
+    await supabase.from('requirements').delete().eq('requirement_id', id);
     loadRequirements();
 };
 
@@ -397,33 +393,29 @@ window.deleteStep = async (id) => {
 };
 
 window.updateStep = async (id) => {
+    // Helper to safely get values from potentially missing elements
+    const getVal = (id) => document.getElementById(id) ? document.getElementById(id).value : null;
+
     const updates = {
-        title: document.getElementById('step-title-input').value,
-        assigned_to: document.getElementById('step-assign-select').value,
-        estimated_hours: parseFloat(document.getElementById('step-hours-input').value) || 0,
-        cost: parseFloat(document.getElementById('step-cost-input').value) || 0,
-        // ADDED: This ensures your "Notes / Sub-tasks" field actually saves
-        description: document.getElementById('step-desc-input').value 
+        title: getVal('step-title-input'),
+        assigned_to: getVal('step-assign-select'),
+        estimated_hours: parseFloat(getVal('step-hours-input')) || 0,
+        cost: parseFloat(getVal('step-cost-input')) || 0,
+        description: getVal('step-desc-input') // Aligned with your column 'description'
     };
 
-    // ADDED: Catching the error object
     const { error } = await supabase
         .from('steps')
         .update(updates)
-        .eq('step_id', id);
+        .eq('step_id', id); // Aligned with PK 'step_id'
 
     if (error) {
         console.error("Update Error:", error.message);
         alert("Failed to update task: " + error.message);
     } else {
-        console.log("Task updated successfully!");
-        closeTaskSlider();
+        window.closeTaskSlider();
         refreshSteps();
-        
-        // Ensure this function exists in your script to update the parent requirement totals
-        if (typeof rollupToRequirement === 'function') {
-            rollupToRequirement();
-        }
+        if (typeof rollupToRequirement === 'function') rollupToRequirement();
     }
 };
 
@@ -555,14 +547,15 @@ window.updateStep = async (id) => {
     window.submitStep = async () => {
     if (!selectedReqId) return alert("Select a requirement first.");
     
-    const title = document.getElementById('step-title-input').value.trim();
-    const assignedId = document.getElementById('step-assign-select').value;
-    const hours = parseFloat(document.getElementById('step-hours-input').value) || 0;
-    const cost = parseFloat(document.getElementById('step-cost-input').value) || 0;
+    const title = document.getElementById('step-title-input')?.value.trim();
+    const assignedId = document.getElementById('step-assign-select')?.value;
+    const hours = parseFloat(document.getElementById('step-hours-input')?.value) || 0;
+    const cost = parseFloat(document.getElementById('step-cost-input')?.value) || 0;
+    const desc = document.getElementById('step-desc-input')?.value || '';
 
-    if (!title || !assignedId || hours <= 0) return alert("Fill all fields.");
+    if (!title || !assignedId || hours <= 0) return alert("Fill all required fields.");
 
-    // Fetch highest order for this specific requirement
+    // Fetch highest order
     const { data: existingSteps } = await supabase
         .from('steps')
         .select('sequence_order')
@@ -573,20 +566,23 @@ window.updateStep = async (id) => {
     const nextOrder = (existingSteps?.[0]?.sequence_order || 0) + 10;
 
     const { error } = await supabase.from('steps').insert([{
-        requirement_id: selectedReqId, 
-        tenant_id: tenantId, 
+        requirement_id: selectedReqId, // Aligned with FK 'requirement_id'
+        tenant_id: typeof tenantId !== 'undefined' ? tenantId : null, 
         title, 
         assigned_to: assignedId, 
         estimated_hours: hours, 
         cost, 
-        sequence_order: nextOrder // Replaces 999
+        description: desc,
+        sequence_order: nextOrder 
     }]);
 
-    if (error) alert("Save failed.");
-    else {
-        closeTaskSlider();
+    if (error) {
+        console.error("Save Error:", error.message);
+        alert("Save failed: " + error.message);
+    } else {
+        window.closeTaskSlider();
         refreshSteps();
-        rollupToRequirement();
+        if (typeof rollupToRequirement === 'function') rollupToRequirement();
     }
 };
 
@@ -610,7 +606,7 @@ window.updateStep = async (id) => {
             custom_rate: newRate,
             updated_at: new Date() 
         })
-        .eq('req_id', selectedReqId);
+        .eq('requirement_id', selectedReqId);
 
     if (error) console.error("Rollup failed:", error);
     

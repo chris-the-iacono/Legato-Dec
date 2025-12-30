@@ -368,7 +368,7 @@ async function refreshSteps() {
                     </button>
                     <div id="kebab-task-${s.step_id}" class="hidden absolute right-0 mt-1 w-32 bg-white border shadow-lg rounded-md z-[110] py-1">
                         <button onclick="event.stopPropagation(); openTaskSlider('${s.step_id}')" class="w-full text-left px-4 py-2 text-xs hover:bg-blue-50">Edit</button>
-                        <button onclick="event.stopPropagation(); deleteTask('${s.step_id}')" class="w-full text-left px-4 py-2 text-xs text-red-600 hover:bg-red-50">Delete</button>
+                        <button onclick="event.stopPropagation(); deleteStep('${s.step_id}')" class="w-full text-left px-4 py-2 text-xs text-red-600 hover:bg-red-50">Delete</button>
                     </div>
                 </div>
             </li>`;
@@ -590,50 +590,6 @@ window.updateStep = async (id) => {
     }
 };
 
-async function refreshSteps() {
-    const { data: steps } = await supabase.from('steps')
-        .select(`*, user_profiles:assigned_to(full_name, email)`)
-        .eq('requirement_id', selectedReqId)
-        .order('sequence_order');
-
-    document.getElementById('task-count').innerText = `${steps?.length || 0} TASKS`;
-    document.getElementById('selected-req-meta').innerText = `${steps?.length || 0} tasks identified`;
-    
-    const list = document.getElementById('step-list');
-    
-    // Using .map() to build the list with the confirmed step_id column
-    list.innerHTML = (steps || []).map(s => `
-        <li class="px-4 py-3 flex justify-between items-center group active-task-row transition-all" data-id="${s.step_id}">
-            <div class="flex items-center gap-3">
-                <span class="cursor-move text-gray-200 group-hover:text-blue-300 font-bold">::</span>
-                <div>
-                    <p class="text-sm font-semibold text-gray-700">${s.title}</p>
-                    <p class="text-[10px] text-blue-400 font-bold uppercase">${s.user_profiles?.full_name || 'Unassigned'}</p>
-                </div>
-            </div>
-            
-            <div class="flex items-center gap-4">
-                <div class="text-right">
-                    <p class="text-[11px] font-bold text-gray-900">$${(s.cost || 0).toLocaleString()}</p>
-                    <p class="text-[9px] text-gray-400">${s.estimated_hours}h</p>
-                </div>
-                
-                <div class="relative kebab-container">
-                    <button onclick="event.stopPropagation(); toggleKebab('task-${s.step_id}')" class="p-1 text-gray-400 hover:text-blue-600 transition-colors">
-                        <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
-                        </svg>
-                    </button>
-                    <div id="kebab-task-${s.step_id}" class="hidden absolute right-0 mt-1 w-40 bg-white border border-gray-100 shadow-xl rounded-lg z-[110] py-1 ring-1 ring-black ring-opacity-5">
-                        <button onclick="event.stopPropagation(); openTaskSlider('${s.step_id}')" class="w-full text-left px-4 py-2 text-sm hover:bg-blue-50 flex items-center gap-2">Edit
-                        </button>
-                        <div class="border-t border-gray-100 my-1"></div>
-                        <button onclick="event.stopPropagation(); deleteStep('${s.step_id}')" class="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50">Delete</button>
-                    </div>
-                </div>
-            </div>
-        </li>`).join('');
-}
     async function rollupToRequirement() {
     if (!selectedReqId) return;
 
@@ -678,7 +634,7 @@ onEnd: async () => {
         return supabase
             .from('requirements')
             .update({ sequence_order: (index + 1) * 10 })
-            .eq('req_id', row.getAttribute('data-id'));
+            .eq('requirement_id', row.getAttribute('data-id'));
     });
 
     console.log("Syncing new requirement order...");

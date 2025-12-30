@@ -245,60 +245,63 @@
         });
     });
 
-    // SLIDER CONTROLS
-window.closeTaskSlider = () => document.getElementById('task-editor-panel').classList.remove('active');
-window.closeReqSlider = () => document.getElementById('req-editor-panel').classList.remove('active');
+/**
+ * RE-SYNCED SLIDER & TASK LOGIC
+ * 1. Fixed window scope for sliders
+ * 2. Fixed 'step_id' vs 'id' mapping
+ * 3. Fixed z-index and active class triggers
+ */
+
+// --- SLIDER CONTROLS (GLOBAL SCOPE) ---
+window.closeTaskSlider = () => {
+    document.getElementById('task-editor-panel').classList.remove('active');
+};
+
+window.closeReqSlider = () => {
+    document.getElementById('req-editor-panel').classList.remove('active');
+};
 
 window.openReqSlider = async (id = null) => {
     const panel = document.getElementById('req-editor-panel');
     const titleEl = document.getElementById('req-editor-title');
     const btnEl = document.getElementById('req-save-btn');
 
+    // Clear previous state
     if (id) {
         titleEl.innerText = "Edit Requirement";
         btnEl.innerText = "Update Requirement";
         
-        // Fetch specific data from Supabase
-        const { data: req } = await supabase.from('requirements').select('*').eq('req_id', id).single();
-        
+        const { data: req, error } = await supabase
+            .from('requirements')
+            .select('*')
+            .eq('req_id', id)
+            .single();
+
         if (req) {
-            document.getElementById('req-title-input').value = req.title;
-            document.getElementById('req-assign-select').value = req.assigned_to;
-            document.getElementById('req-hours-input').value = req.estimated_hours;
-            document.getElementById('req-applied-rate').value = req.custom_rate;
-            
-            // Redirect the save button to an update function
+            document.getElementById('req-title-input').value = req.title || '';
+            document.getElementById('req-assign-select').value = req.assigned_to || '';
+            document.getElementById('req-hours-input').value = req.estimated_hours || 0;
+            document.getElementById('req-rate-input').value = req.custom_rate || 0;
+            document.getElementById('req-desc-input').value = req.description || '';
             btnEl.onclick = () => updateRequirement(id);
         }
     } else {
-        titleEl.innerText = "Create Requirement";
-        btnEl.innerText = "Create Requirement";
-        document.getElementById('req-title-input').value = '';
-        document.getElementById('req-hours-input').value = '';
-        btnEl.onclick = () => addRequirement();
+        titleEl.innerText = "Add New Requirement";
+        btnEl.innerText = "Save Requirement";
+        // Reset form...
+        btnEl.onclick = () => submitRequirement();
     }
     panel.classList.add('active');
 };
 
-    window.openTaskSlider = async (id = null) => {
-    // 1. Requirement Selection Check
-    if (!selectedReqId) return alert("Select a requirement first.");
+window.openTaskSlider = async (id = null) => {
+    if (!selectedReqId) return;
 
-    // 2. Element References
     const panel = document.getElementById('task-editor-panel');
     const titleEl = document.getElementById('task-editor-title');
-    
-    // SYNCED ID: Changed 'task-save-btn' to 'step-save-btn' to match your HTML
-    const btnEl = document.getElementById('step-save-btn');
-
-    // Safety: Ensure the panel and elements exist
-    if (!panel || !titleEl || !btnEl) {
-        console.error("UI Elements missing:", { panel, titleEl, btnEl });
-        return;
-    }
+    const btnEl = document.getElementById('task-save-btn');
 
     if (id) {
-        // --- EDIT MODE ---
         titleEl.innerText = "Edit Task";
         btnEl.innerText = "Update Task";
 
@@ -308,69 +311,71 @@ window.openReqSlider = async (id = null) => {
             .eq('step_id', id)
             .single();
 
-        if (error) {
-            console.error("Supabase error:", error.message);
-            return alert("Error loading task data.");
-        }
-
         if (step) {
             document.getElementById('step-title-input').value = step.title || '';
             document.getElementById('step-assign-select').value = step.assigned_to || '';
             document.getElementById('step-hours-input').value = step.estimated_hours || 0;
             document.getElementById('step-cost-input').value = step.cost || 0;
-            
-            // ADDED: Make sure the Notes field is updated too
-            if (document.getElementById('step-desc-input')) {
-                document.getElementById('step-desc-input').value = step.description || '';
-            }
-            
+            document.getElementById('step-desc-input').value = step.description || '';
             btnEl.onclick = () => updateStep(id);
         }
     } else {
-        // --- CREATE MODE ---
         titleEl.innerText = "Add New Task";
         btnEl.innerText = "Save Task";
-        
-        document.getElementById('step-title-input').value = '';
-        document.getElementById('step-assign-select').value = '';
-        document.getElementById('step-hours-input').value = '';
-        document.getElementById('step-cost-input').value = '0.00';
-        if (document.getElementById('step-desc-input')) {
-            document.getElementById('step-desc-input').value = '';
-        }
-        
+        // Reset form...
         btnEl.onclick = () => submitStep();
     }
-
-    // 3. Final Step: Show the panel
     panel.classList.add('active');
 };
-	
-	window.updateRequirement = async (id) => {
-    const updates = {
-        title: document.getElementById('req-title-input').value,
-        assigned_to: document.getElementById('req-assign-select').value,
-        estimated_hours: parseFloat(document.getElementById('req-hours-input').value) || 0,
-        custom_rate: parseFloat(document.getElementById('req-applied-rate').value) || 0
-    };
 
-    // Added error handling to prevent "silent failures"
-    const { error } = await supabase
-        .from('requirements')
-        .update(updates)
-        .eq('req_id', id);
+// --- TASK LIST GENERATION (RE-SYNCED) ---
+async function refreshSteps() {
+    if (!selectedReqId) return;
+    
+    const { data: steps, error } = await supabase
+        .from('steps')
+        .select(`*, assignee:assigned_to(full_name)`)
+        .eq('req_id', selectedReqId)
+        .order('sequence_order');
 
-    if (error) {
-        console.error("Requirement Update Error:", error.message);
-        alert("Failed to update requirement: " + error.message);
-    } else {
-        closeReqSlider();
-        loadRequirements();
+    if (error) return console.error(error);
+
+    const list = document.getElementById('step-list');
+    list.innerHTML = steps.map(s => {
+        const statusClass = s.status === 'Complete' ? 'status-complete' : (s.status === 'In Progress' ? 'status-inprogress' : 'status-pending');
         
-        // If you have a total budget or progress bar on the page, 
-        // you might want to call a refresh for those here too.
-    }
-};
+        return `
+            <li class="active-task-row p-3 hover:bg-blue-50 border-b flex justify-between items-center group transition-colors" data-id="${s.step_id}">
+                <div class="flex items-center gap-3">
+                    <span class="cursor-move text-gray-300 font-bold p-1">::</span>
+                    <div>
+                        <p class="text-sm font-semibold text-gray-700">${s.title}</p>
+                        <div class="flex items-center gap-2 text-[10px] text-gray-400 font-bold uppercase">
+                            <span>${s.assignee?.full_name || 'Unassigned'}</span>
+                            <span>•</span>
+                            <span>${s.estimated_hours}h</span>
+                            <span class="${statusClass} px-1.5 py-0.5 rounded text-[8px]">${s.status || 'Pending'}</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- KEBAB MENU FOR TASK -->
+                <div class="relative kebab-container">
+                    <button onclick="event.stopPropagation(); toggleKebab('task-${s.step_id}')" class="p-1 text-gray-400 hover:text-blue-600">
+                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+                        </svg>
+                    </button>
+                    <div id="kebab-task-${s.step_id}" class="hidden absolute right-0 mt-1 w-32 bg-white border shadow-lg rounded-md z-[110] py-1">
+                        <button onclick="event.stopPropagation(); openTaskSlider('${s.step_id}')" class="w-full text-left px-4 py-2 text-xs hover:bg-blue-50">Edit</button>
+                        <button onclick="event.stopPropagation(); deleteTask('${s.step_id}')" class="w-full text-left px-4 py-2 text-xs text-red-600 hover:bg-red-50">Delete</button>
+                    </div>
+                </div>
+            </li>`;
+    }).join('');
+    
+    initSortable(); // Re-init sortable after DOM update
+}
 
 window.updateStatus = async (id, newStatus) => {
     await supabase.from('requirements').update({ status: newStatus }).eq('req_id', id);

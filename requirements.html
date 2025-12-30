@@ -7,7 +7,7 @@
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     
-    <link rel="stylesheet" href="../../_Legato_/css/style.css">
+    <link rel="stylesheet" href="css/style.css">
 
     <style>
         /* Layout & Viewport */
@@ -193,6 +193,27 @@
     let selectedReqId = null; 
     let projectBlendedRate = 0;
     let teamMembers = [];
+	
+	async function selectRequirement(row) {
+    // 1. UI Feedback: Highlight the active row
+    document.querySelectorAll('.req-row').forEach(r => r.classList.remove('active-req'));
+    row.classList.add('active-req');
+
+    // 2. Set State
+    selectedReqId = row.getAttribute('data-id');
+    const title = row.getAttribute('data-title');
+
+    // 3. Update Header Display
+    document.getElementById('selected-req-title-display').innerText = `2. Tasks for: ${title}`;
+    
+    // 4. Enable the "Add Task" button
+    const addTaskBtn = document.getElementById('add-task-btn');
+    addTaskBtn.disabled = false;
+    addTaskBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+
+    // 5. Load the associated tasks
+    refreshSteps();
+}
 
     document.addEventListener('DOMContentLoaded', async () => {
         session = await checkAccess(MODULES.REQUIREMENTS);

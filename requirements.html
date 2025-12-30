@@ -259,34 +259,61 @@
     panel.classList.add('active');
 };
 
-    window.closeReqSlider = () => document.getElementById('req-editor-panel').classList.remove('active');
-
     window.openTaskSlider = async (id = null) => {
+    // 1. Requirement Selection Check
     if (!selectedReqId) return alert("Select a requirement first.");
+
+    // 2. Element References
     const panel = document.getElementById('task-editor-panel');
     const titleEl = document.getElementById('task-editor-title');
     const btnEl = document.getElementById('task-save-btn');
 
+    // Safety: Ensure the panel actually exists in the HTML
+    if (!panel) return console.error("Element #task-editor-panel not found.");
+
     if (id) {
+        // --- EDIT MODE ---
         titleEl.innerText = "Edit Task";
         btnEl.innerText = "Update Task";
-        const { data: step } = await supabase.from('steps').select('*').eq('step_id', id).single();
+
+        const { data: step, error } = await supabase
+            .from('steps')
+            .select('*')
+            .eq('step_id', id)
+            .single();
+
+        if (error) {
+            console.error("Supabase error:", error.message);
+            return alert("Error loading task data.");
+        }
+
         if (step) {
-            document.getElementById('step-title-input').value = step.title;
-            document.getElementById('step-assign-select').value = step.assigned_to;
-            document.getElementById('step-hours-input').value = step.estimated_hours;
-            document.getElementById('step-cost-input').value = step.cost;
+            document.getElementById('step-title-input').value = step.title || '';
+            document.getElementById('step-assign-select').value = step.assigned_to || '';
+            document.getElementById('step-hours-input').value = step.estimated_hours || 0;
+            document.getElementById('step-cost-input').value = step.cost || 0;
+            
+            // Re-bind the click event to Update
             btnEl.onclick = () => updateStep(id);
         }
     } else {
+        // --- CREATE MODE ---
         titleEl.innerText = "Add New Task";
         btnEl.innerText = "Save Task";
+        
+        // Reset all fields so data from a previous "Edit" doesn't linger
         document.getElementById('step-title-input').value = '';
+        document.getElementById('step-assign-select').value = '';
+        document.getElementById('step-hours-input').value = '';
+        document.getElementById('step-cost-input').value = '0.00';
+        
+        // Re-bind the click event to Submit
         btnEl.onclick = () => submitStep();
     }
+
+    // 3. Final Step: Show the panel
     panel.classList.add('active');
 };
-
     window.closeTaskSlider = () => document.getElementById('task-editor-panel').classList.remove('active');
 
     function selectRequirement(rowElement) {

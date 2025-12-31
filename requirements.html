@@ -216,34 +216,46 @@
 }
 
     document.addEventListener('DOMContentLoaded', async () => {
-        session = await checkAccess(MODULES.REQUIREMENTS);
-        projectId = localStorage.getItem('selected_project_id');
-        
-        if (!projectId) {
-            window.location.href = 'index.html';
-            return;
-        }
+    session = await checkAccess(MODULES.REQUIREMENTS);
+    projectId = localStorage.getItem('selected_project_id');
+    
+    if (!projectId) {
+        window.location.href = 'index.html';
+        return;
+    }
 
-        const { data: proj } = await supabase.from('projects').select('blended_rate').eq('id', projectId).single();
-        projectBlendedRate = proj?.blended_rate || 0;
+    // Fetch Project Blended Rate and store globally for the Waterfall calculation
+    const { data: proj } = await supabase.from('projects').select('blended_rate').eq('id', projectId).single();
+    window.projectBlendedRate = proj?.blended_rate || 0;
 
-        const { data: profiles } = await supabase.from('user_profiles').select('user_id, email, full_name, hourly_cost, tenant_id'); 
-        teamMembers = profiles || [];
-        const currentUserProfile = teamMembers.find(p => p.user_id === session.user.id);
-        tenantId = currentUserProfile?.tenant_id;
+    // Fetch Team Members including hourly_cost for the Waterfall calculation
+    const { data: profiles } = await supabase.from('user_profiles').select('user_id, email, full_name, hourly_cost, tenant_id'); 
+    window.teamMembers = profiles || [];
+    
+    const currentUserProfile = window.teamMembers.find(p => p.user_id === session.user.id);
+    tenantId = currentUserProfile?.tenant_id;
 
-        populateDropdowns();
-        renderProjectHeader(session, 'requirements', localStorage.getItem('selected_project_name'));
-        loadRequirements();
-        initSortable();
+    populateDropdowns();
+    renderProjectHeader(session, 'requirements', localStorage.getItem('selected_project_name'));
+    loadRequirements();
+    initSortable();
 
-        // Row Selection Logic
-        document.getElementById('req-list').addEventListener('click', (e) => {
-            const row = e.target.closest('.req-row');
-            if (!row || e.target.closest('.kebab-container')) return;
-            selectRequirement(row);
-        });
+    // Row Selection Logic
+    document.getElementById('req-list').addEventListener('click', (e) => {
+        const row = e.target.closest('.req-row');
+        if (!row || e.target.closest('.kebab-container')) return;
+        selectRequirement(row);
     });
+
+    // ADDED: Listener to automatically update cost when hours change
+    document.addEventListener('input', (e) => {
+        if (e.target.id === 'step-hours-input') {
+            if (typeof window.handleUserSelection === 'function') {
+                window.handleUserSelection('step');
+            }
+        }
+    });
+});
 
 /**
  * RE-SYNCED SLIDER & TASK LOGIC

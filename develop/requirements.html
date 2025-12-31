@@ -257,6 +257,16 @@
     });
 });
 
+    // ADDED: Listener to automatically update cost when hours change
+    document.addEventListener('input', (e) => {
+        if (e.target.id === 'step-hours-input') {
+            if (typeof window.handleUserSelection === 'function') {
+                window.handleUserSelection('step');
+            }
+        }
+    });
+});
+
 /**
  * RE-SYNCED SLIDER & TASK LOGIC
  * 1. Fixed window scope for sliders

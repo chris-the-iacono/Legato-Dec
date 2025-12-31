@@ -440,18 +440,25 @@ window.updateStep = async (id) => {
 };
 
     function populateDropdowns() {
-        ['req-assign-select', 'step-assign-select'].forEach(id => {
-            const el = document.getElementById(id);
-            if (!el) return;
-            el.innerHTML = '<option value="">Select Resource</option>';
-            teamMembers.forEach(u => {
-                const opt = document.createElement('option');
-                opt.value = u.user_id;
-                opt.textContent = u.full_name || u.email;
-                el.appendChild(opt);
-            });
+    // Look for the data on the window object where we saved it
+    const members = window.teamMembers || [];
+
+    ['req-assign-select', 'step-assign-select'].forEach(id => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        
+        el.innerHTML = '<option value="">Select Resource</option>';
+        
+        members.forEach(u => {
+            const opt = document.createElement('option');
+            opt.value = u.user_id;
+            opt.textContent = u.full_name || u.email;
+            el.appendChild(opt);
         });
-    }
+    });
+    
+    console.log(`Dropdowns populated with ${members.length} members.`);
+}
 
     window.handleUserSelection = (type) => {
         const userId = document.getElementById(`${type}-assign-select`).value;

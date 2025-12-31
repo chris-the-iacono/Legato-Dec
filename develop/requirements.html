@@ -122,7 +122,7 @@
                 </div>
                 <div class="grid grid-cols-2 gap-4">
                     <div class="flex flex-col">
-                        <label class="text-[11px] font-bold text-gray-500 uppercase mb-1 ml-1">Assigned Resource</label>
+                        <label class="text-[11px] font-bold text-gray-500 uppercase mb-1 ml-1">Responsible</label>
                         <select id="req-assign-select" onchange="
 						('req')" class="border-gray-200 rounded-lg text-sm p-3 bg-gray-50 border"></select>
                     </div>
@@ -160,7 +160,7 @@
                 </div>
                 <div class="grid grid-cols-2 gap-4">
                     <div class="flex flex-col">
-                        <label class="text-[11px] font-bold text-gray-500 uppercase mb-1 ml-1">Assignee</label>
+                        <label class="text-[11px] font-bold text-gray-500 uppercase mb-1 ml-1">Responsible Assignee</label>
                         <select id="step-assign-select" onchange="handleUserSelection('step')" class="border-gray-200 rounded-lg text-sm p-3 bg-gray-50 border"></select>
                     </div>
                     <div class="grid grid-cols-2 gap-2">
@@ -309,6 +309,15 @@ window.openReqSlider = async (id = null) => {
     const titleEl = document.getElementById('req-editor-title');
     const btnEl = document.getElementById('req-save-btn');
 
+    // Helper to clear fields for new requirements
+    const resetForm = () => {
+        if (document.getElementById('req-title-input')) document.getElementById('req-title-input').value = '';
+        if (document.getElementById('req-assign-select')) document.getElementById('req-assign-select').value = '';
+        if (document.getElementById('req-hours-input')) document.getElementById('req-hours-input').value = 0;
+        const rateField = document.getElementById('req-applied-rate') || document.getElementById('req-rate-input');
+        if (rateField) rateField.value = window.projectBlendedRate || 0;
+    };
+
     if (id) {
         titleEl.innerText = "Edit Requirement";
         btnEl.innerText = "Update Requirement";
@@ -316,7 +325,7 @@ window.openReqSlider = async (id = null) => {
         const { data: req } = await supabase
             .from('requirements')
             .select('*')
-            .eq('req_id', id) // Verified Column Name
+            .eq('req_id', id)
             .single();
 
         if (req) {
@@ -327,20 +336,32 @@ window.openReqSlider = async (id = null) => {
             if (document.getElementById('req-hours-input')) 
                 document.getElementById('req-hours-input').value = req.estimated_hours || 0;
             
-            // Check for both common IDs for rate
+            // --- WATERFALL LOGIC FOR REQUIREMENT RATE ---
             const rateField = document.getElementById('req-applied-rate') || document.getElementById('req-rate-input');
-            if (rateField) rateField.value = req.custom_rate || 0;
+            if (rateField) {
+                // We parse the saved rate, but if it's 0 or that specific '7' we are debugging, we recalculate
+                let currentRate = parseFloat(req.custom_rate) || 0;
+
+                if (currentRate === 0 || currentRate === 7) {
+                    const user = window.teamMembers?.find(u => u.user_id === req.assigned_to);
+                    currentRate = (user && parseFloat(user.hourly_cost) > 0) 
+                                 ? user.hourly_cost 
+                                 : (window.projectBlendedRate || 0);
+                }
+                rateField.value = currentRate;
+            }
+            // --------------------------------------------
 
             btnEl.onclick = () => updateRequirement(id);
         }
     } else {
         titleEl.innerText = "Add New Requirement";
         btnEl.innerText = "Save Requirement";
+        resetForm();
         btnEl.onclick = () => submitRequirement();
     }
     panel.classList.add('active');
 };
-
 window.openTaskSlider = async (id = null) => {
     if (!selectedReqId) return;
 

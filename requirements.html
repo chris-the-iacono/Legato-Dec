@@ -122,9 +122,12 @@
                 </div>
                 <div class="grid grid-cols-2 gap-4">
                     <div class="flex flex-col">
-                        <label class="text-[11px] font-bold text-gray-500 uppercase mb-1 ml-1">Responsible</label>
-                        <select id="req-assign-select" onchange="
-						('req')" class="border-gray-200 rounded-lg text-sm p-3 bg-gray-50 border"></select>
+    <label class="text-[11px] font-bold text-gray-500 uppercase mb-1 ml-1">Assignee</label>
+    <select id="req-assign-select" 
+            onchange="handleUserSelection('req')" 
+            class="bg-white border-gray-200 rounded-lg text-sm p-3 border">
+        </select>
+</div>
                     </div>
                     <div class="flex flex-col">
                         <label class="text-[11px] font-bold text-gray-500 uppercase mb-1 ml-1">Hourly Rate</label>
@@ -538,33 +541,42 @@ window.updateStep = async (id) => {
 }
 
     window.handleUserSelection = (type) => {
-    // 1. Ensure we are looking at the global data we fetched
+    // 1. Explicitly grab global data
     const members = window.teamMembers || [];
     const defaultRate = parseFloat(window.projectBlendedRate) || 0;
 
-    const userId = document.getElementById(`${type}-assign-select`).value;
+    // 2. Get selected user
+    const selectEl = document.getElementById(`${type}-assign-select`);
+    if (!selectEl) return;
+    
+    const userId = selectEl.value;
     const user = members.find(u => u.user_id === userId);
 
-    // 2. THE WATERFALL: 
-    // Use user.hourly_cost if it is a valid number > 0. Otherwise, use project default.
+    // 3. THE WATERFALL: 
+    // Use user.hourly_cost if > 0. Otherwise, use project default.
     let rate = (user && parseFloat(user.hourly_cost) > 0) 
                ? parseFloat(user.hourly_cost) 
                : defaultRate;
 
+    // 4. Update the UI
     if (type === 'req') {
-        const rateEl = document.getElementById('req-applied-rate');
-        if (rateEl) rateEl.value = rate;
+        // Try both possible IDs for the requirement rate field
+        const rateEl = document.getElementById('req-applied-rate') || document.getElementById('req-rate-input');
+        if (rateEl) {
+            rateEl.value = rate; // This updates the "Hourly Rate" box in the slider
+        }
     } else {
         const hoursInput = document.getElementById('step-hours-input');
         const costInput = document.getElementById('step-cost-input');
         
-        const hours = parseFloat(hoursInput.value) || 0;
-        costInput.value = (rate * hours).toFixed(2);
+        const hours = parseFloat(hoursInput?.value) || 0;
+        if (costInput) {
+            costInput.value = (rate * hours).toFixed(2);
+        }
     }
     
-    console.log(`Selection update: User=${user?.full_name}, Rate=${rate}, Type=${type}`);
+    console.log(`Updated ${type} rate to: ${rate} (Blended fallback: ${rate === defaultRate})`);
 };
-
    window.addRequirement = async () => {
     // 1. Keep all your original constants
     const title = document.getElementById('req-title-input').value.trim();

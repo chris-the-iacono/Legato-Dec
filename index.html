@@ -223,25 +223,37 @@ const { data: projects, error } = await supabase
  * We attach these to 'window' so the HTML onclick handlers can find them.
  **/
 window.openInviteModal = async (targetTenantId) => {
-    const email = prompt("Enter the new member's email:");
+    // 1. Collect Data
+    const email = prompt("Enter email:");
     if (!email) return;
 
-    const fullName = prompt("Enter their full name:");
-    const hourlyCost = prompt("Enter their hourly rate:", "0");
+    const fullName = prompt("Enter full name:");
+    const hourlyCost = prompt("Enter hourly rate (0 for project default):", "0");
+    const role = prompt("Enter role (admin or member):", "member");
 
+    // 2. Insert into Supabase
     const { error } = await supabase
         .from('user_profiles')
         .insert([{
             email: email,
             full_name: fullName,
             hourly_cost: parseFloat(hourlyCost) || 0,
+            role: role ? role.toLowerCase() : 'member',
             tenant_id: targetTenantId 
         }]);
 
+    // 3. Handle Result
     if (error) {
+        console.error("Invite Error:", error.message);
         alert("Error: " + error.message);
     } else {
-        alert(`${fullName} added to this tenant successfully.`);
+        alert(`${fullName} added successfully.`);
+        
+        /* 4. DATA REFRESH (Optional but recommended)
+           If you are on a page that lists users, you'd call your 
+           fetch function here so the new name shows up instantly.
+        */
+        if (typeof loadProjects === 'function') loadProjects();
     }
 };
     </script>

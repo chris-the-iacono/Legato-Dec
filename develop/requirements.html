@@ -348,6 +348,15 @@ window.openTaskSlider = async (id = null) => {
     const titleEl = document.getElementById('task-editor-title');
     const btnEl = document.getElementById('task-save-btn');
 
+    // Helper to reset the form (useful for "Add New Task")
+    const resetForm = () => {
+        document.getElementById('step-title-input').value = '';
+        document.getElementById('step-assign-select').value = '';
+        document.getElementById('step-hours-input').value = 0;
+        document.getElementById('step-cost-input').value = "0.00";
+        document.getElementById('step-desc-input').value = '';
+    };
+
     if (id) {
         titleEl.innerText = "Edit Task";
         btnEl.innerText = "Update Task";
@@ -361,20 +370,36 @@ window.openTaskSlider = async (id = null) => {
         if (step) {
             document.getElementById('step-title-input').value = step.title || '';
             document.getElementById('step-assign-select').value = step.assigned_to || '';
-            document.getElementById('step-hours-input').value = step.estimated_hours || 0;
-            document.getElementById('step-cost-input').value = step.cost || 0;
+            
+            const hours = step.estimated_hours || 0;
+            document.getElementById('step-hours-input').value = hours;
+
+            // --- WATERFALL CALCULATION ---
+            let displayCost = step.cost;
+
+            // If cost is 0 or missing in DB, calculate it based on rate waterfall
+            if (!displayCost || displayCost === 0) {
+                const user = window.teamMembers?.find(u => u.user_id === step.assigned_to);
+                const rate = (user && parseFloat(user.hourly_cost) > 0) 
+                             ? parseFloat(user.hourly_cost) 
+                             : (window.projectBlendedRate || 0);
+                displayCost = hours * rate;
+            }
+
+            document.getElementById('step-cost-input').value = parseFloat(displayCost).toFixed(2);
+            // -----------------------------
+
             document.getElementById('step-desc-input').value = step.description || '';
             btnEl.onclick = () => updateStep(id);
         }
     } else {
         titleEl.innerText = "Add New Task";
         btnEl.innerText = "Save Task";
-        // Reset form...
+        resetForm(); // Ensure old data isn't lingering
         btnEl.onclick = () => submitStep();
     }
     panel.classList.add('active');
 };
-
 // --- TASK LIST GENERATION (RE-SYNCED) ---
 async function refreshSteps() {
     if (!selectedReqId) return;

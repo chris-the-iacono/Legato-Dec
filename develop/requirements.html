@@ -346,6 +346,13 @@ async function refreshSteps() {
         console.error("Step Load Error:", error.message);
         return;
     }
+	// Update the counter at the top of the Task section
+	const taskCountEl = document.getElementById('task-count');
+	if (taskCountEl) taskCountEl.innerText = `${steps?.length || 0} ITEMS`;
+
+// Update the metadata text if you have that element
+	const metaEl = document.getElementById('selected-req-meta');
+	if (metaEl) metaEl.innerText = `${steps?.length || 0} tasks identified`;
 
     const list = document.getElementById('step-list');
     list.innerHTML = (steps || []).map(s => {
@@ -374,7 +381,8 @@ async function refreshSteps() {
     if (typeof initSortable === 'function') initSortable();
 }
 window.updateStatus = async (id, newStatus) => {
-    await supabase.from('requirements').update({ status: newStatus }).eq('requirement_id', id);
+    // Fixed: Database uses 'req_id' for the requirements table
+    await supabase.from('requirements').update({ status: newStatus }).eq('req_id', id);
     loadRequirements();
 };
 

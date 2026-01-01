@@ -721,13 +721,14 @@ window.updateStep = async (id) => {
     async function rollupToRequirement() {
     if (!selectedReqId) return;
 
-    // Fetch steps AND the assigned user's rate in one go
+    // 1. Fetch steps AND the hourly cost of the assigned user in one go
+    // Note: 'user_profiles' join depends on your foreign key relationship name
     const { data: steps, error: fetchError } = await supabase.from('steps')
         .select(`
             cost, 
             estimated_hours, 
             assigned_to,
-            user_profiles!steps_assigned_to_fkey(hourly_cost)
+            user_profiles:assigned_to (hourly_cost)
         `)
         .eq('requirement_id', selectedReqId);
 
@@ -736,30 +737,33 @@ window.updateStep = async (id) => {
         return;
     }
 
-    let totalCost = 0;
+    let calculatedTotalCost = 0;
     let totalHours = 0;
 
     (steps || []).forEach(s => {
         const hours = parseFloat(s.estimated_hours) || 0;
         let cost = parseFloat(s.cost) || 0;
 
-        // WATERFALL: If cost is 0, calculate what it SHOULD be
+        // --- WATERFALL LOGIC DURING SUMMATION ---
+        // If the database cost is 0, we calculate what it SHOULD be
         if (cost === 0 && hours > 0) {
             const userRate = parseFloat(s.user_profiles?.hourly_cost) || 0;
-            const rate = userRate > 0 ? userRate : (window.projectBlendedRate || 0);
-            cost = hours * rate;
+            const fallbackRate = userRate > 0 ? userRate : (window.projectBlendedRate || 0);
+            cost = hours * fallbackRate;
         }
 
-        totalCost += cost;
+        calculatedTotalCost += cost;
         totalHours += hours;
     });
     
-    const newRate = totalHours > 0 ? (totalCost / totalHours) : window.projectBlendedRate;
+    // Calculate the "Average Blended Rate" for this specific requirement
+    const newRate = totalHours > 0 ? (calculatedTotalCost / totalHours) : (window.projectBlendedRate || 0);
 
+    // 2. Update the requirements table with the verified totals
     const { error: updateError } = await supabase.from('requirements')
         .update({ 
             estimated_hours: totalHours, 
-            custom_rate: newRate,
+            custom_rate: newRate, // Saving the blended average
             updated_at: new Date().toISOString()
         })
         .eq('req_id', selectedReqId);
@@ -767,6 +771,7 @@ window.updateStep = async (id) => {
     if (updateError) {
         console.error("Rollup Update failed:", updateError.message);
     } else {
+        // 3. Refresh the main list to show the new dollar amounts
         loadRequirements();
     }
 }

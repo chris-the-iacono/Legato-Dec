@@ -125,7 +125,7 @@
     <label class="text-[11px] font-bold text-gray-500 uppercase mb-1 ml-1">Assignee</label>
     <select id="req-assign-select" 
             onchange="handleUserSelection('req')" 
-            class="bg-white border-gray-200 rounded-lg text-sm p-3 border">
+            class="bg-white border-gray-200 rounded-lg text-sm p-3 bg-gray-50 border">
         </select>
 </div>
                     </div>
@@ -721,8 +721,14 @@ window.updateStep = async (id) => {
     async function rollupToRequirement() {
     if (!selectedReqId) return;
 
+    // Fetch steps AND the assigned user's rate in one go
     const { data: steps, error: fetchError } = await supabase.from('steps')
-        .select('cost, estimated_hours')
+        .select(`
+            cost, 
+            estimated_hours, 
+            assigned_to,
+            user_profiles!steps_assigned_to_fkey(hourly_cost)
+        `)
         .eq('requirement_id', selectedReqId);
 
     if (fetchError) {
@@ -730,25 +736,37 @@ window.updateStep = async (id) => {
         return;
     }
 
-    // Use parseFloat to ensure numbers stay numbers
-    const totalCost = (steps || []).reduce((sum, s) => sum + (parseFloat(s.cost) || 0), 0);
-    const totalHours = (steps || []).reduce((sum, s) => sum + (parseFloat(s.estimated_hours) || 0), 0);
+    let totalCost = 0;
+    let totalHours = 0;
+
+    (steps || []).forEach(s => {
+        const hours = parseFloat(s.estimated_hours) || 0;
+        let cost = parseFloat(s.cost) || 0;
+
+        // WATERFALL: If cost is 0, calculate what it SHOULD be
+        if (cost === 0 && hours > 0) {
+            const userRate = parseFloat(s.user_profiles?.hourly_cost) || 0;
+            const rate = userRate > 0 ? userRate : (window.projectBlendedRate || 0);
+            cost = hours * rate;
+        }
+
+        totalCost += cost;
+        totalHours += hours;
+    });
     
-    // Maintain your Blended Rate logic
-    const newRate = totalHours > 0 ? (totalCost / totalHours) : projectBlendedRate;
+    const newRate = totalHours > 0 ? (totalCost / totalHours) : window.projectBlendedRate;
 
     const { error: updateError } = await supabase.from('requirements')
         .update({ 
             estimated_hours: totalHours, 
             custom_rate: newRate,
-            updated_at: new Date().toISOString() // Use ISO string for Supabase timestamptz
+            updated_at: new Date().toISOString()
         })
-        .eq('req_id', selectedReqId); // FIXED: Aligned with your 'req_id' column
+        .eq('req_id', selectedReqId);
 
     if (updateError) {
         console.error("Rollup Update failed:", updateError.message);
     } else {
-        // Only reload if the update actually worked
         loadRequirements();
     }
 }

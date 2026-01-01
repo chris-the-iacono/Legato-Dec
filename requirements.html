@@ -122,8 +122,12 @@
                 </div>
                 <div class="grid grid-cols-2 gap-4">
                     <div class="flex flex-col">
-                        <label class="text-[11px] font-bold text-gray-500 uppercase mb-1 ml-1">Assigned Resource</label>
-                        <select id="req-assign-select" onchange="handleUserSelection('req')" class="border-gray-200 rounded-lg text-sm p-3 bg-gray-50 border"></select>
+    <label class="text-[11px] font-bold text-gray-500 uppercase mb-1 ml-1">Assignee</label>
+    <select id="req-assign-select" 
+            onchange="handleUserSelection('req')" 
+            class="bg-white border-gray-200 rounded-lg text-sm p-3 bg-gray-50 border">
+        </select>
+</div>
                     </div>
                     <div class="flex flex-col">
                         <label class="text-[11px] font-bold text-gray-500 uppercase mb-1 ml-1">Hourly Rate</label>
@@ -159,7 +163,7 @@
                 </div>
                 <div class="grid grid-cols-2 gap-4">
                     <div class="flex flex-col">
-                        <label class="text-[11px] font-bold text-gray-500 uppercase mb-1 ml-1">Assignee</label>
+                        <label class="text-[11px] font-bold text-gray-500 uppercase mb-1 ml-1">Responsible Assignee</label>
                         <select id="step-assign-select" onchange="handleUserSelection('step')" class="border-gray-200 rounded-lg text-sm p-3 bg-gray-50 border"></select>
                     </div>
                     <div class="grid grid-cols-2 gap-2">
@@ -194,6 +198,36 @@
     let projectBlendedRate = 0;
     let teamMembers = [];
 	
+	window.openInviteModal = async () => {
+    const email = prompt("Enter the new member's email:");
+    if (!email) return;
+
+    const fullName = prompt("Enter their full name:");
+    const hourlyCost = prompt("Enter their hourly rate (e.g., 75):", "0");
+
+    // Create the profile entry in Supabase
+    const { error } = await supabase
+        .from('user_profiles')
+        .insert([{
+            email: email,
+            full_name: fullName,
+            hourly_cost: parseFloat(hourlyCost) || 0,
+            tenant_id: tenantId // Links them to your current organization
+        }]);
+
+    if (error) {
+        console.error("Invite Error:", error.message);
+        alert("Error adding member: " + error.message);
+    } else {
+        alert("Member added successfully!");
+        
+        // Refresh the global team list and update the dropdowns immediately
+        const { data: profiles } = await supabase.from('user_profiles').select('*');
+        window.teamMembers = profiles || [];
+        populateDropdowns();
+    }
+};
+	
 	async function selectRequirement(row) {
     // 1. UI Feedback: Highlight the active row
     document.querySelectorAll('.req-row').forEach(r => r.classList.remove('active-req'));
@@ -216,34 +250,46 @@
 }
 
     document.addEventListener('DOMContentLoaded', async () => {
-        session = await checkAccess(MODULES.REQUIREMENTS);
-        projectId = localStorage.getItem('selected_project_id');
-        
-        if (!projectId) {
-            window.location.href = 'index.html';
-            return;
-        }
+    session = await checkAccess(MODULES.REQUIREMENTS);
+    projectId = localStorage.getItem('selected_project_id');
+    
+    if (!projectId) {
+        window.location.href = 'index.html';
+        return;
+    }
 
-        const { data: proj } = await supabase.from('projects').select('blended_rate').eq('id', projectId).single();
-        projectBlendedRate = proj?.blended_rate || 0;
+    // Fetch Project Blended Rate and store globally for the Waterfall calculation
+    const { data: proj } = await supabase.from('projects').select('blended_rate').eq('id', projectId).single();
+    window.projectBlendedRate = proj?.blended_rate || 0;
 
-        const { data: profiles } = await supabase.from('user_profiles').select('user_id, email, full_name, hourly_cost, tenant_id'); 
-        teamMembers = profiles || [];
-        const currentUserProfile = teamMembers.find(p => p.user_id === session.user.id);
-        tenantId = currentUserProfile?.tenant_id;
+    // Fetch Team Members including hourly_cost for the Waterfall calculation
+    const { data: profiles } = await supabase.from('user_profiles').select('user_id, email, full_name, hourly_cost, tenant_id'); 
+    window.teamMembers = profiles || [];
+    
+    const currentUserProfile = window.teamMembers.find(p => p.user_id === session.user.id);
+    tenantId = currentUserProfile?.tenant_id;
 
-        populateDropdowns();
-        renderProjectHeader(session, 'requirements', localStorage.getItem('selected_project_name'));
-        loadRequirements();
-        initSortable();
+    populateDropdowns();
+    renderProjectHeader(session, 'requirements', localStorage.getItem('selected_project_name'));
+    loadRequirements();
+    initSortable();
 
-        // Row Selection Logic
-        document.getElementById('req-list').addEventListener('click', (e) => {
-            const row = e.target.closest('.req-row');
-            if (!row || e.target.closest('.kebab-container')) return;
-            selectRequirement(row);
-        });
+    // Row Selection Logic
+    document.getElementById('req-list').addEventListener('click', (e) => {
+        const row = e.target.closest('.req-row');
+        if (!row || e.target.closest('.kebab-container')) return;
+        selectRequirement(row);
     });
+
+    // ADDED: Listener to automatically update cost when hours change
+    document.addEventListener('input', (e) => {
+        if (e.target.id === 'step-hours-input') {
+            if (typeof window.handleUserSelection === 'function') {
+                window.handleUserSelection('step');
+            }
+        }
+    });
+});
 
 /**
  * RE-SYNCED SLIDER & TASK LOGIC
@@ -266,6 +312,15 @@ window.openReqSlider = async (id = null) => {
     const titleEl = document.getElementById('req-editor-title');
     const btnEl = document.getElementById('req-save-btn');
 
+    // Helper to clear fields for new requirements
+    const resetForm = () => {
+        if (document.getElementById('req-title-input')) document.getElementById('req-title-input').value = '';
+        if (document.getElementById('req-assign-select')) document.getElementById('req-assign-select').value = '';
+        if (document.getElementById('req-hours-input')) document.getElementById('req-hours-input').value = 0;
+        const rateField = document.getElementById('req-applied-rate') || document.getElementById('req-rate-input');
+        if (rateField) rateField.value = window.projectBlendedRate || 0;
+    };
+
     if (id) {
         titleEl.innerText = "Edit Requirement";
         btnEl.innerText = "Update Requirement";
@@ -273,7 +328,7 @@ window.openReqSlider = async (id = null) => {
         const { data: req } = await supabase
             .from('requirements')
             .select('*')
-            .eq('req_id', id) // Verified Column Name
+            .eq('req_id', id)
             .single();
 
         if (req) {
@@ -284,26 +339,47 @@ window.openReqSlider = async (id = null) => {
             if (document.getElementById('req-hours-input')) 
                 document.getElementById('req-hours-input').value = req.estimated_hours || 0;
             
-            // Check for both common IDs for rate
+            // --- WATERFALL LOGIC FOR REQUIREMENT RATE ---
             const rateField = document.getElementById('req-applied-rate') || document.getElementById('req-rate-input');
-            if (rateField) rateField.value = req.custom_rate || 0;
+            if (rateField) {
+                // We parse the saved rate, but if it's 0 or that specific '7' we are debugging, we recalculate
+                let currentRate = parseFloat(req.custom_rate) || 0;
+
+                if (currentRate === 0 || currentRate === 7) {
+                    const user = window.teamMembers?.find(u => u.user_id === req.assigned_to);
+                    currentRate = (user && parseFloat(user.hourly_cost) > 0) 
+                                 ? user.hourly_cost 
+                                 : (window.projectBlendedRate || 0);
+                }
+                rateField.value = currentRate;
+            }
+            // --------------------------------------------
 
             btnEl.onclick = () => updateRequirement(id);
         }
     } else {
         titleEl.innerText = "Add New Requirement";
         btnEl.innerText = "Save Requirement";
+        resetForm();
         btnEl.onclick = () => submitRequirement();
     }
     panel.classList.add('active');
 };
-
 window.openTaskSlider = async (id = null) => {
     if (!selectedReqId) return;
 
     const panel = document.getElementById('task-editor-panel');
     const titleEl = document.getElementById('task-editor-title');
     const btnEl = document.getElementById('task-save-btn');
+
+    // Helper to reset the form (useful for "Add New Task")
+    const resetForm = () => {
+        document.getElementById('step-title-input').value = '';
+        document.getElementById('step-assign-select').value = '';
+        document.getElementById('step-hours-input').value = 0;
+        document.getElementById('step-cost-input').value = "0.00";
+        document.getElementById('step-desc-input').value = '';
+    };
 
     if (id) {
         titleEl.innerText = "Edit Task";
@@ -318,20 +394,36 @@ window.openTaskSlider = async (id = null) => {
         if (step) {
             document.getElementById('step-title-input').value = step.title || '';
             document.getElementById('step-assign-select').value = step.assigned_to || '';
-            document.getElementById('step-hours-input').value = step.estimated_hours || 0;
-            document.getElementById('step-cost-input').value = step.cost || 0;
+            
+            const hours = step.estimated_hours || 0;
+            document.getElementById('step-hours-input').value = hours;
+
+            // --- WATERFALL CALCULATION ---
+            let displayCost = step.cost;
+
+            // If cost is 0 or missing in DB, calculate it based on rate waterfall
+            if (!displayCost || displayCost === 0) {
+                const user = window.teamMembers?.find(u => u.user_id === step.assigned_to);
+                const rate = (user && parseFloat(user.hourly_cost) > 0) 
+                             ? parseFloat(user.hourly_cost) 
+                             : (window.projectBlendedRate || 0);
+                displayCost = hours * rate;
+            }
+
+            document.getElementById('step-cost-input').value = parseFloat(displayCost).toFixed(2);
+            // -----------------------------
+
             document.getElementById('step-desc-input').value = step.description || '';
             btnEl.onclick = () => updateStep(id);
         }
     } else {
         titleEl.innerText = "Add New Task";
         btnEl.innerText = "Save Task";
-        // Reset form...
+        resetForm(); // Ensure old data isn't lingering
         btnEl.onclick = () => submitStep();
     }
     panel.classList.add('active');
 };
-
 // --- TASK LIST GENERATION (RE-SYNCED) ---
 async function refreshSteps() {
     if (!selectedReqId) return;
@@ -346,6 +438,13 @@ async function refreshSteps() {
         console.error("Step Load Error:", error.message);
         return;
     }
+	// Update the counter at the top of the Task section
+	const taskCountEl = document.getElementById('task-count');
+	if (taskCountEl) taskCountEl.innerText = `${steps?.length || 0} ITEMS`;
+
+// Update the metadata text if you have that element
+	const metaEl = document.getElementById('selected-req-meta');
+	if (metaEl) metaEl.innerText = `${steps?.length || 0} tasks identified`;
 
     const list = document.getElementById('step-list');
     list.innerHTML = (steps || []).map(s => {
@@ -374,7 +473,8 @@ async function refreshSteps() {
     if (typeof initSortable === 'function') initSortable();
 }
 window.updateStatus = async (id, newStatus) => {
-    await supabase.from('requirements').update({ status: newStatus }).eq('requirement_id', id);
+    // Fixed: Database uses 'req_id' for the requirements table
+    await supabase.from('requirements').update({ status: newStatus }).eq('req_id', id);
     loadRequirements();
 };
 
@@ -393,58 +493,106 @@ window.deleteStep = async (id) => {
 };
 
 window.updateStep = async (id) => {
-    // Helper to safely get values from potentially missing elements
-    const getVal = (id) => document.getElementById(id) ? document.getElementById(id).value : null;
+    // 1. Gather values directly from the slider inputs
+    const title = document.getElementById('step-title-input')?.value.trim();
+    const assignedId = document.getElementById('step-assign-select')?.value;
+    const hours = parseFloat(document.getElementById('step-hours-input')?.value) || 0;
+    const cost = parseFloat(document.getElementById('step-cost-input')?.value) || 0;
+    const desc = document.getElementById('step-desc-input')?.value || '';
 
+    // 2. Prepare the update object
     const updates = {
-        title: getVal('step-title-input'),
-        assigned_to: getVal('step-assign-select'),
-        estimated_hours: parseFloat(getVal('step-hours-input')) || 0,
-        cost: parseFloat(getVal('step-cost-input')) || 0,
-        description: getVal('step-desc-input') // Aligned with your column 'description'
+        title: title,
+        assigned_to: assignedId,
+        estimated_hours: hours, 
+        cost: cost,            
+        description: desc
     };
 
+    console.log(`Saving Task ${id}:`, updates);
+
+    // 3. Update Supabase
     const { error } = await supabase
         .from('steps')
         .update(updates)
-        .eq('step_id', id); // Aligned with PK 'step_id'
+        .eq('step_id', id);
 
     if (error) {
         console.error("Update Error:", error.message);
         alert("Failed to update task: " + error.message);
     } else {
+        // 4. SUCCESS: Close the slider immediately for UX
         window.closeTaskSlider();
-        refreshSteps();
-        if (typeof rollupToRequirement === 'function') rollupToRequirement();
+        
+        // 5. CRITICAL SEQUENCE: Wait for list to refresh, then trigger the rollup
+        await refreshSteps();
+        
+        if (typeof rollupToRequirement === 'function') {
+            console.log("Triggering Requirement Rollup...");
+            await rollupToRequirement(); 
+        }
+        
+        console.log(`Task ${id} update complete.`);
     }
 };
-
     function populateDropdowns() {
-        ['req-assign-select', 'step-assign-select'].forEach(id => {
-            const el = document.getElementById(id);
-            if (!el) return;
-            el.innerHTML = '<option value="">Select Resource</option>';
-            teamMembers.forEach(u => {
-                const opt = document.createElement('option');
-                opt.value = u.user_id;
-                opt.textContent = u.full_name || u.email;
-                el.appendChild(opt);
-            });
+    // Look for the data on the window object where we saved it
+    const members = window.teamMembers || [];
+
+    ['req-assign-select', 'step-assign-select'].forEach(id => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        
+        el.innerHTML = '<option value="">Select Resource</option>';
+        
+        members.forEach(u => {
+            const opt = document.createElement('option');
+            opt.value = u.user_id;
+            opt.textContent = u.full_name || u.email;
+            el.appendChild(opt);
         });
-    }
+    });
+    
+    console.log(`Dropdowns populated with ${members.length} members.`);
+}
 
     window.handleUserSelection = (type) => {
-        const userId = document.getElementById(`${type}-assign-select`).value;
-        const user = teamMembers.find(u => u.user_id === userId);
-        const rate = (user && user.hourly_cost) ? user.hourly_cost : projectBlendedRate;
-        if (type === 'req') {
-            document.getElementById('req-applied-rate').value = rate;
-        } else {
-            const hours = parseFloat(document.getElementById('step-hours-input').value) || 0;
-            document.getElementById('step-cost-input').value = (rate * hours).toFixed(2);
-        }
-    };
+    // 1. Explicitly grab global data
+    const members = window.teamMembers || [];
+    const defaultRate = parseFloat(window.projectBlendedRate) || 0;
 
+    // 2. Get selected user
+    const selectEl = document.getElementById(`${type}-assign-select`);
+    if (!selectEl) return;
+    
+    const userId = selectEl.value;
+    const user = members.find(u => u.user_id === userId);
+
+    // 3. THE WATERFALL: 
+    // Use user.hourly_cost if > 0. Otherwise, use project default.
+    let rate = (user && parseFloat(user.hourly_cost) > 0) 
+               ? parseFloat(user.hourly_cost) 
+               : defaultRate;
+
+    // 4. Update the UI
+    if (type === 'req') {
+        // Try both possible IDs for the requirement rate field
+        const rateEl = document.getElementById('req-applied-rate') || document.getElementById('req-rate-input');
+        if (rateEl) {
+            rateEl.value = rate; // This updates the "Hourly Rate" box in the slider
+        }
+    } else {
+        const hoursInput = document.getElementById('step-hours-input');
+        const costInput = document.getElementById('step-cost-input');
+        
+        const hours = parseFloat(hoursInput?.value) || 0;
+        if (costInput) {
+            costInput.value = (rate * hours).toFixed(2);
+        }
+    }
+    
+    console.log(`Updated ${type} rate to: ${rate} (Blended fallback: ${rate === defaultRate})`);
+};
    window.addRequirement = async () => {
     // 1. Keep all your original constants
     const title = document.getElementById('req-title-input').value.trim();
@@ -494,9 +642,15 @@ window.updateStep = async (id) => {
     async function loadRequirements() {
     const { data: reqs, error } = await supabase.from('requirements')
         .select(`*, assignee:assigned_to(full_name, email), editor:updated_by(full_name)`)
-        .eq('project_id', projectId).eq('tenant_id', tenantId).order('sequence_order');
+        .eq('project_id', projectId)
+        .eq('tenant_id', tenantId)
+        .order('sequence_order');
 
-    if (error) return;
+    if (error) {
+        console.error("Load Requirements Error:", error.message);
+        return;
+    }
+
     document.getElementById('req-count').innerText = `${reqs.length} ITEMS`;
     const list = document.getElementById('req-list');
     
@@ -504,6 +658,12 @@ window.updateStep = async (id) => {
         const status = req.status || 'Pending';
         const statusClass = (status === 'In Progress') ? "status-inprogress" : (status === 'Complete' ? "status-complete" : "status-pending");
         
+        // Use the new total_cost column as the source of truth. 
+        // Fallback to 0 if null, or use the old math only if total_cost is missing.
+        const displayTotal = req.total_cost !== null 
+            ? parseFloat(req.total_cost) 
+            : (parseFloat(req.estimated_hours || 0) * parseFloat(req.custom_rate || 0));
+
         return `
             <li class="req-row p-4 hover:bg-gray-50 flex justify-between items-center cursor-pointer border-l-4 border-transparent transition-all" 
                 data-id="${req.req_id}" data-title="${req.title.replace(/"/g, '&quot;')}">
@@ -518,12 +678,13 @@ window.updateStep = async (id) => {
                             <p class="text-sm font-bold text-gray-800">${req.title}</p>
                             <span class="text-[8px] px-1.5 py-0.5 rounded font-black uppercase ${statusClass}">${status}</span>
                         </div>
-                        <p class="text-[10px] text-gray-400 font-bold uppercase">${req.assignee?.full_name || 'Unassigned'} | ${req.estimated_hours}h</p>
+                        <p class="text-[10px] text-gray-400 font-bold uppercase">${req.assignee?.full_name || 'Unassigned'} | ${req.estimated_hours || 0}h</p>
                     </div>
                 </div>
                 
                 <div class="flex items-center gap-4">
-                    <p class="text-sm font-mono font-bold text-indigo-600">$${((req.estimated_hours || 0) * (req.custom_rate || 0)).toLocaleString()}</p>
+                    <p class="text-sm font-mono font-bold text-indigo-600">$${displayTotal.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</p>
+                    
                     <div class="relative kebab-container">
                         <button onclick="event.stopPropagation(); toggleKebab('req-${req.req_id}')" class="p-1 text-gray-400 hover:text-indigo-600 transition-colors">
                             <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -589,31 +750,57 @@ window.updateStep = async (id) => {
     async function rollupToRequirement() {
     if (!selectedReqId) return;
 
-    const { data: steps } = await supabase.from('steps')
-        .select('cost, estimated_hours')
+    // 1. Fetch ONLY the steps. No complex joins that cause filtering.
+    const { data: steps, error: fetchError } = await supabase.from('steps')
+        .select('cost, estimated_hours, assigned_to')
         .eq('requirement_id', selectedReqId);
 
-    const totalCost = (steps || []).reduce((sum, s) => sum + (s.cost || 0), 0);
-    const totalHours = (steps || []).reduce((sum, s) => sum + (s.estimated_hours || 0), 0);
-    
-    // Calculate the new blended rate for this specific requirement
-    // If no hours exist, we default to the projectBlendedRate we fetched on load
-    const newRate = totalHours > 0 ? (totalCost / totalHours) : projectBlendedRate;
+    if (fetchError) {
+        console.error("Rollup Fetch Error:", fetchError.message);
+        return;
+    }
 
-    const { error } = await supabase.from('requirements')
+    let calculatedTotalCost = 0;
+    let totalHours = 0;
+    const members = window.teamMembers || [];
+
+    (steps || []).forEach(s => {
+        const hours = parseFloat(s.estimated_hours) || 0;
+        let taskCost = parseFloat(s.cost) || 0;
+
+        // If task cost is 0, manually calculate it using our memory-resident team list
+        if (taskCost === 0 && hours > 0) {
+            const user = members.find(m => m.user_id === s.assigned_to);
+            const userRate = parseFloat(user?.hourly_cost) || 0;
+            const effectiveRate = userRate > 0 ? userRate : (window.projectBlendedRate || 0);
+            taskCost = hours * effectiveRate;
+        }
+
+        calculatedTotalCost += taskCost;
+        totalHours += hours;
+    });
+    
+    // Ensure we don't send NaN to the database
+    const finalCost = isNaN(calculatedTotalCost) ? 0 : calculatedTotalCost;
+    const finalHours = isNaN(totalHours) ? 0 : totalHours;
+    const newRate = finalHours > 0 ? (finalCost / finalHours) : (window.projectBlendedRate || 0);
+
+    // 2. Update the requirements table
+    const { error: updateError } = await supabase.from('requirements')
         .update({ 
-            estimated_hours: totalHours, 
+            estimated_hours: finalHours, 
             custom_rate: newRate,
-            updated_at: new Date() 
+            total_cost: finalCost, // This will now populate
+            updated_at: new Date().toISOString()
         })
-        .eq('requirement_id', selectedReqId);
+        .eq('req_id', selectedReqId);
 
-    if (error) console.error("Rollup failed:", error);
-    
-    // Refresh the UI to show the new totals in the right column
-    loadRequirements();
+    if (updateError) {
+        console.error("Rollup Update failed:", updateError.message);
+    } else {
+        loadRequirements();
+    }
 }
-
 function initSortable() {
         // 1. Requirements Ordering (Right List)
         const reqList = document.getElementById('req-list');

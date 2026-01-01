@@ -102,16 +102,14 @@
         });
 
         async function loadProjects() {
-            const projectContainer = document.getElementById('project-list');
-            if (!projectContainer) return;
-
-            const { data: projects, error } = await supabase
-                .from('projects')
-                .select(`
-                    id, name, status,
-                    requirements (steps (cost, is_active))
-                `)
-                .eq('tenant_id', sessionData.tenantId);
+            // In loadProjects()
+const { data: projects, error } = await supabase
+    .from('projects')
+    .select(`
+        id, name, status, tenant_id,
+        requirements (steps (cost, is_active))
+    `)
+    .eq('tenant_id', sessionData.tenantId);
 
             if (error) {
                 projectContainer.innerHTML = `<p class="text-red-500">Error: ${error.message}</p>`;
@@ -127,29 +125,46 @@
         }
 
         function renderProjectCards(projects) {
-            const projectContainer = document.getElementById('project-list');
-            projectContainer.innerHTML = projects.map(project => {
-                const totalCost = project.requirements?.reduce((acc, req) => {
-                    const stepSum = req.steps?.filter(s => s.is_active).reduce((sum, s) => sum + (s.cost || 0), 0);
-                    return acc + (stepSum || 0);
-                }, 0) || 0;
+    const projectContainer = document.getElementById('project-list');
+    
+    // Check if the current user is an admin
+    // This assumes sessionData contains your user's role
+    const isAdmin = sessionData.role === 'admin';
 
-                return `
-                    <div class="bg-white shadow rounded-lg border border-gray-200 hover:shadow-md transition cursor-pointer" 
-                         onclick="openProject('${project.id}', '${project.name}')">
-                        <div class="px-4 py-5 sm:p-6">
-                            <div class="flex items-center justify-between mb-2">
-                                <h3 class="text-lg font-bold text-gray-900">${project.name}</h3>
-                                <span class="px-2 py-0.5 text-xs font-bold rounded-full bg-indigo-50 text-indigo-700 uppercase border border-indigo-100">
-                                    ${project.status}
-                                </span>
-                            </div>
-                            <p class="text-sm text-gray-500 mb-4">Total Estimate</p>
-                            <p class="text-2xl font-black text-indigo-600">$${totalCost.toLocaleString()}</p>
-                        </div>
-                    </div>`;
-            }).join('');
-        }
+    projectContainer.innerHTML = projects.map(project => {
+        const totalCost = project.requirements?.reduce((acc, req) => {
+            const stepSum = req.steps?.filter(s => s.is_active).reduce((sum, s) => sum + (s.cost || 0), 0);
+            return acc + (stepSum || 0);
+        }, 0) || 0;
+
+        // Create the button only if the user is an admin
+        const inviteBtn = isAdmin ? `
+            <div class="mt-4 pt-4 border-t border-gray-100">
+                <button onclick="event.stopPropagation(); openInviteModal('${project.tenant_id}')" 
+                        class="w-full text-center px-3 py-2 bg-gray-50 text-indigo-600 text-xs font-bold rounded hover:bg-indigo-50 transition-colors border border-dashed border-indigo-200">
+                    + ADD TEAM MEMBER
+                </button>
+            </div>
+        ` : '';
+
+        return `
+            <div class="bg-white shadow rounded-lg border border-gray-200 hover:shadow-md transition cursor-pointer" 
+                 onclick="openProject('${project.id}', '${project.name}')">
+                <div class="px-4 py-5 sm:p-6">
+                    <div class="flex items-center justify-between mb-2">
+                        <h3 class="text-lg font-bold text-gray-900">${project.name}</h3>
+                        <span class="px-2 py-0.5 text-xs font-bold rounded-full bg-indigo-50 text-indigo-700 uppercase border border-indigo-100">
+                            ${project.status}
+                        </span>
+                    </div>
+                    <p class="text-sm text-gray-500 mb-1">Total Estimate</p>
+                    <p class="text-2xl font-black text-indigo-600">$${totalCost.toLocaleString()}</p>
+                    
+                    ${inviteBtn}
+                </div>
+            </div>`;
+    }).join('');
+}
 
         window.toggleProjectModal = () => {
             const modal = document.getElementById('project-modal');
@@ -201,6 +216,46 @@
                 alert("Save failed: " + err.message);
             }
         };
+	// ... existing loadProjects and renderProjectCards functions ...
+
+/**
+ * GLOBAL FUNCTIONS
+ * We attach these to 'window' so the HTML onclick handlers can find them.
+ **/
+window.openInviteModal = async (targetTenantId) => {
+    // 1. Collect Data
+    const email = prompt("Enter email:");
+    if (!email) return;
+
+    const fullName = prompt("Enter full name:");
+    const hourlyCost = prompt("Enter hourly rate (0 for project default):", "0");
+    const role = prompt("Enter role (admin or member):", "member");
+
+    // 2. Insert into Supabase
+    const { error } = await supabase
+        .from('user_profiles')
+        .insert([{
+            email: email,
+            full_name: fullName,
+            hourly_cost: parseFloat(hourlyCost) || 0,
+            role: role ? role.toLowerCase() : 'member',
+            tenant_id: targetTenantId 
+        }]);
+
+    // 3. Handle Result
+    if (error) {
+        console.error("Invite Error:", error.message);
+        alert("Error: " + error.message);
+    } else {
+        alert(`${fullName} added successfully.`);
+        
+        /* 4. DATA REFRESH (Optional but recommended)
+           If you are on a page that lists users, you'd call your 
+           fetch function here so the new name shows up instantly.
+        */
+        if (typeof loadProjects === 'function') loadProjects();
+    }
+};
     </script>
 </body>
 </html>

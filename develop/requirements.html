@@ -504,10 +504,12 @@ window.updateStep = async (id) => {
     const updates = {
         title: title,
         assigned_to: assignedId,
-        estimated_hours: hours, // This fixes the table/slider mismatch
-        cost: cost,            // This saves the "Waterfall" cost to the DB
+        estimated_hours: hours, 
+        cost: cost,            
         description: desc
     };
+
+    console.log(`Saving Task ${id}:`, updates);
 
     // 3. Update Supabase
     const { error } = await supabase
@@ -519,17 +521,18 @@ window.updateStep = async (id) => {
         console.error("Update Error:", error.message);
         alert("Failed to update task: " + error.message);
     } else {
-        // 4. SUCCESS: Close, Refresh Tasks, and Trigger the Smart Rollup
+        // 4. SUCCESS: Close the slider immediately for UX
         window.closeTaskSlider();
         
-        // Use 'await' to ensure the database is finished before we refresh the UI
+        // 5. CRITICAL SEQUENCE: Wait for list to refresh, then trigger the rollup
         await refreshSteps();
         
         if (typeof rollupToRequirement === 'function') {
+            console.log("Triggering Requirement Rollup...");
             await rollupToRequirement(); 
         }
         
-        console.log(`Task ${id} updated: ${hours}h @ $${cost}`);
+        console.log(`Task ${id} update complete.`);
     }
 };
     function populateDropdowns() {
@@ -639,9 +642,15 @@ window.updateStep = async (id) => {
     async function loadRequirements() {
     const { data: reqs, error } = await supabase.from('requirements')
         .select(`*, assignee:assigned_to(full_name, email), editor:updated_by(full_name)`)
-        .eq('project_id', projectId).eq('tenant_id', tenantId).order('sequence_order');
+        .eq('project_id', projectId)
+        .eq('tenant_id', tenantId)
+        .order('sequence_order');
 
-    if (error) return;
+    if (error) {
+        console.error("Load Requirements Error:", error.message);
+        return;
+    }
+
     document.getElementById('req-count').innerText = `${reqs.length} ITEMS`;
     const list = document.getElementById('req-list');
     
@@ -649,6 +658,12 @@ window.updateStep = async (id) => {
         const status = req.status || 'Pending';
         const statusClass = (status === 'In Progress') ? "status-inprogress" : (status === 'Complete' ? "status-complete" : "status-pending");
         
+        // Use the new total_cost column as the source of truth. 
+        // Fallback to 0 if null, or use the old math only if total_cost is missing.
+        const displayTotal = req.total_cost !== null 
+            ? parseFloat(req.total_cost) 
+            : (parseFloat(req.estimated_hours || 0) * parseFloat(req.custom_rate || 0));
+
         return `
             <li class="req-row p-4 hover:bg-gray-50 flex justify-between items-center cursor-pointer border-l-4 border-transparent transition-all" 
                 data-id="${req.req_id}" data-title="${req.title.replace(/"/g, '&quot;')}">
@@ -663,12 +678,13 @@ window.updateStep = async (id) => {
                             <p class="text-sm font-bold text-gray-800">${req.title}</p>
                             <span class="text-[8px] px-1.5 py-0.5 rounded font-black uppercase ${statusClass}">${status}</span>
                         </div>
-                        <p class="text-[10px] text-gray-400 font-bold uppercase">${req.assignee?.full_name || 'Unassigned'} | ${req.estimated_hours}h</p>
+                        <p class="text-[10px] text-gray-400 font-bold uppercase">${req.assignee?.full_name || 'Unassigned'} | ${req.estimated_hours || 0}h</p>
                     </div>
                 </div>
                 
                 <div class="flex items-center gap-4">
-                    <p class="text-sm font-mono font-bold text-indigo-600">$${((req.estimated_hours || 0) * (req.custom_rate || 0)).toLocaleString()}</p>
+                    <p class="text-sm font-mono font-bold text-indigo-600">$${displayTotal.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</p>
+                    
                     <div class="relative kebab-container">
                         <button onclick="event.stopPropagation(); toggleKebab('req-${req.req_id}')" class="p-1 text-gray-400 hover:text-indigo-600 transition-colors">
                             <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -734,14 +750,9 @@ window.updateStep = async (id) => {
     async function rollupToRequirement() {
     if (!selectedReqId) return;
 
-    // 1. Fetch steps AND the hourly cost of the assigned user in one go
+    // 1. Fetch ONLY the steps. No complex joins that cause filtering.
     const { data: steps, error: fetchError } = await supabase.from('steps')
-        .select(`
-            cost, 
-            estimated_hours, 
-            assigned_to,
-            user_profiles:assigned_to (hourly_cost)
-        `)
+        .select('cost, estimated_hours, assigned_to')
         .eq('requirement_id', selectedReqId);
 
     if (fetchError) {
@@ -751,33 +762,35 @@ window.updateStep = async (id) => {
 
     let calculatedTotalCost = 0;
     let totalHours = 0;
+    const members = window.teamMembers || [];
 
     (steps || []).forEach(s => {
         const hours = parseFloat(s.estimated_hours) || 0;
-        let cost = parseFloat(s.cost) || 0;
+        let taskCost = parseFloat(s.cost) || 0;
 
-        // --- WATERFALL LOGIC DURING SUMMATION ---
-        // If the database cost is 0, we calculate what it SHOULD be based on user rate or project rate
-        if (cost === 0 && hours > 0) {
-            const userRate = parseFloat(s.user_profiles?.hourly_cost) || 0;
-            const fallbackRate = userRate > 0 ? userRate : (window.projectBlendedRate || 0);
-            cost = hours * fallbackRate;
+        // If task cost is 0, manually calculate it using our memory-resident team list
+        if (taskCost === 0 && hours > 0) {
+            const user = members.find(m => m.user_id === s.assigned_to);
+            const userRate = parseFloat(user?.hourly_cost) || 0;
+            const effectiveRate = userRate > 0 ? userRate : (window.projectBlendedRate || 0);
+            taskCost = hours * effectiveRate;
         }
 
-        calculatedTotalCost += cost;
+        calculatedTotalCost += taskCost;
         totalHours += hours;
     });
     
-    // Calculate the "Average Blended Rate" for this specific requirement
-    const newRate = totalHours > 0 ? (calculatedTotalCost / totalHours) : (window.projectBlendedRate || 0);
+    // Ensure we don't send NaN to the database
+    const finalCost = isNaN(calculatedTotalCost) ? 0 : calculatedTotalCost;
+    const finalHours = isNaN(totalHours) ? 0 : totalHours;
+    const newRate = finalHours > 0 ? (finalCost / finalHours) : (window.projectBlendedRate || 0);
 
-    // 2. Update the requirements table with the verified totals
-    // ADDED: total_cost to capture the actual sum of steps
+    // 2. Update the requirements table
     const { error: updateError } = await supabase.from('requirements')
         .update({ 
-            estimated_hours: totalHours, 
-            custom_rate: newRate,      // The calculated average rate
-            total_cost: calculatedTotalCost, // THE NEW TOTAL COLUMN
+            estimated_hours: finalHours, 
+            custom_rate: newRate,
+            total_cost: finalCost, // This will now populate
             updated_at: new Date().toISOString()
         })
         .eq('req_id', selectedReqId);
@@ -785,7 +798,6 @@ window.updateStep = async (id) => {
     if (updateError) {
         console.error("Rollup Update failed:", updateError.message);
     } else {
-        // 3. Refresh the main list to show the new dollar amounts
         loadRequirements();
     }
 }

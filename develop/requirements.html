@@ -493,32 +493,45 @@ window.deleteStep = async (id) => {
 };
 
 window.updateStep = async (id) => {
-    // Helper to safely get values from potentially missing elements
-    const getVal = (id) => document.getElementById(id) ? document.getElementById(id).value : null;
+    // 1. Gather values directly from the slider inputs
+    const title = document.getElementById('step-title-input')?.value.trim();
+    const assignedId = document.getElementById('step-assign-select')?.value;
+    const hours = parseFloat(document.getElementById('step-hours-input')?.value) || 0;
+    const cost = parseFloat(document.getElementById('step-cost-input')?.value) || 0;
+    const desc = document.getElementById('step-desc-input')?.value || '';
 
+    // 2. Prepare the update object
     const updates = {
-        title: getVal('step-title-input'),
-        assigned_to: getVal('step-assign-select'),
-        estimated_hours: parseFloat(getVal('step-hours-input')) || 0,
-        cost: parseFloat(getVal('step-cost-input')) || 0,
-        description: getVal('step-desc-input') // Aligned with your column 'description'
+        title: title,
+        assigned_to: assignedId,
+        estimated_hours: hours, // This fixes the table/slider mismatch
+        cost: cost,            // This saves the "Waterfall" cost to the DB
+        description: desc
     };
 
+    // 3. Update Supabase
     const { error } = await supabase
         .from('steps')
         .update(updates)
-        .eq('step_id', id); // Aligned with PK 'step_id'
+        .eq('step_id', id);
 
     if (error) {
         console.error("Update Error:", error.message);
         alert("Failed to update task: " + error.message);
     } else {
+        // 4. SUCCESS: Close, Refresh Tasks, and Trigger the Smart Rollup
         window.closeTaskSlider();
-        refreshSteps();
-        if (typeof rollupToRequirement === 'function') rollupToRequirement();
+        
+        // Use 'await' to ensure the database is finished before we refresh the UI
+        await refreshSteps();
+        
+        if (typeof rollupToRequirement === 'function') {
+            await rollupToRequirement(); 
+        }
+        
+        console.log(`Task ${id} updated: ${hours}h @ $${cost}`);
     }
 };
-
     function populateDropdowns() {
     // Look for the data on the window object where we saved it
     const members = window.teamMembers || [];
@@ -722,7 +735,6 @@ window.updateStep = async (id) => {
     if (!selectedReqId) return;
 
     // 1. Fetch steps AND the hourly cost of the assigned user in one go
-    // Note: 'user_profiles' join depends on your foreign key relationship name
     const { data: steps, error: fetchError } = await supabase.from('steps')
         .select(`
             cost, 
@@ -745,7 +757,7 @@ window.updateStep = async (id) => {
         let cost = parseFloat(s.cost) || 0;
 
         // --- WATERFALL LOGIC DURING SUMMATION ---
-        // If the database cost is 0, we calculate what it SHOULD be
+        // If the database cost is 0, we calculate what it SHOULD be based on user rate or project rate
         if (cost === 0 && hours > 0) {
             const userRate = parseFloat(s.user_profiles?.hourly_cost) || 0;
             const fallbackRate = userRate > 0 ? userRate : (window.projectBlendedRate || 0);
@@ -760,10 +772,12 @@ window.updateStep = async (id) => {
     const newRate = totalHours > 0 ? (calculatedTotalCost / totalHours) : (window.projectBlendedRate || 0);
 
     // 2. Update the requirements table with the verified totals
+    // ADDED: total_cost to capture the actual sum of steps
     const { error: updateError } = await supabase.from('requirements')
         .update({ 
             estimated_hours: totalHours, 
-            custom_rate: newRate, // Saving the blended average
+            custom_rate: newRate,      // The calculated average rate
+            total_cost: calculatedTotalCost, // THE NEW TOTAL COLUMN
             updated_at: new Date().toISOString()
         })
         .eq('req_id', selectedReqId);

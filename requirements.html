@@ -308,26 +308,33 @@
         };
         tenantId = myProfile.tenant_id;
     }
-
-    // 4. UI INITIALIZATION
+	
    // 4. UI INITIALIZATION
     populateDropdowns();
     
-    // Construct the exact session structure components.js expects
-    if (typeof renderProjectHeader === 'function') {
-        const fullSessionObject = { 
-            user: user, 
-            permissions: { 
-                module_requirements: 'edit',
-                module_tasks: 'edit',
-                module_dashboard: 'view'
-            } 
-        };
-        
-        console.log("Rendering Header with Session:", fullSessionObject);
-        renderProjectHeader(fullSessionObject, 'requirements', projectName);
+    try {
+        if (typeof renderProjectHeader === 'function') {
+            // Create a robust session object with all common modules
+            const fullSessionObject = { 
+                user: user, 
+                permissions: { 
+                    module_requirements: 'edit',
+                    module_tasks: 'edit',
+                    module_dashboard: 'view',
+                    module_team: 'view'
+                } 
+            };
+            
+            console.log("Attempting to render header...");
+            renderProjectHeader(fullSessionObject, 'requirements', projectName);
+        }
+    } catch (headerError) {
+        console.warn("Header failed to render, but continuing to load data:", headerError.message);
+        // This catch prevents the "module_requirements" error from stopping the rest of the script
     }
     
+    // This part will now run even if the header has an error!
+    console.log("Proceeding to load requirements and steps...");
     loadRequirements();
     if (typeof initSortable === 'function') initSortable();
 

@@ -199,8 +199,7 @@
                     </div>
                 <div class="flex gap-2">
                     <input type="text" id="new-note-input" placeholder="Append a note..." class="flex-grow p-2 border rounded-lg text-sm">
-                    <button onclick="appendNote()" class="bg-gray-800 text-white px-4 py-2 rounded-lg text-xs font-bold hover:bg-black">Add</button>
-                </div>
+                    <button type="button" onclick="appendNote()" class="bg-gray-800 text-white px-4 py-2 rounded-lg text-xs font-bold hover:bg-black">Add</button>                </div>
             </div>
         </div>
     </section>
@@ -210,11 +209,16 @@
     import { checkAccess } from './js/auth.js';
     import { renderProjectHeader } from './js/components.js';
 
-    let session, projectId, tenantId; 
-    let selectedReqId = null; 
-    let projectBlendedRate = 0;
-    let teamMembers = [];
-	let currentUser = null; // This keeps it available for all functions
+    let currentUser = null;
+	let projectId = null;
+	let tenantId = null; // This will be populated by the profile fetch
+	let selectedReqId = null;
+	let projectBlendedRate = 0;
+	let teamMembers = [];
+
+// Get Project ID from URL (e.g., requirements.html?id=xxx)
+	const urlParams = new URLSearchParams(window.location.search);
+	projectId = urlParams.get('id');
 	
 	window.openInviteModal = async () => {
     const email = prompt("Enter the new member's email:");
@@ -898,7 +902,13 @@ function getKabobMenu(item, type) {
     }
 };
 
-    async function loadRequirements() {
+async function loadRequirements() {
+    // SAFETY CHECK: Prevent Supabase from crashing on 'undefined' UUIDs
+    if (!projectId || !tenantId || projectId === "undefined" || tenantId === "undefined") {
+        console.warn("loadRequirements blocked: Missing projectId or tenantId", { projectId, tenantId });
+        return;
+    }
+
     const { data: reqs, error } = await supabase.from('requirements')
         .select(`*, assignee:assigned_to(full_name, email), editor:updated_by(full_name)`)
         .eq('project_id', projectId)
@@ -910,26 +920,32 @@ function getKabobMenu(item, type) {
         return;
     }
 
-    document.getElementById('req-count').innerText = `${reqs.length} ITEMS`;
+    // Update the counter
+    const countEl = document.getElementById('req-count');
+    if (countEl) countEl.innerText = `${reqs.length} ITEMS`;
+
     const list = document.getElementById('req-list');
+    if (!list) return;
     
     list.innerHTML = reqs.map(req => {
         const status = req.status || 'Pending';
         const statusClass = (status === 'In Progress') ? "status-inprogress" : (status === 'Complete' ? "status-complete" : "status-pending");
         
-        // Use the new total_cost column as the source of truth
+        // Use the total_cost column as the source of truth
         const displayTotal = req.total_cost !== null 
             ? parseFloat(req.total_cost) 
             : (parseFloat(req.estimated_hours || 0) * parseFloat(req.custom_rate || 0));
 
-        // Generate the dynamic menu based on the user's role
+        // Generate the dynamic menu based on the user's role (Admin vs User)
         const menuHtml = getKabobMenu(req, 'req');
 
         return `
             <li class="req-row p-4 hover:bg-gray-50 flex justify-between items-center cursor-pointer border-l-4 border-transparent transition-all" 
-                data-id="${req.req_id}" data-title="${req.title.replace(/"/g, '&quot;')}">
+                data-id="${req.req_id}" 
+                data-title="${req.title.replace(/"/g, '&quot;')}"
+                onclick="selectRequirement('${req.req_id}')">
+                
                 <div class="flex items-center gap-3">
-                    
                     <input type="checkbox" class="req-checkbox w-4 h-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" 
                         data-id="${req.req_id}" onclick="event.stopPropagation()">
 
@@ -939,7 +955,9 @@ function getKabobMenu(item, type) {
                             <p class="text-sm font-bold text-gray-800">${req.title}</p>
                             <span class="text-[8px] px-1.5 py-0.5 rounded font-black uppercase ${statusClass}">${status}</span>
                         </div>
-                        <p class="text-[10px] text-gray-400 font-bold uppercase">${req.assignee?.full_name || 'Unassigned'} | ${req.estimated_hours || 0}h</p>
+                        <p class="text-[10px] text-gray-400 font-bold uppercase">
+                            ${req.assignee?.full_name || 'Unassigned'} | ${req.estimated_hours || 0}h
+                        </p>
                     </div>
                 </div>
                 
@@ -971,9 +989,17 @@ function getKabobMenu(item, type) {
     const cost = parseFloat(document.getElementById('step-cost-input')?.value) || 0;
     const desc = document.getElementById('step-desc-input')?.value || '';
 
-    if (!title || !assignedId || hours <= 0) return alert("Fill all required fields.");
+    // Basic Validation
+    if (!title || !assignedId || hours <= 0) {
+        return alert("Fill all required fields (Title, Assignee, and Hours).");
+    }
 
-    // Fetch highest order
+    // Double-check tenantId is available
+    if (!tenantId || tenantId === "undefined") {
+        return alert("Error: Organizational ID (Tenant) not found. Please refresh.");
+    }
+
+    // 1. Fetch highest sequence order to keep the list organized
     const { data: existingSteps } = await supabase
         .from('steps')
         .select('sequence_order')
@@ -983,24 +1009,50 @@ function getKabobMenu(item, type) {
 
     const nextOrder = (existingSteps?.[0]?.sequence_order || 0) + 10;
 
-    const { error } = await supabase.from('steps').insert([{
-        requirement_id: selectedReqId, // Aligned with FK 'requirement_id'
-        tenant_id: typeof tenantId !== 'undefined' ? tenantId : null, 
-        title, 
-        assigned_to: assignedId, 
-        estimated_hours: hours, 
-        cost, 
-        description: desc,
-        sequence_order: nextOrder 
-    }]);
+    // 2. Insert the New Task
+    const { data: newStep, error: stepError } = await supabase
+        .from('steps')
+        .insert([{
+            requirement_id: selectedReqId,
+            tenant_id: tenantId, 
+            title: title, 
+            assigned_to: assignedId, 
+            estimated_hours: hours, 
+            cost: cost, 
+            description: desc, // Keep for legacy, though we're moving to notes
+            sequence_order: nextOrder 
+        }])
+        .select()
+        .single();
 
-    if (error) {
-        console.error("Save Error:", error.message);
-        alert("Save failed: " + error.message);
-    } else {
-        window.closeTaskSlider();
-        refreshSteps();
-        if (typeof rollupToRequirement === 'function') rollupToRequirement();
+    if (stepError) {
+        console.error("Save Error:", stepError.message);
+        return alert("Save failed: " + stepError.message);
+    }
+
+    // 3. Create the Initial Note/Activity Log
+    // This connects the 'Description' field to our new Activity Feed system
+    if (newStep) {
+        const initialNoteContent = desc ? `Task created with initial notes: ${desc}` : "Task created.";
+        
+        const { error: noteError } = await supabase
+            .from('task_notes')
+            .insert([{
+                task_id: newStep.step_id,
+                user_id: currentUser?.id,
+                content: initialNoteContent
+            }]);
+
+        if (noteError) console.warn("Task created, but initial note failed:", noteError.message);
+    }
+
+    // 4. Cleanup and Refresh UI
+    window.closeTaskSlider();
+    if (typeof refreshSteps === 'function') await refreshSteps();
+    
+    // Update the parent requirement's budget totals
+    if (typeof rollupToRequirement === 'function') {
+        rollupToRequirement();
     }
 };
 
@@ -1156,38 +1208,45 @@ document.getElementById('req-list').addEventListener('change', (e) => {
 });
 
 async function initializeApp() {
-    // 1. Get the authenticated user from Supabase
+    // 1. Get Auth User
     const { data: { user }, error: authError } = await supabase.auth.getUser();
-
     if (authError || !user) {
-        console.error("User not logged in");
-        window.location.href = "login.html"; // Redirect if not authenticated
+        console.log("No active session, redirecting...");
+        window.location.href = "login.html";
         return;
     }
 
-    // 2. Fetch the user's profile to get their ROLE (Admin/User)
+    // 2. Fetch User Profile (This is where we get the Role AND Tenant ID)
     const { data: profile, error: profileError } = await supabase
         .from('user_profiles')
         .select('*')
         .eq('user_id', user.id)
         .single();
 
-    if (profileError) {
-        console.error("Error fetching profile:", profileError.message);
+    if (profileError || !profile) {
+        console.error("Profile Fetch Error:", profileError);
         return;
     }
 
-    // 3. Set the global currentUser variable
+    // 3. Set Global Variables
     currentUser = {
         id: user.id,
-        role: profile.role, // 'admin', 'contractor', etc.
+        role: profile.role,
         full_name: profile.full_name
     };
+    
+    // This solves your 'undefined' tenant error!
+    tenantId = profile.tenant_id; 
 
-    // 4. NOW it is safe to load the requirements
-    loadRequirements();
+    console.log("App Initialized for:", currentUser.full_name, "Tenant:", tenantId);
+
+    // 4. Now load data
+    if (projectId) {
+        await loadRequirements();
+    } else {
+        console.warn("No Project ID found in URL parameters.");
+    }
 }
-
 // Start the app when the page is ready
 document.addEventListener('DOMContentLoaded', initializeApp);
 

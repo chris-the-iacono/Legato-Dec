@@ -273,7 +273,6 @@
 
     document.addEventListener('DOMContentLoaded', async () => {
     // 1. AUTH & INITIALIZATION
-    // This replaces 'session = await checkAccess...'
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     
     if (authError || !user) {
@@ -293,16 +292,13 @@
     }
 
     // 3. FETCH DATA & SET GLOBAL CONTEXT
-    // Fetch Project Blended Rate
     const { data: proj } = await supabase.from('projects').select('blended_rate, name').eq('id', projectId).single();
     window.projectBlendedRate = proj?.blended_rate || 0;
     const projectName = proj?.name || localStorage.getItem('selected_project_name');
 
-    // Fetch Team Members (includes Role and Tenant ID)
     const { data: profiles } = await supabase.from('user_profiles').select('user_id, email, full_name, hourly_cost, tenant_id, role'); 
     window.teamMembers = profiles || [];
     
-    // Set Global User and Tenant ID
     const myProfile = window.teamMembers.find(p => p.user_id === user.id);
     if (myProfile) {
         currentUser = {
@@ -316,9 +312,13 @@
     // 4. UI INITIALIZATION
     populateDropdowns();
     
-    // We pass 'user' and 'currentUser' to the header instead of the old 'session'
-    if (typeof renderProjectHeader === 'function') {
-        renderProjectHeader({ user }, 'requirements', projectName);
+    // FIX FOR components.js: Create the structured session object it expects
+    if (typeof renderProjectHeader === 'function' && currentUser) {
+        const headerSession = { 
+            user: user, 
+            permissions: { module_requirements: 'edit' } // Mimics the checkAccess structure
+        };
+        renderProjectHeader(headerSession, 'requirements', projectName);
     }
     
     loadRequirements();
@@ -330,11 +330,13 @@
     if (reqListEl) {
         reqListEl.addEventListener('click', (e) => {
             const row = e.target.closest('.req-row');
-            // Don't trigger if clicking the checkbox or the kebab menu
             if (!row || e.target.closest('.kebab-container') || e.target.closest('.req-checkbox')) return;
             
             const id = row.getAttribute('data-id');
-            selectRequirement(id);
+            // Call the window-scoped function we created earlier
+            if (typeof window.selectRequirement === 'function') {
+                window.selectRequirement(id);
+            }
         });
     }
 
@@ -354,8 +356,21 @@
             if (e.target.id === 'task-editor-panel') closeTaskSlider();
         });
     }
-});
 
+    // Activity Feed: Enter key to submit note
+    const noteInput = document.getElementById('new-note-input');
+    if (noteInput) {
+        noteInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                appendNote();
+            }
+        });
+    }
+
+    console.log("App initialized for:", currentUser?.full_name);
+});
+	
 /**
  * RE-SYNCED SLIDER & TASK LOGIC
  * 1. Fixed window scope for sliders
@@ -1297,7 +1312,7 @@ async function initializeApp() {
     }
 }
 // Start the app when the page is ready
-document.addEventListener('DOMContentLoaded', initializeApp);
+// document.addEventListener('DOMContentLoaded', initializeApp);
 
 window.applyBulkStatus = async () => {
     const statusSelect = document.getElementById('bulk-status-select');

@@ -210,7 +210,7 @@
     import { renderProjectHeader } from './js/components.js';
 
     let currentUser = null;
-	let projectId = null;
+	let projectId = new URLSearchParams(window.location.search).get('id');
 	let tenantId = null; // This will be populated by the profile fetch
 	let selectedReqId = null;
 	let projectBlendedRate = 0;
@@ -272,38 +272,73 @@
 }
 
     document.addEventListener('DOMContentLoaded', async () => {
-    session = await checkAccess(MODULES.REQUIREMENTS);
-    projectId = localStorage.getItem('selected_project_id');
+    // 1. AUTH & INITIALIZATION
+    // This replaces 'session = await checkAccess...'
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
     
-    if (!projectId) {
+    if (authError || !user) {
+        console.error("No active session found.");
+        window.location.href = 'login.html';
+        return;
+    }
+
+    // 2. GET PROJECT ID (Check URL first, then LocalStorage)
+    const urlParams = new URLSearchParams(window.location.search);
+    projectId = urlParams.get('id') || localStorage.getItem('selected_project_id');
+    
+    if (!projectId || projectId === "undefined") {
+        console.error("No Project ID found.");
         window.location.href = 'index.html';
         return;
     }
 
-    // Fetch Project Blended Rate and store globally for the Waterfall calculation
-    const { data: proj } = await supabase.from('projects').select('blended_rate').eq('id', projectId).single();
+    // 3. FETCH DATA & SET GLOBAL CONTEXT
+    // Fetch Project Blended Rate
+    const { data: proj } = await supabase.from('projects').select('blended_rate, name').eq('id', projectId).single();
     window.projectBlendedRate = proj?.blended_rate || 0;
+    const projectName = proj?.name || localStorage.getItem('selected_project_name');
 
-    // Fetch Team Members including hourly_cost for the Waterfall calculation
-    const { data: profiles } = await supabase.from('user_profiles').select('user_id, email, full_name, hourly_cost, tenant_id'); 
+    // Fetch Team Members (includes Role and Tenant ID)
+    const { data: profiles } = await supabase.from('user_profiles').select('user_id, email, full_name, hourly_cost, tenant_id, role'); 
     window.teamMembers = profiles || [];
     
-    const currentUserProfile = window.teamMembers.find(p => p.user_id === session.user.id);
-    tenantId = currentUserProfile?.tenant_id;
+    // Set Global User and Tenant ID
+    const myProfile = window.teamMembers.find(p => p.user_id === user.id);
+    if (myProfile) {
+        currentUser = {
+            id: user.id,
+            role: myProfile.role,
+            full_name: myProfile.full_name
+        };
+        tenantId = myProfile.tenant_id;
+    }
 
+    // 4. UI INITIALIZATION
     populateDropdowns();
-    renderProjectHeader(session, 'requirements', localStorage.getItem('selected_project_name'));
+    
+    // We pass 'user' and 'currentUser' to the header instead of the old 'session'
+    if (typeof renderProjectHeader === 'function') {
+        renderProjectHeader({ user }, 'requirements', projectName);
+    }
+    
     loadRequirements();
-    initSortable();
+    if (typeof initSortable === 'function') initSortable();
 
+    // 5. EVENT LISTENERS
     // Row Selection Logic
-    document.getElementById('req-list').addEventListener('click', (e) => {
-        const row = e.target.closest('.req-row');
-        if (!row || e.target.closest('.kebab-container')) return;
-        selectRequirement(row);
-    });
+    const reqListEl = document.getElementById('req-list');
+    if (reqListEl) {
+        reqListEl.addEventListener('click', (e) => {
+            const row = e.target.closest('.req-row');
+            // Don't trigger if clicking the checkbox or the kebab menu
+            if (!row || e.target.closest('.kebab-container') || e.target.closest('.req-checkbox')) return;
+            
+            const id = row.getAttribute('data-id');
+            selectRequirement(id);
+        });
+    }
 
-    // ADDED: Listener to automatically update cost when hours change
+    // Auto-update cost calculation when hours change in slider
     document.addEventListener('input', (e) => {
         if (e.target.id === 'step-hours-input') {
             if (typeof window.handleUserSelection === 'function') {
@@ -311,6 +346,14 @@
             }
         }
     });
+
+    // Close Slider on click outside
+    const taskPanel = document.getElementById('task-editor-panel');
+    if (taskPanel) {
+        taskPanel.addEventListener('click', (e) => {
+            if (e.target.id === 'task-editor-panel') closeTaskSlider();
+        });
+    }
 });
 
 /**
@@ -568,48 +611,63 @@ window.deleteStep = async (id) => {
 };
 
 window.updateStep = async (id) => {
-    // 1. Gather values directly from the slider inputs
+    // 1. Gather values from the slider inputs
     const title = document.getElementById('step-title-input')?.value.trim();
     const assignedId = document.getElementById('step-assign-select')?.value;
     const hours = parseFloat(document.getElementById('step-hours-input')?.value) || 0;
     const cost = parseFloat(document.getElementById('step-cost-input')?.value) || 0;
     const desc = document.getElementById('step-desc-input')?.value || '';
 
-    // 2. Prepare the update object
-    const updates = {
-        title: title,
-        assigned_to: assignedId,
-        estimated_hours: hours, 
-        cost: cost,            
-        description: desc
-    };
-
-    console.log(`Saving Task ${id}:`, updates);
+    // 2. Validation
+    if (!title || !assignedId) return alert("Title and Assignee are required.");
 
     // 3. Update Supabase
     const { error } = await supabase
         .from('steps')
-        .update(updates)
+        .update({
+            title: title,
+            assigned_to: assignedId,
+            estimated_hours: hours,
+            cost: cost,
+            description: desc,
+            updated_at: new Date().toISOString()
+        })
         .eq('step_id', id);
 
     if (error) {
         console.error("Update Error:", error.message);
-        alert("Failed to update task: " + error.message);
+        alert("Update failed: " + error.message);
     } else {
-        // 4. SUCCESS: Close the slider immediately for UX
+        // 4. LOG THE CHANGE: Create an activity entry for the baseline update
+        // This ensures non-admins can see that the budget was changed
+        const baselineNote = `Baseline updated by ${currentUser?.full_name || 'Admin'}: ${hours}h / $${cost.toFixed(2)}`;
+        await appendNoteToActivity(id, baselineNote);
+        
+        // 5. SUCCESS: Close and refresh
         window.closeTaskSlider();
         
-        // 5. CRITICAL SEQUENCE: Wait for list to refresh, then trigger the rollup
-        await refreshSteps();
-        
-        if (typeof rollupToRequirement === 'function') {
-            console.log("Triggering Requirement Rollup...");
-            await rollupToRequirement(); 
+        if (typeof refreshSteps === 'function') {
+            await refreshSteps();
         }
         
-        console.log(`Task ${id} update complete.`);
+        // 6. RECALCULATE HEALTH: Sum up new totals to the Requirement level
+        if (typeof rollupToRequirement === 'function') {
+            console.log("Recalculating requirement budget...");
+            await rollupToRequirement();
+        }
+        
+        console.log(`Task ${id} update and baseline log complete.`);
     }
 };
+// Small helper to auto-post the log entry to the notes feed
+async function appendNoteToActivity(taskId, content) {
+    if (!taskId || !content) return;
+    await supabase.from('task_notes').insert([{
+        task_id: taskId,
+        user_id: currentUser?.id,
+        content: content
+    }]);
+}
     function populateDropdowns() {
     // Look for the data on the window object where we saved it
     const members = window.teamMembers || [];
@@ -781,15 +839,6 @@ async function saveTimeLog() {
         console.error("Time Log Error:", err.message);
         alert("Failed to log time. See console.");
     }
-}
-
-// Small helper to auto-post the log entry to the notes feed
-async function appendNoteToActivity(taskId, content) {
-    await supabase.from('task_notes').insert([{
-        task_id: taskId,
-        user_id: currentUser.id,
-        content: content
-    }]);
 }
 
 function getKabobMenu(item, type) {

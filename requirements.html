@@ -310,15 +310,22 @@
     }
 
     // 4. UI INITIALIZATION
+   // 4. UI INITIALIZATION
     populateDropdowns();
     
-    // FIX FOR components.js: Create the structured session object it expects
-    if (typeof renderProjectHeader === 'function' && currentUser) {
-        const headerSession = { 
+    // Construct the exact session structure components.js expects
+    if (typeof renderProjectHeader === 'function') {
+        const fullSessionObject = { 
             user: user, 
-            permissions: { module_requirements: 'edit' } // Mimics the checkAccess structure
+            permissions: { 
+                module_requirements: 'edit',
+                module_tasks: 'edit',
+                module_dashboard: 'view'
+            } 
         };
-        renderProjectHeader(headerSession, 'requirements', projectName);
+        
+        console.log("Rendering Header with Session:", fullSessionObject);
+        renderProjectHeader(fullSessionObject, 'requirements', projectName);
     }
     
     loadRequirements();

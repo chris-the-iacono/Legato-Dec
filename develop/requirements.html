@@ -639,6 +639,32 @@ window.deleteStep = async (id) => {
     rollupToRequirement();
 };
 
+window.selectRequirement = async (id) => {
+    console.log("Requirement clicked ID:", id);
+    window.selectedReqId = id;
+
+    // Visual highlight for the selected row
+    document.querySelectorAll('.req-row').forEach(row => {
+        row.classList.remove('bg-blue-50', 'border-blue-500');
+        if (row.getAttribute('data-id') === id) {
+            row.classList.add('bg-blue-50', 'border-blue-500');
+        }
+    });
+
+    // Update the Task Panel Header
+    const rowEl = document.querySelector(`.req-row[data-id="${id}"]`);
+    const title = rowEl?.getAttribute('data-title') || "Tasks";
+    const headerEl = document.getElementById('selected-req-title');
+    if (headerEl) headerEl.innerText = title;
+
+    // Refresh the task list on the right
+    if (typeof refreshSteps === 'function') {
+        await refreshSteps();
+    } else {
+        console.warn("refreshSteps function not found.");
+    }
+};
+
 window.updateStep = async (id) => {
     // 1. Gather values from the slider inputs
     const title = document.getElementById('step-title-input')?.value.trim();

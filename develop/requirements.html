@@ -309,32 +309,35 @@
         tenantId = myProfile.tenant_id;
     }
 	
-   // 4. UI INITIALIZATION
+   // 4. UI // --- 4. UI INITIALIZATION ---
     populateDropdowns();
     
     try {
         if (typeof renderProjectHeader === 'function') {
-            // Create a robust session object with all common modules
-            const fullSessionObject = { 
-                user: user, 
+            // We create a "fake" session that matches exactly what components.js wants
+            const sessionForHeader = { 
+                user: {
+                    ...user, // This is the user from supabase.auth.getUser()
+                    user_metadata: user.user_metadata || {}
+                }, 
                 permissions: { 
                     module_requirements: 'edit',
                     module_tasks: 'edit',
-                    module_dashboard: 'view',
-                    module_team: 'view'
+                    module_dashboard: 'view'
                 } 
             };
             
-            console.log("Attempting to render header...");
-            renderProjectHeader(fullSessionObject, 'requirements', projectName);
+            console.log("Rendering Header...");
+            renderProjectHeader(sessionForHeader, 'requirements', projectName);
         }
     } catch (headerError) {
-        console.warn("Header failed to render, but continuing to load data:", headerError.message);
-        // This catch prevents the "module_requirements" error from stopping the rest of the script
+        console.error("Header Crash prevented:", headerError.message);
+        // Fallback: If the header still fails, we can at least show the project name
+        const headerTitle = document.getElementById('project-name-display');
+        if (headerTitle) headerTitle.innerText = projectName;
     }
     
-    // This part will now run even if the header has an error!
-    console.log("Proceeding to load requirements and steps...");
+    // Now load the data
     loadRequirements();
     if (typeof initSortable === 'function') initSortable();
 
@@ -1007,11 +1010,13 @@ function getKabobMenu(item, type) {
 };
 
 async function loadRequirements() {
-    // SAFETY CHECK: Prevent Supabase from crashing on 'undefined' UUIDs
+    // 1. SAFETY CHECK: Prevent Supabase from crashing on 'undefined' UUIDs
     if (!projectId || !tenantId || projectId === "undefined" || tenantId === "undefined") {
         console.warn("loadRequirements blocked: Missing projectId or tenantId", { projectId, tenantId });
         return;
     }
+
+    console.log("Fetching requirements for Project:", projectId);
 
     const { data: reqs, error } = await supabase.from('requirements')
         .select(`*, assignee:assigned_to(full_name, email), editor:updated_by(full_name)`)
@@ -1024,30 +1029,39 @@ async function loadRequirements() {
         return;
     }
 
-    // Update the counter
+    // 2. UPDATE UI COUNTER
     const countEl = document.getElementById('req-count');
     if (countEl) countEl.innerText = `${reqs.length} ITEMS`;
 
     const list = document.getElementById('req-list');
     if (!list) return;
+
+    // 3. HANDLE EMPTY STATE
+    if (reqs.length === 0) {
+        list.innerHTML = `<li class="p-8 text-center text-gray-500 italic border-2 border-dashed border-gray-200 rounded-lg">
+            No requirements found for this project.
+        </li>`;
+        return;
+    }
     
+    // 4. RENDER LIST
     list.innerHTML = reqs.map(req => {
         const status = req.status || 'Pending';
         const statusClass = (status === 'In Progress') ? "status-inprogress" : (status === 'Complete' ? "status-complete" : "status-pending");
         
-        // Use the total_cost column as the source of truth
+        // Use the total_cost column as the source of truth (Project Budget Requirement)
         const displayTotal = req.total_cost !== null 
             ? parseFloat(req.total_cost) 
             : (parseFloat(req.estimated_hours || 0) * parseFloat(req.custom_rate || 0));
 
-        // Generate the dynamic menu based on the user's role (Admin vs User)
-        const menuHtml = getKabobMenu(req, 'req');
+        // Generate the dynamic menu based on user's role (Admin vs User)
+        const menuHtml = (typeof getKabobMenu === 'function') ? getKabobMenu(req, 'req') : '';
 
         return `
             <li class="req-row p-4 hover:bg-gray-50 flex justify-between items-center cursor-pointer border-l-4 border-transparent transition-all" 
                 data-id="${req.req_id}" 
                 data-title="${req.title.replace(/"/g, '&quot;')}"
-                onclick="selectRequirement('${req.req_id}')">
+                onclick="window.selectRequirement('${req.req_id}')">
                 
                 <div class="flex items-center gap-3">
                     <input type="checkbox" class="req-checkbox w-4 h-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" 
@@ -1077,7 +1091,6 @@ async function loadRequirements() {
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
                             </svg>
                         </button>
-                        
                         ${menuHtml}
                     </div>
                 </div>

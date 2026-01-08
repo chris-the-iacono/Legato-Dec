@@ -314,13 +314,22 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     try {
         if (typeof renderProjectHeader === 'function') {
+            // We are nesting permissions inside the user object to see if components.js finds it there
             const sessionForHeader = { 
                 user: {
                     ...user,
                     id: user.id,
                     email: user.email,
-                    user_metadata: user.user_metadata || {}
-                }, 
+                    user_metadata: user.user_metadata || {},
+                    // Some versions of the component look here:
+                    permissions: { 
+                        module_requirements: 'edit',
+                        module_tasks: 'edit',
+                        module_dashboard: 'view',
+                        module_team: 'view'
+                    }
+                },
+                // Some versions look here:
                 permissions: { 
                     module_requirements: 'edit',
                     module_tasks: 'edit',

@@ -312,40 +312,29 @@ document.addEventListener('DOMContentLoaded', async () => {
     // 4. UI INITIALIZATION
     populateDropdowns();
     
-    try {
+try {
         if (typeof renderProjectHeader === 'function') {
-            // Build the session object with multiple fallbacks to prevent undefined errors
-            const sessionForHeader = { 
+            // 1. Define a global session object that components.js might be looking for
+            window.session = {
                 user: {
-                    ...(user || {}),
-                    id: user?.id,
-                    email: user?.email,
-                    user_metadata: user?.user_metadata || {},
-                    permissions: { 
-                        module_requirements: 'edit',
-                        module_tasks: 'edit',
-                        module_dashboard: 'view',
-                        module_team: 'view'
-                    }
+                    ...user,
+                    user_metadata: user.user_metadata || {}
                 },
-                permissions: { 
+                permissions: {
                     module_requirements: 'edit',
                     module_tasks: 'edit',
                     module_dashboard: 'view',
                     module_team: 'view'
-                } 
+                }
             };
 
-            // Double-check permissions exist before passing to render
-            if (sessionForHeader && sessionForHeader.permissions) {
-                console.log("Attempting Header Render...");
-                renderProjectHeader(sessionForHeader, 'requirements', projectName);
-            } else {
-                console.warn("Session object incomplete, skipping header render.");
-            }
+            console.log("Global session injected. Attempting Header Render...");
+            
+            // 2. Pass that same object into the function
+            renderProjectHeader(window.session, 'requirements', projectName);
         }
     } catch (headerError) {
-        console.error("Header Crash prevented:", headerError.message);
+        console.error("Header still crashing internally:", headerError.message);
     }
     
     loadRequirements();

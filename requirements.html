@@ -567,64 +567,90 @@ window.openTaskSlider = async (id = null) => {
     panel.classList.add('active');
 };
 // --- TASK LIST GENERATION (RE-SYNCED) ---
-async function refreshSteps() {
-    if (!selectedReqId) return;
-    
+window.refreshSteps = async () => {
+    const reqId = window.selectedReqId;
+    console.log("--- ?? REFRESHING TASKS ---", reqId);
+
+    if (!reqId) return;
+
     const { data: steps, error } = await supabase
         .from('steps')
-        .select(`*, assignee:assigned_to(full_name)`)
-        .eq('requirement_id', selectedReqId) 
-        .order('sequence_order');
+        .select(`*, assignee:assigned_to(full_name, email)`)
+        .eq('requirement_id', reqId)
+        .order('sequence_order', { ascending: true });
 
     if (error) {
-        console.error("Step Load Error:", error.message);
+        console.error("Step Fetch Error:", error.message);
         return;
     }
 
-    // Update the counter at the top of the Task section
+    // --- 1. UPDATE UI COUNTERS (Preserving your original feature) ---
     const taskCountEl = document.getElementById('task-count');
     if (taskCountEl) taskCountEl.innerText = `${steps?.length || 0} ITEMS`;
 
-    // Update the metadata text
     const metaEl = document.getElementById('selected-req-meta');
     if (metaEl) metaEl.innerText = `${steps?.length || 0} tasks identified`;
 
     const list = document.getElementById('step-list');
-    
-    // Build the list items using the dynamic Kabob Menu
-    list.innerHTML = (steps || []).map(s => {
-        // Generate the menu HTML based on user role (Admin vs User)
-        const menuHtml = getKabobMenu(s, 'task');
+    if (!list) return;
+
+    // --- 2. HANDLE EMPTY STATE (Improved for testing) ---
+    if (!steps || steps.length === 0) {
+        list.innerHTML = `
+            <div class="p-10 text-center bg-gray-50 rounded-xl border-2 border-dashed border-gray-200">
+                <p class="text-gray-500 mb-4">No tasks found for this requirement.</p>
+                <button onclick="openTaskSlider()" class="bg-indigo-600 text-white px-4 py-2 rounded-lg font-bold text-sm hover:bg-indigo-700 transition-colors">
+                    + Add Your First Task
+                </button>
+            </div>`;
+        return;
+    }
+
+    // --- 3. RENDER TASKS (Merging your Kabob Menu & Drag handles) ---
+    list.innerHTML = steps.map(s => {
+        // Keeps your existing Kabob Menu logic
+        const menuHtml = typeof getKabobMenu === 'function' ? getKabobMenu(s, 'task') : '';
 
         return `
-            <li class="active-task-row p-3 hover:bg-blue-50 border-b flex justify-between items-center group" data-id="${s.step_id}">
+            <div class="task-card active-task-row p-4 mb-3 bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md cursor-pointer group flex justify-between items-center" 
+                 data-id="${s.step_id}" onclick="openTaskSlider('${s.step_id}')">
+                
                 <div class="flex items-center gap-3">
-                    <span class="cursor-move text-gray-300 font-bold p-1">::</span>
+                    <span class="cursor-move text-gray-300 font-bold p-1 group-hover:text-indigo-400">::</span>
                     <div>
-                        <p class="text-sm font-semibold text-gray-700">${s.title}</p>
-                        <p class="text-[10px] text-gray-400 uppercase">
-                            ${s.assignee?.full_name || 'Unassigned'} | ${s.estimated_hours}h
+                        <p class="text-sm font-bold text-gray-800 group-hover:text-indigo-600 transition-colors">${s.title}</p>
+                        <p class="text-[10px] text-gray-400 uppercase font-bold">
+                            ${s.assignee?.full_name || 'Unassigned'} | ${s.estimated_hours || 0}h
                         </p>
                     </div>
                 </div>
-                
-                <div class="relative kebab-container">
-                    <button onclick="event.stopPropagation(); toggleKebab('task-${s.step_id}')" 
-                        class="p-1 text-gray-400 hover:text-blue-600 transition-colors">
-                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" 
-                                stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                        </svg>
-                    </button>
-                    
-                    ${menuHtml}
+
+                <div class="flex items-center gap-4">
+                    <div class="text-right mr-2">
+                        <p class="text-sm font-mono font-black text-indigo-600">${s.estimated_hours || 0}h</p>
+                    </div>
+
+                    <div class="relative kebab-container">
+                        <button onclick="event.stopPropagation(); toggleKebab('task-${s.step_id}')" 
+                                class="p-1 text-gray-400 hover:text-indigo-600 transition-colors">
+                            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" 
+                                      stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                        </button>
+                        ${menuHtml}
+                    </div>
                 </div>
-            </li>`;
+            </div>`;
     }).join('');
-    
-    // Re-initialize drag-and-drop if applicable
+
+    // --- 4. RE-INITIALIZE DRAG & ROLLUP ---
     if (typeof initSortable === 'function') initSortable();
-}
+    
+    if (typeof rollupToRequirement === 'function') {
+        rollupToRequirement(reqId, steps);
+    }
+};
 
 window.deleteReq = async (id) => {
     if (!confirm("Delete this requirement and all associated tasks?")) return;

@@ -314,7 +314,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     try {
         if (typeof renderProjectHeader === 'function') {
-            // Build the EXACT object structure components.js is looking for
             const sessionForHeader = { 
                 user: {
                     ...user,
@@ -329,37 +328,63 @@ document.addEventListener('DOMContentLoaded', async () => {
                     module_team: 'view'
                 } 
             };
-            
-            console.log("Attempting Header Render with structured session...");
+            console.log("Attempting Header Render...");
             renderProjectHeader(sessionForHeader, 'requirements', projectName);
         }
     } catch (headerError) {
         console.error("Header Crash prevented:", headerError.message);
-        // Fallback: Ensure the Project Name at least shows up somewhere
-        const headerTitle = document.getElementById('project-name-display');
-        if (headerTitle) headerTitle.innerText = projectName;
     }
     
-    // Now load the data
     loadRequirements();
     if (typeof initSortable === 'function') initSortable();
 
     // 5. EVENT LISTENERS
-    // Row Selection Logic
+    
+    // Requirement Selection
     const reqListEl = document.getElementById('req-list');
     if (reqListEl) {
         reqListEl.addEventListener('click', (e) => {
             const row = e.target.closest('.req-row');
             if (!row || e.target.closest('.kebab-container') || e.target.closest('.req-checkbox')) return;
-            
             const id = row.getAttribute('data-id');
-            // Call the window-scoped function
             if (typeof window.selectRequirement === 'function') {
                 window.selectRequirement(id);
             }
         });
     }
 
+    // Cost Calculation Auto-Update
+    document.addEventListener('input', (e) => {
+        if (e.target.id === 'step-hours-input') {
+            if (typeof window.handleUserSelection === 'function') {
+                window.handleUserSelection('step');
+            }
+        }
+    });
+
+    // Close Slider on background click
+    const taskPanel = document.getElementById('task-editor-panel');
+    if (taskPanel) {
+        taskPanel.addEventListener('click', (e) => {
+            if (e.target.id === 'task-editor-panel') {
+                if (typeof closeTaskSlider === 'function') closeTaskSlider();
+            }
+        });
+    }
+
+    // Activity Feed: Enter key for notes
+    const noteInput = document.getElementById('new-note-input');
+    if (noteInput) {
+        noteInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                if (typeof appendNote === 'function') appendNote();
+            }
+        });
+    }
+
+    console.log("App initialized for:", currentUser?.full_name);
+});
     // Auto-update cost calculation when hours change in slider
     document.addEventListener('input', (e) => {
         if (e.target.id === 'step-hours-input') {

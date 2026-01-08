@@ -314,14 +314,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     try {
         if (typeof renderProjectHeader === 'function') {
-            // We are nesting permissions inside the user object to see if components.js finds it there
+            // Build the session object with multiple fallbacks to prevent undefined errors
             const sessionForHeader = { 
                 user: {
-                    ...user,
-                    id: user.id,
-                    email: user.email,
-                    user_metadata: user.user_metadata || {},
-                    // Some versions of the component look here:
+                    ...(user || {}),
+                    id: user?.id,
+                    email: user?.email,
+                    user_metadata: user?.user_metadata || {},
                     permissions: { 
                         module_requirements: 'edit',
                         module_tasks: 'edit',
@@ -329,7 +328,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                         module_team: 'view'
                     }
                 },
-                // Some versions look here:
                 permissions: { 
                     module_requirements: 'edit',
                     module_tasks: 'edit',
@@ -337,8 +335,14 @@ document.addEventListener('DOMContentLoaded', async () => {
                     module_team: 'view'
                 } 
             };
-            console.log("Attempting Header Render...");
-            renderProjectHeader(sessionForHeader, 'requirements', projectName);
+
+            // Double-check permissions exist before passing to render
+            if (sessionForHeader && sessionForHeader.permissions) {
+                console.log("Attempting Header Render...");
+                renderProjectHeader(sessionForHeader, 'requirements', projectName);
+            } else {
+                console.warn("Session object incomplete, skipping header render.");
+            }
         }
     } catch (headerError) {
         console.error("Header Crash prevented:", headerError.message);

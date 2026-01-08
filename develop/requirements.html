@@ -271,7 +271,7 @@
     refreshSteps();
 }
 
-    document.addEventListener('DOMContentLoaded', async () => {
+document.addEventListener('DOMContentLoaded', async () => {
     // 1. AUTH & INITIALIZATION
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     
@@ -309,30 +309,33 @@
         tenantId = myProfile.tenant_id;
     }
 	
-   // 4. UI // --- 4. UI INITIALIZATION ---
+    // 4. UI INITIALIZATION
     populateDropdowns();
     
     try {
         if (typeof renderProjectHeader === 'function') {
-            // We create a "fake" session that matches exactly what components.js wants
+            // Build the EXACT object structure components.js is looking for
             const sessionForHeader = { 
                 user: {
-                    ...user, // This is the user from supabase.auth.getUser()
+                    ...user,
+                    id: user.id,
+                    email: user.email,
                     user_metadata: user.user_metadata || {}
                 }, 
                 permissions: { 
                     module_requirements: 'edit',
                     module_tasks: 'edit',
-                    module_dashboard: 'view'
+                    module_dashboard: 'view',
+                    module_team: 'view'
                 } 
             };
             
-            console.log("Rendering Header...");
+            console.log("Attempting Header Render with structured session...");
             renderProjectHeader(sessionForHeader, 'requirements', projectName);
         }
     } catch (headerError) {
         console.error("Header Crash prevented:", headerError.message);
-        // Fallback: If the header still fails, we can at least show the project name
+        // Fallback: Ensure the Project Name at least shows up somewhere
         const headerTitle = document.getElementById('project-name-display');
         if (headerTitle) headerTitle.innerText = projectName;
     }
@@ -350,13 +353,32 @@
             if (!row || e.target.closest('.kebab-container') || e.target.closest('.req-checkbox')) return;
             
             const id = row.getAttribute('data-id');
-            // Call the window-scoped function we created earlier
+            // Call the window-scoped function
             if (typeof window.selectRequirement === 'function') {
                 window.selectRequirement(id);
             }
         });
     }
 
+    // Auto-update cost calculation when hours change in slider
+    document.addEventListener('input', (e) => {
+        if (e.target.id === 'step-hours-input') {
+            if (typeof window.handleUserSelection === 'function') {
+                window.handleUserSelection('step');
+            }
+        }
+    });
+
+    // Close Slider on click outside
+    const taskPanel = document.getElementById('task-editor-panel');
+    if (taskPanel) {
+        taskPanel.addEventListener('click', (e) => {
+            if (e.target.id === 'task-editor-panel') {
+                if (typeof closeTaskSlider === 'function') closeTaskSlider();
+            }
+        });
+    }
+});
     // Auto-update cost calculation when hours change in slider
     document.addEventListener('input', (e) => {
         if (e.target.id === 'step-hours-input') {

@@ -353,7 +353,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
-    // Cost Calculation Auto-Update
+    // Cost Calculation Auto-Update (Hours change in slider)
     document.addEventListener('input', (e) => {
         if (e.target.id === 'step-hours-input') {
             if (typeof window.handleUserSelection === 'function') {
@@ -379,55 +379,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (e.key === 'Enter') {
                 e.preventDefault();
                 if (typeof appendNote === 'function') appendNote();
-            }
-        });
-    }
-
-    console.log("App initialized for:", currentUser?.full_name);
-});
-    // Auto-update cost calculation when hours change in slider
-    document.addEventListener('input', (e) => {
-        if (e.target.id === 'step-hours-input') {
-            if (typeof window.handleUserSelection === 'function') {
-                window.handleUserSelection('step');
-            }
-        }
-    });
-
-    // Close Slider on click outside
-    const taskPanel = document.getElementById('task-editor-panel');
-    if (taskPanel) {
-        taskPanel.addEventListener('click', (e) => {
-            if (e.target.id === 'task-editor-panel') {
-                if (typeof closeTaskSlider === 'function') closeTaskSlider();
-            }
-        });
-    }
-});
-    // Auto-update cost calculation when hours change in slider
-    document.addEventListener('input', (e) => {
-        if (e.target.id === 'step-hours-input') {
-            if (typeof window.handleUserSelection === 'function') {
-                window.handleUserSelection('step');
-            }
-        }
-    });
-
-    // Close Slider on click outside
-    const taskPanel = document.getElementById('task-editor-panel');
-    if (taskPanel) {
-        taskPanel.addEventListener('click', (e) => {
-            if (e.target.id === 'task-editor-panel') closeTaskSlider();
-        });
-    }
-
-    // Activity Feed: Enter key to submit note
-    const noteInput = document.getElementById('new-note-input');
-    if (noteInput) {
-        noteInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                appendNote();
             }
         });
     }

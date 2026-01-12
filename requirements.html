@@ -689,29 +689,37 @@ window.selectRequirement = async (id) => {
     console.log("Requirement clicked ID:", id);
     window.selectedReqId = id;
 
-    // 1. VISUAL HIGHLIGHT (Preserving logic, fixing regression)
-    document.querySelectorAll('.req-row').forEach(row => {
-        // We ensure we remove the full set of classes
-        row.classList.remove('bg-blue-50', 'border-l-4', 'border-blue-500');
-        
-        if (row.getAttribute('data-id') === id) {
-            // We add border-l-4 to ensure the blue bar is actually visible
-            row.classList.add('bg-blue-50', 'border-l-4', 'border-blue-500');
-        }
-    });
-
-    // 2. UPDATE TASK PANEL HEADER (Preserving your existing logic)
+    // 1. UPDATE TASK PANEL HEADER (Preserved existing logic)
+    // We do this immediately so the UI feels responsive
     const rowEl = document.querySelector(`.req-row[data-id="${id}"]`);
     const title = rowEl?.getAttribute('data-title') || "Tasks";
     const headerEl = document.getElementById('selected-req-title');
     if (headerEl) headerEl.innerText = title;
 
-    // 3. REFRESH TASK LIST (Preserving your existing logic)
+    // 2. REFRESH TASK LIST (Preserved existing logic)
+    // We await the updated refreshSteps (with the try/catch we just added)
     if (typeof refreshSteps === 'function') {
-        await refreshSteps();
+        try {
+            await refreshSteps();
+        } catch (refreshError) {
+            console.error("Critical failure during refreshSteps:", refreshError);
+        }
     } else {
         console.warn("refreshSteps function not found.");
     }
+
+    // 3. VISUAL HIGHLIGHT (The "Safe Order" Fix)
+    // Moved to the end to ensure it applies to the most current DOM state
+    document.querySelectorAll('.req-row').forEach(row => {
+        // Remove all highlight classes
+        row.classList.remove('bg-blue-50', 'border-l-4', 'border-blue-500');
+        
+        // Match by ID
+        if (row.getAttribute('data-id') === id) {
+            row.classList.add('bg-blue-50', 'border-l-4', 'border-blue-500');
+            console.log("Highlight successfully applied to row:", id);
+        }
+    });
 };
 
 window.updateStep = async (id) => {

@@ -340,12 +340,26 @@ try {
 
     // 5. EVENT LISTENERS
     
-    // Requirement Selection
+// Requirement Selection with Multi-Row Highlight Fix
     const reqListEl = document.getElementById('req-list');
     if (reqListEl) {
         reqListEl.addEventListener('click', (e) => {
             const row = e.target.closest('.req-row');
+            
+            // 1. PRESERVE EXISTING GUARD LOGIC
+            // Don't trigger selection if clicking the menu or checkbox
             if (!row || e.target.closest('.kebab-container') || e.target.closest('.req-checkbox')) return;
+            
+            // 2. NEW FIX: RESET ALL HIGHLIGHTS
+            // This ensures only the current selection is blue
+            document.querySelectorAll('.req-row').forEach(r => {
+                r.classList.remove('bg-blue-50', 'border-l-4', 'border-blue-600');
+            });
+
+            // 3. APPLY NEW HIGHLIGHT
+            row.classList.add('bg-blue-50', 'border-l-4', 'border-blue-600');
+
+            // 4. PRESERVE EXISTING SELECTION LOGIC
             const id = row.getAttribute('data-id');
             if (typeof window.selectRequirement === 'function') {
                 window.selectRequirement(id);

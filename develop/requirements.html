@@ -684,21 +684,24 @@ window.selectRequirement = async (id) => {
     console.log("Requirement clicked ID:", id);
     window.selectedReqId = id;
 
-    // Visual highlight for the selected row
+    // 1. VISUAL HIGHLIGHT (Preserving logic, fixing regression)
     document.querySelectorAll('.req-row').forEach(row => {
-        row.classList.remove('bg-blue-50', 'border-blue-500');
+        // We ensure we remove the full set of classes
+        row.classList.remove('bg-blue-50', 'border-l-4', 'border-blue-500');
+        
         if (row.getAttribute('data-id') === id) {
-            row.classList.add('bg-blue-50', 'border-blue-500');
+            // We add border-l-4 to ensure the blue bar is actually visible
+            row.classList.add('bg-blue-50', 'border-l-4', 'border-blue-500');
         }
     });
 
-    // Update the Task Panel Header
+    // 2. UPDATE TASK PANEL HEADER (Preserving your existing logic)
     const rowEl = document.querySelector(`.req-row[data-id="${id}"]`);
     const title = rowEl?.getAttribute('data-title') || "Tasks";
     const headerEl = document.getElementById('selected-req-title');
     if (headerEl) headerEl.innerText = title;
 
-    // Refresh the task list on the right
+    // 3. REFRESH TASK LIST (Preserving your existing logic)
     if (typeof refreshSteps === 'function') {
         await refreshSteps();
     } else {

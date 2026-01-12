@@ -598,7 +598,7 @@ window.refreshSteps = async () => {
         return;
     }
 
-    // --- 1. UPDATE UI COUNTERS (Preserving your original feature) ---
+    // --- 1. UPDATE UI COUNTERS ---
     const taskCountEl = document.getElementById('task-count');
     if (taskCountEl) taskCountEl.innerText = `${steps?.length || 0} ITEMS`;
 
@@ -608,7 +608,7 @@ window.refreshSteps = async () => {
     const list = document.getElementById('step-list');
     if (!list) return;
 
-    // --- 2. HANDLE EMPTY STATE (Improved for testing) ---
+    // --- 2. HANDLE EMPTY STATE ---
     if (!steps || steps.length === 0) {
         list.innerHTML = `
             <div class="p-10 text-center bg-gray-50 rounded-xl border-2 border-dashed border-gray-200">
@@ -620,42 +620,47 @@ window.refreshSteps = async () => {
         return;
     }
 
-    // --- 3. RENDER TASKS (Merging your Kabob Menu & Drag handles) ---
+    // --- 3. RENDER TASKS (With Safety Catch for Callback Errors) ---
     list.innerHTML = steps.map(s => {
-        // Keeps your existing Kabob Menu logic
-        const menuHtml = typeof getKabobMenu === 'function' ? getKabobMenu(s, 'task') : '';
+        try {
+            // Safety check for the Kabob Menu utility
+            const menuHtml = (typeof getKabobMenu === 'function') ? getKabobMenu(s, 'task') : '';
 
-        return `
-            <div class="task-card active-task-row p-4 mb-3 bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md cursor-pointer group flex justify-between items-center" 
-                 data-id="${s.step_id}" onclick="openTaskSlider('${s.step_id}')">
-                
-                <div class="flex items-center gap-3">
-                    <span class="cursor-move text-gray-300 font-bold p-1 group-hover:text-indigo-400">::</span>
-                    <div>
-                        <p class="text-sm font-bold text-gray-800 group-hover:text-indigo-600 transition-colors">${s.title}</p>
-                        <p class="text-[10px] text-gray-400 uppercase font-bold">
-                            ${s.assignee?.full_name || 'Unassigned'} | ${s.estimated_hours || 0}h
-                        </p>
-                    </div>
-                </div>
-
-                <div class="flex items-center gap-4">
-                    <div class="text-right mr-2">
-                        <p class="text-sm font-mono font-black text-indigo-600">${s.estimated_hours || 0}h</p>
+            return `
+                <div class="task-card active-task-row p-4 mb-3 bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md cursor-pointer group flex justify-between items-center" 
+                     data-id="${s.step_id}" onclick="openTaskSlider('${s.step_id}')">
+                    
+                    <div class="flex items-center gap-3">
+                        <span class="cursor-move text-gray-300 font-bold p-1 group-hover:text-indigo-400">::</span>
+                        <div>
+                            <p class="text-sm font-bold text-gray-800 group-hover:text-indigo-600 transition-colors">${s.title}</p>
+                            <p class="text-[10px] text-gray-400 uppercase font-bold">
+                                ${s.assignee?.full_name || 'Unassigned'} | ${s.estimated_hours || 0}h
+                            </p>
+                        </div>
                     </div>
 
-                    <div class="relative kebab-container">
-                        <button onclick="event.stopPropagation(); toggleKebab('task-${s.step_id}')" 
-                                class="p-1 text-gray-400 hover:text-indigo-600 transition-colors">
-                            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" 
-                                      stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                            </svg>
-                        </button>
-                        ${menuHtml}
+                    <div class="flex items-center gap-4">
+                        <div class="text-right mr-2">
+                            <p class="text-sm font-mono font-black text-indigo-600">${s.estimated_hours || 0}h</p>
+                        </div>
+
+                        <div class="relative kebab-container">
+                            <button onclick="event.stopPropagation(); toggleKebab('task-${s.step_id}')" 
+                                    class="p-1 text-gray-400 hover:text-indigo-600 transition-colors">
+                                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" 
+                                          stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                </svg>
+                            </button>
+                            ${menuHtml}
+                        </div>
                     </div>
-                </div>
-            </div>`;
+                </div>`;
+        } catch (mapError) {
+            console.error("Error rendering task row:", mapError, s);
+            return `<div class="p-2 text-xs text-red-500">Error loading task row</div>`;
+        }
     }).join('');
 
     // --- 4. RE-INITIALIZE DRAG & ROLLUP ---

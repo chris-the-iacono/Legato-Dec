@@ -277,54 +277,6 @@
         });
 
         // 2. CORE FUNCTIONS (ATTACHED TO WINDOW)
-		
-window.addRequirement = async () => {
-    // 1. Pull data from the Req Slider inputs
-    const title = document.getElementById('req-title-input').value;
-    const hours = parseFloat(document.getElementById('req-hours-input').value) || 0;
-    const rate = parseFloat(document.getElementById('req-applied-rate').value) || window.projectBlendedRate;
-
-    // 2. Determine if we are updating or creating new
-    const isUpdate = !!window.selectedReqId;
-    
-    // 3. Logic for Versioning
-    let nextVersion = 1;
-    if (isUpdate) {
-        const { data: current } = await supabase.from('requirements')
-            .select('version')
-            .eq('req_id', window.selectedReqId)
-            .single();
-        nextVersion = (current?.version || 1) + 1;
-    }
-
-    const payload = {
-        title: title,
-        estimated_hours: hours,
-        custom_rate: rate,
-        total_cost: hours * rate,
-        version: nextVersion,
-        project_id: projectId,
-        tenant_id: tenantId,
-        updated_at: new Date().toISOString()
-    };
-
-    // 4. Send to Supabase
-    let result;
-    if (isUpdate) {
-        result = await supabase.from('requirements').update(payload).eq('req_id', window.selectedReqId);
-    } else {
-        result = await supabase.from('requirements').insert([payload]);
-    }
-
-    if (result.error) {
-        console.error("Save Error:", result.error);
-        alert("Could not save: " + result.error.message);
-    } else {
-        alert(`Baseline saved as v${nextVersion}`);
-        window.closeReqSlider();
-        window.loadRequirements(); // Now we call the OTHER function to refresh the list!
-    }
-};		
 
         window.selectRequirement = async (id) => {
             // FIX: Force ID to string and trim to prevent mismatch
@@ -600,6 +552,54 @@ window.addRequirement = async () => {
             });
         }
 
+		window.addRequirement = async () => {
+    // 1. Pull data from the Req Slider inputs
+    const title = document.getElementById('req-title-input').value;
+    const hours = parseFloat(document.getElementById('req-hours-input').value) || 0;
+    const rate = parseFloat(document.getElementById('req-applied-rate').value) || window.projectBlendedRate;
+
+    // 2. Determine if we are updating or creating new
+    const isUpdate = !!window.selectedReqId;
+    
+    // 3. Logic for Versioning
+    let nextVersion = 1;
+    if (isUpdate) {
+        const { data: current } = await supabase.from('requirements')
+            .select('version')
+            .eq('req_id', window.selectedReqId)
+            .single();
+        nextVersion = (current?.version || 1) + 1;
+    }
+
+    const payload = {
+        title: title,
+        estimated_hours: hours,
+        custom_rate: rate,
+        total_cost: hours * rate,
+        version: nextVersion,
+        project_id: projectId,
+        tenant_id: tenantId,
+        updated_at: new Date().toISOString()
+    };
+
+    // 4. Send to Supabase
+    let result;
+    if (isUpdate) {
+        result = await supabase.from('requirements').update(payload).eq('req_id', window.selectedReqId);
+    } else {
+        result = await supabase.from('requirements').insert([payload]);
+    }
+
+    if (result.error) {
+        console.error("Save Error:", result.error);
+        alert("Could not save: " + result.error.message);
+    } else {
+        alert(`Baseline saved as v${nextVersion}`);
+        window.closeReqSlider();
+        window.loadRequirements(); // Now we call the OTHER function to refresh the list!
+    }
+};
+
         async function loadRequirements() {
             if (!projectId || !tenantId) return;
             const { data: reqs } = await supabase.from('requirements')
@@ -706,6 +706,8 @@ window.addRequirement = async () => {
             if (!taskId || !content) return;
             await supabase.from('task_notes').insert([{ task_id: taskId, user_id: currentUser?.id, content: content }]);
         }
+        
+        // --- END OF SCRIPT ---
     </script>
 </body>
 </html>

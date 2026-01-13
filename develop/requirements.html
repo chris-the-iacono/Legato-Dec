@@ -317,73 +317,101 @@
         };
 
         window.refreshSteps = async () => {
-            const reqId = window.selectedReqId;
-            if (!reqId) return;
+    const reqId = window.selectedReqId;
+    if (!reqId) return;
 
-            const { data: steps, error } = await supabase
-                .from('steps')
-                .select(`*, assignee:assigned_to(full_name, email)`)
-                .eq('requirement_id', reqId)
-                .order('sequence_order', { ascending: true });
+    // 1. Fetch Steps AND all Time Logs for this project to calculate actuals
+    const { data: steps, error } = await supabase
+        .from('steps')
+        .select(`*, assignee:assigned_to(full_name, email)`)
+        .eq('requirement_id', reqId) // Keep your existing column name
+        .order('sequence_order', { ascending: true });
 
-            if (error) {
-                console.error("Step Fetch Error:", error.message);
-                return;
-            }
+    const { data: logs } = await supabase
+        .from('time_logs')
+        .select('step_id, hours_logged, billing_amount');
 
-            // Update Counters
-            const taskCountEl = document.getElementById('task-count');
-            if (taskCountEl) taskCountEl.innerText = `${steps?.length || 0} TASKS`;
+    if (error) {
+        console.error("Step Fetch Error:", error.message);
+        return;
+    }
 
-            const list = document.getElementById('step-list');
-            if (!list) return;
+    // Update Task Counter (Preserved)
+    const taskCountEl = document.getElementById('task-count');
+    if (taskCountEl) taskCountEl.innerText = `${steps?.length || 0} TASKS`;
 
-            // Empty State
-            if (!steps || steps.length === 0) {
-                list.innerHTML = `
-                    <div class="p-10 text-center bg-gray-50 rounded-xl border-2 border-dashed border-gray-200">
-                        <p class="text-gray-500 mb-4">No tasks found for this requirement.</p>
-                        <button onclick="window.openTaskSlider()" class="bg-indigo-600 text-white px-4 py-2 rounded-lg font-bold text-sm hover:bg-indigo-700 transition-colors">
-                            + Add Your First Task
-                        </button>
-                    </div>`;
-                return;
-            }
+    const list = document.getElementById('step-list');
+    if (!list) return;
 
-            // Render Tasks
-            list.innerHTML = steps.map(s => {
-                try {
-                    const menuHtml = (typeof getKabobMenu === 'function') ? getKabobMenu(s, 'task') : '';
-                    return `
-                        <div class="task-card active-task-row p-4 mb-3 bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md cursor-pointer group flex justify-between items-center" 
-                             data-id="${s.step_id}" onclick="window.openTaskSlider('${s.step_id}')">
-                            <div class="flex items-center gap-3">
-                                <span class="cursor-move text-gray-300 font-bold p-1 group-hover:text-indigo-400">::</span>
-                                <div>
-                                    <p class="text-sm font-bold text-gray-800 group-hover:text-indigo-600 transition-colors">${s.title}</p>
-                                    <p class="text-[10px] text-gray-400 uppercase font-bold">
-                                        ${s.assignee?.full_name || 'Unassigned'} | ${s.estimated_hours || 0}h
-                                    </p>
-                                </div>
+    // Empty State (Preserved)
+    if (!steps || steps.length === 0) {
+        list.innerHTML = `
+            <div class="p-10 text-center bg-gray-50 rounded-xl border-2 border-dashed border-gray-200">
+                <p class="text-gray-500 mb-4">No tasks found for this requirement.</p>
+                <button onclick="window.openTaskSlider()" class="bg-indigo-600 text-white px-4 py-2 rounded-lg font-bold text-sm hover:bg-indigo-700 transition-colors">
+                    + Add Your First Task
+                </button>
+            </div>`;
+        return;
+    }
+
+    // Render Tasks
+    list.innerHTML = steps.map(s => {
+        try {
+            // Logic for Actuals & Health
+            const taskLogs = logs?.filter(l => l.step_id === s.step_id) || [];
+            const actHrs = taskLogs.reduce((sum, l) => sum + (parseFloat(l.hours_logged) || 0), 0);
+            const actCost = taskLogs.reduce((sum, l) => sum + (parseFloat(l.billing_amount) || 0), 0);
+            
+            const estHrs = s.estimated_hours || 0;
+            const isOverBudget = actHrs > estHrs;
+            const healthClass = isOverBudget ? 'text-red-500 font-black' : 'text-green-600 font-bold';
+
+            const menuHtml = (typeof getKabobMenu === 'function') ? getKabobMenu(s, 'task') : '';
+            
+            return `
+                <div class="task-card active-task-row p-4 mb-3 bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md cursor-pointer group flex justify-between items-center" 
+                     data-id="${s.step_id}" onclick="window.openTaskSlider('${s.step_id}')">
+                    
+                    <div class="flex items-center gap-3">
+                        <span class="cursor-move text-gray-300 font-bold p-1 group-hover:text-indigo-400">::</span>
+                        <div>
+                            <div class="flex items-center gap-2">
+                                <p class="text-sm font-bold text-gray-800 group-hover:text-indigo-600 transition-colors">${s.title}</p>
+                                <span class="text-[9px] bg-blue-100 text-blue-600 px-1.5 rounded font-bold uppercase">v${s.version || 1}</span>
                             </div>
-                            <div class="flex items-center gap-4">
-                                <p class="text-sm font-mono font-black text-indigo-600">${s.estimated_hours || 0}h</p>
-                                <div class="relative kebab-container">
-                                    <button onclick="event.stopPropagation(); toggleKebab('task-${s.step_id}')" class="p-1 text-gray-400 hover:text-indigo-600">
-                                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                                    </button>
-                                    ${menuHtml}
-                                </div>
-                            </div>
-                        </div>`;
-                } catch (e) { return ''; }
-            }).join('');
+                            <p class="text-[10px] text-gray-400 uppercase font-bold">
+                                ${s.assignee?.full_name || 'Unassigned'} | Est: ${estHrs}h | 
+                                <span class="${healthClass}">Act: ${actHrs.toFixed(1)}h</span>
+                            </p>
+                        </div>
+                    </div>
 
-            if (typeof initSortable === 'function') initSortable();
-            // Trigger Rollup Engine
-            if (typeof rollupToRequirement === 'function') window.rollupToRequirement(reqId, steps);
-        if (typeof window.initSortable === 'function') window.initSortable();
-		};
+                    <div class="flex items-center gap-4">
+                        <div class="text-right mr-2">
+                            <p class="text-sm font-mono font-black text-indigo-600">$${actCost.toLocaleString()}</p>
+                            <p class="text-[9px] text-gray-400 font-bold uppercase">Logged</p>
+                        </div>
+                        <div class="relative kebab-container">
+                            <button onclick="event.stopPropagation(); toggleKebab('task-${s.step_id}')" class="p-1 text-gray-400 hover:text-indigo-600">
+                                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                </svg>
+                            </button>
+                            ${menuHtml}
+                        </div>
+                    </div>
+                </div>`;
+        } catch (e) { 
+            console.error("Error rendering task row:", e);
+            return ''; 
+        }
+    }).join('');
+
+    // --- Post-Render Triggers ---
+    if (typeof window.initSortable === 'function') window.initSortable();
+    if (typeof rollupToRequirement === 'function') window.rollupToRequirement(reqId, steps);
+};
 		
 		// --- TILE DRAG AND DROP SORTING ---
 		window.initSortable = () => {

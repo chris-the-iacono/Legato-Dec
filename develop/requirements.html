@@ -324,7 +324,7 @@
     const { data: steps, error } = await supabase
         .from('steps')
         .select(`*, assignee:assigned_to(full_name, email)`)
-        .eq('requirement_id', reqId) // Keep your existing column name
+        .eq('requirement_id', reqId) 
         .order('sequence_order', { ascending: true });
 
     const { data: logs } = await supabase
@@ -336,14 +336,14 @@
         return;
     }
 
-    // Update Task Counter (Preserved)
+    // Update Task Counter
     const taskCountEl = document.getElementById('task-count');
     if (taskCountEl) taskCountEl.innerText = `${steps?.length || 0} TASKS`;
 
     const list = document.getElementById('step-list');
     if (!list) return;
 
-    // Empty State (Preserved)
+    // Empty State
     if (!steps || steps.length === 0) {
         list.innerHTML = `
             <div class="p-10 text-center bg-gray-50 rounded-xl border-2 border-dashed border-gray-200">
@@ -358,15 +358,12 @@
     // Render Tasks
     list.innerHTML = steps.map(s => {
         try {
-            // Logic for Actuals & Health
             const taskLogs = logs?.filter(l => l.step_id === s.step_id) || [];
             const actHrs = taskLogs.reduce((sum, l) => sum + (parseFloat(l.hours_logged) || 0), 0);
             const actCost = taskLogs.reduce((sum, l) => sum + (parseFloat(l.billing_amount) || 0), 0);
             
             const estHrs = s.estimated_hours || 0;
-            const isOverBudget = actHrs > estHrs;
-            const healthClass = isOverBudget ? 'text-red-500 font-black' : 'text-green-600 font-bold';
-
+            const healthClass = actHrs > estHrs ? 'text-red-500 font-black' : 'text-green-600 font-bold';
             const menuHtml = (typeof getKabobMenu === 'function') ? getKabobMenu(s, 'task') : '';
             
             return `
@@ -408,14 +405,20 @@
         }
     }).join('');
 
-    // --- Post-Render Triggers ---
-    if (typeof window.initSortable === 'function') window.initSortable();
+    // --- CRITICAL FIX: The Delay ---
+    // We wait 50ms to ensure the browser has finished "painting" the new tasks before binding Sortable
+    setTimeout(() => {
+        if (typeof window.initSortable === 'function') {
+            window.initSortable();
+            console.log("Sortable re-bound to Tasks");
+        }
+    }, 50);
+
     if (typeof rollupToRequirement === 'function') window.rollupToRequirement(reqId, steps);
 };
-		
-		// --- TILE DRAG AND DROP SORTING ---
-		window.initSortable = () => {
-    // Requirements (Left Side) - You mentioned this is working
+
+// --- UPDATED TILE DRAG AND DROP ---
+window.initSortable = () => {
     const reqList = document.getElementById('req-list');
     if (reqList && typeof Sortable !== 'undefined') {
         if (reqList.sortable) reqList.sortable.destroy();
@@ -426,15 +429,15 @@
         });
     }
 
-    // Tasks (Right Side) - The Fix
     const stepList = document.getElementById('step-list');
     if (stepList && typeof Sortable !== 'undefined') {
-        // Destroy old instance to prevent "ghost" dragging or double listeners
+        // Destroy old instance to prevent "ghosting"
         if (stepList.sortable) stepList.sortable.destroy();
         
         stepList.sortable = new Sortable(stepList, {
             animation: 150,
-            handle: '.cursor-move', // Ensure your Task Tile HTML has this class on the "::"
+            handle: '.cursor-move', 
+            draggable: '.task-card', // Explicitly target the class
             ghostClass: 'bg-blue-50',
             onEnd: () => window.saveOrder('steps', stepList)
         });

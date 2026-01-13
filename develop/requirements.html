@@ -387,23 +387,26 @@
 		
 		// --- TILE DRAG AND DROP SORTING ---
 		window.initSortable = () => {
-    // Requirements List (Left)
+    // Requirements (Left Side) - You mentioned this is working
     const reqList = document.getElementById('req-list');
     if (reqList && typeof Sortable !== 'undefined') {
-        new Sortable(reqList, {
+        if (reqList.sortable) reqList.sortable.destroy();
+        reqList.sortable = new Sortable(reqList, {
             animation: 150,
-            handle: '.cursor-move', // Matches your "::" span
-            ghostClass: 'bg-indigo-50',
+            handle: '.cursor-move',
             onEnd: () => window.saveOrder('requirements', reqList)
         });
     }
 
-    // Task List (Right)
+    // Tasks (Right Side) - The Fix
     const stepList = document.getElementById('step-list');
     if (stepList && typeof Sortable !== 'undefined') {
-        new Sortable(stepList, {
+        // Destroy old instance to prevent "ghost" dragging or double listeners
+        if (stepList.sortable) stepList.sortable.destroy();
+        
+        stepList.sortable = new Sortable(stepList, {
             animation: 150,
-            handle: '.cursor-move',
+            handle: '.cursor-move', // Ensure your Task Tile HTML has this class on the "::"
             ghostClass: 'bg-blue-50',
             onEnd: () => window.saveOrder('steps', stepList)
         });

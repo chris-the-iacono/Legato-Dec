@@ -450,7 +450,7 @@ window.saveOrder = async (table, container) => {
 
     console.log(`Starting sequential save for ${table}...`);
 
-    // --- We use a for...of loop to ensure one request finishes before the next starts
+    // We use a for...of loop to ensure one request finishes before the next starts
     for (let [index, el] of items.entries()) {
         const id = el.getAttribute('data-id');
         const newOrder = (index + 1) * 10;

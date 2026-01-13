@@ -382,7 +382,47 @@
             if (typeof initSortable === 'function') initSortable();
             // Trigger Rollup Engine
             if (typeof rollupToRequirement === 'function') window.rollupToRequirement(reqId, steps);
-        };
+        if (typeof window.initSortable === 'function') window.initSortable();
+		};
+		
+		// --- TILE DRAG AND DROP SORTING ---
+		window.initSortable = () => {
+    // Requirements List (Left)
+    const reqList = document.getElementById('req-list');
+    if (reqList && typeof Sortable !== 'undefined') {
+        new Sortable(reqList, {
+            animation: 150,
+            handle: '.cursor-move', // Matches your "::" span
+            ghostClass: 'bg-indigo-50',
+            onEnd: () => window.saveOrder('requirements', reqList)
+        });
+    }
+
+    // Task List (Right)
+    const stepList = document.getElementById('step-list');
+    if (stepList && typeof Sortable !== 'undefined') {
+        new Sortable(stepList, {
+            animation: 150,
+            handle: '.cursor-move',
+            ghostClass: 'bg-blue-50',
+            onEnd: () => window.saveOrder('steps', stepList)
+        });
+    }
+};
+
+window.saveOrder = async (table, container) => {
+    const items = Array.from(container.querySelectorAll('[data-id]'));
+    const idField = (table === 'requirements') ? 'req_id' : 'step_id';
+
+    const updates = items.map((el, index) => {
+        return supabase.from(table)
+            .update({ sequence_order: (index + 1) * 10 })
+            .eq(idField, el.getAttribute('data-id'));
+    });
+
+    await Promise.all(updates);
+    console.log(`${table} order saved.`);
+};
 
         // --- ROLLUP ENGINE (STEP 2 REQUESTED) ---
         window.rollupToRequirement = async (reqId = window.selectedReqId, steps = null) => {
@@ -694,7 +734,8 @@
                         </li>`;
                  }).join('');
             }
-        }
+        if (typeof window.initSortable === 'function') window.initSortable();
+		}
         
         // Helper for Rates
         window.handleUserSelection = (type) => {

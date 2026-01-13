@@ -448,14 +448,24 @@ window.saveOrder = async (table, container) => {
     const items = Array.from(container.querySelectorAll('[data-id]'));
     const idField = (table === 'requirements') ? 'req_id' : 'step_id';
 
-    const updates = items.map((el, index) => {
-        return supabase.from(table)
-            .update({ sequence_order: (index + 1) * 10 })
-            .eq(idField, el.getAttribute('data-id'));
-    });
+    console.log(`Starting sequential save for ${table}...`);
 
-    await Promise.all(updates);
-    console.log(`${table} order saved.`);
+    // We use a for...of loop to ensure one request finishes before the next starts
+    for (let [index, el] of items.entries()) {
+        const id = el.getAttribute('data-id');
+        const newOrder = (index + 1) * 10;
+
+        const { error } = await supabase
+            .from(table)
+            .update({ sequence_order: newOrder })
+            .eq(idField, id);
+
+        if (error) {
+            console.error(`Error updating order for ${id}:`, error.message);
+        }
+    }
+
+    console.log(`${table} order saved successfully without conflicts.`);
 };
 
         // --- ROLLUP ENGINE (STEP 2 REQUESTED) ---

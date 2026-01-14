@@ -567,7 +567,7 @@ window.rollupToRequirement = async (reqId = window.selectedReqId, steps = null) 
         titleEl.innerText = "Task Details";
         btnEl.innerText = "Update Baseline Changes";
         
-        // 1. Fetch Task Details
+        // 1. Fetch Task Details (Verified Schema: steps)
         const { data: step } = await supabase.from('steps').select('*').eq('step_id', id).single();
         if (step) {
             document.getElementById('step-title-input').value = step.title;
@@ -579,14 +579,14 @@ window.rollupToRequirement = async (reqId = window.selectedReqId, steps = null) 
             if (typeof loadTaskNotes === 'function') loadTaskNotes(id);
         }
 
-        // 2. Fetch and Display Actuals (Logged Hours & Cost)
+        // 2. Fetch and Display Actuals (Verified Schema: time_logs)
         const { data: logs } = await supabase
             .from('time_logs')
-            .select('hours_logged, billing_amount')
-            .eq('step_id', id);
+            .select('hours_spent, calculated_cost') // Corrected from hours_logged, billing_amount
+            .eq('task_id', id); // Corrected from step_id
 
-        const totalActualHrs = logs?.reduce((sum, l) => sum + (parseFloat(l.hours_logged) || 0), 0) || 0;
-        const totalActualCost = logs?.reduce((sum, l) => sum + (parseFloat(l.billing_amount) || 0), 0) || 0;
+        const totalActualHrs = logs?.reduce((sum, l) => sum + (parseFloat(l.hours_spent) || 0), 0) || 0;
+        const totalActualCost = logs?.reduce((sum, l) => sum + (parseFloat(l.calculated_cost) || 0), 0) || 0;
 
         const logSection = document.getElementById('log-time-section');
         if (logSection) {
@@ -760,94 +760,170 @@ window.rollupToRequirement = async (reqId = window.selectedReqId, steps = null) 
         }
     }
 };
-        async function loadRequirements() {
-            if (!projectId || !tenantId) return;
-            const { data: reqs } = await supabase.from('requirements')
-                .select(`*, assignee:assigned_to(full_name, email)`)
-                .eq('project_id', projectId)
-                .eq('tenant_id', tenantId)
-                .order('sequence_order');
-
-            const list = document.getElementById('req-list');
-            if(reqs) {
-                 document.getElementById('req-count').innerText = `${reqs.length} ITEMS`;
-                 list.innerHTML = reqs.map(req => {
-                    const displayTotal = req.total_cost || (req.estimated_hours * req.custom_rate);
-                    const menuHtml = (typeof getKabobMenu === 'function') ? getKabobMenu(req, 'req') : '';
-                    return `
-                        <li class="req-row p-4 hover:bg-gray-50 flex justify-between items-center cursor-pointer border-l-4 border-transparent transition-all" 
-                            data-id="${req.req_id}" 
-                            data-title="${req.title.replace(/"/g, '&quot;')}"
-                            onclick="window.selectRequirement('${req.req_id}')">
-                            <div class="flex items-center gap-3">
-                                <input type="checkbox" class="req-checkbox w-4 h-4 rounded border-gray-300" onclick="event.stopPropagation()">
-                                <span class="cursor-move text-gray-300 font-bold p-1">::</span>
-                                <div>
-                                    <p class="text-sm font-bold text-gray-800">${req.title}</p>
-                                    <p class="text-[10px] text-gray-400 font-bold uppercase">${req.assignee?.full_name || 'Unassigned'} | ${req.estimated_hours || 0}h</p>
-                                </div>
-                            </div>
-                            <div class="flex items-center gap-4">
-                                <p class="text-sm font-mono font-bold text-indigo-600">$${Number(displayTotal).toLocaleString()}</p>
-                                <div class="relative kebab-container">
-                                    <button onclick="event.stopPropagation(); window.toggleKebab('req-${req.req_id}')" class="p-1 text-gray-400 hover:text-indigo-600">
-                                        <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                                    </button>
-                                    ${menuHtml}
-                                </div>
-                            </div>
-                        </li>`;
-                 }).join('');
-            }
-        if (typeof window.initSortable === 'function') window.initSortable();
-		}
         
-        // Helper for Rates
-        window.handleUserSelection = (type) => {
-            const members = window.teamMembers || [];
-            const defaultRate = parseFloat(window.projectBlendedRate) || 0;
-            const selectEl = document.getElementById(`${type}-assign-select`);
-            const userId = selectEl.value;
-            const user = members.find(u => u.user_id === userId);
-            let rate = (user && parseFloat(user.hourly_cost) > 0) ? parseFloat(user.hourly_cost) : defaultRate;
-
-            if (type === 'req') {
-                const rateEl = document.getElementById('req-applied-rate');
-                if (rateEl) rateEl.value = rate;
-            } else {
-                const hoursInput = document.getElementById('step-hours-input');
-                const costInput = document.getElementById('step-cost-input');
-                const hours = parseFloat(hoursInput?.value) || 0;
-                if (costInput) costInput.value = (rate * hours).toFixed(2);
-            }
-        };
-
-        // Helper for Kebab Menu
-        function getKabobMenu(item, type) {
-            const isAdmin = currentUser?.role === 'admin';
-            const itemId = type === 'req' ? item.req_id : item.step_id;
-            return `
-                <div id="kebab-${type}-${itemId}" class="hidden absolute right-0 mt-1 w-40 bg-white border shadow-lg rounded-md z-[110] py-1">
-                    <button onclick="event.stopPropagation(); window.open${type === 'req' ? 'Req' : 'Task'}Slider('${itemId}')" 
-                        class="w-full text-left px-4 py-2 text-xs hover:bg-blue-50">
-                        ${isAdmin ? 'Edit Details' : 'View Details'}
-                    </button>
-                    ${isAdmin ? `<button class="w-full text-left px-4 py-2 text-xs text-red-600 hover:bg-red-50">Delete</button>` : ''}
-                </div>
-            `;
+        window.closeReqSlider(); // Hide the panel
+        
+        // Optional: If you changed hours manually, you might want to re-calculate health
+        if (window.selectedReqId === id) {
+            document.getElementById('selected-req-title-display').innerText = `2. ${title}`;
         }
+    }
+};
 
-        window.toggleKebab = (id) => {
-            document.querySelectorAll('[id^="kebab-"]').forEach(el => el.classList.add('hidden'));
-            const menu = document.getElementById(`kebab-${id}`);
-            if (menu) menu.classList.remove('hidden');
-        };
+        // --- REQUIREMENT LIST ENGINE ---
+async function loadRequirements() {
+    if (!projectId || !tenantId) return;
+
+    const { data: reqs, error } = await supabase.from('requirements')
+        .select(`*, assignee:assigned_to(full_name, email)`)
+        .eq('project_id', projectId)
+        .eq('tenant_id', tenantId)
+        .order('sequence_order');
+
+    if (error) {
+        console.error("Error loading requirements:", error.message);
+        return;
+    }
+
+    const list = document.getElementById('req-list');
+    if (reqs && list) {
+        document.getElementById('req-count').innerText = `${reqs.length} ITEMS`;
+        list.innerHTML = reqs.map(req => {
+            // Use schema: total_cost (with fallback)
+            const displayTotal = req.total_cost || (parseFloat(req.estimated_hours) * (parseFloat(req.custom_rate) || 0));
+            const menuHtml = (typeof getKabobMenu === 'function') ? getKabobMenu(req, 'req') : '';
+            
+            return `
+                <li class="req-row p-4 hover:bg-gray-50 flex justify-between items-center cursor-pointer border-l-4 border-transparent transition-all" 
+                    data-id="${req.req_id}" 
+                    onclick="window.selectRequirement('${req.req_id}')">
+                    <div class="flex items-center gap-3">
+                        <input type="checkbox" class="req-checkbox w-4 h-4 rounded border-gray-300" onclick="event.stopPropagation()">
+                        <span class="cursor-move text-gray-300 font-bold p-1">::</span>
+                        <div>
+                            <p class="text-sm font-bold text-gray-800">${req.title}</p>
+                            <p class="text-[10px] text-gray-400 font-bold uppercase">
+                                ${req.assignee?.full_name || 'Unassigned'} | ${req.estimated_hours || 0}h
+                            </p>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-4">
+                        <p class="text-sm font-mono font-bold text-indigo-600">$${Number(displayTotal).toLocaleString()}</p>
+                        <div class="relative kebab-container">
+                            <button onclick="event.stopPropagation(); window.toggleKebab('req-${req.req_id}')" class="p-1 text-gray-400 hover:text-indigo-600">
+                                <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                            </button>
+                            ${menuHtml}
+                        </div>
+                    </div>
+                </li>`;
+        }).join('');
+    }
+
+    if (typeof window.initSortable === 'function') window.initSortable();
+}
+
+// --- NEW/FIXED: THE SLIDER POPULATION FUNCTION ---
+window.openReqSlider = async (id = null) => {
+    const panel = document.getElementById('req-editor-panel');
+    const titleEl = document.getElementById('req-editor-title');
+    const btnEl = document.getElementById('req-save-btn');
+    const versionEl = document.getElementById('req-version-display');
+    const statusBadge = document.getElementById('req-status-badge');
+
+    // 1. Reset Form Fields
+    document.getElementById('req-title-input').value = '';
+    document.getElementById('req-hours-input').value = 0;
+    document.getElementById('req-applied-rate').value = '';
+    // Reset Assignee to first option (usually empty/Unassigned)
+    const assignSelect = document.getElementById('req-assign-select');
+    if (assignSelect) assignSelect.selectedIndex = 0;
+    
+    if(versionEl) versionEl.innerText = '0';
+
+    if (!id) {
+        // --- MODE: CREATE NEW ---
+        window.selectedReqId = null; 
+        titleEl.innerText = "Add New Requirement";
+        btnEl.innerText = "Create Requirement";
         
-        document.addEventListener('click', (e) => {
-             if (!e.target.closest('.kebab-container')) {
-                 document.querySelectorAll('[id^="kebab-"]').forEach(el => el.classList.add('hidden'));
-             }
-        });
+        // Point to the unified addRequirement function
+        btnEl.onclick = () => window.addRequirement();
+        
+        if(statusBadge) {
+            statusBadge.innerText = 'Draft';
+            statusBadge.className = "text-[9px] px-2 py-0.5 rounded-full font-bold uppercase bg-gray-100 text-gray-600";
+        }
+    } else {
+        // --- MODE: EDIT EXISTING ---
+        window.selectedReqId = id; // Crucial: addRequirement uses this to check isUpdate
+        titleEl.innerText = "Requirement Details";
+        
+        const { data: req } = await supabase
+            .from('requirements')
+            .select('*')
+            .eq('req_id', id)
+            .single();
+        
+        if (req) {
+            document.getElementById('req-title-input').value = req.title || '';
+            document.getElementById('req-assign-select').value = req.assigned_to || '';
+            document.getElementById('req-hours-input').value = req.estimated_hours || 0;
+            document.getElementById('req-applied-rate').value = req.custom_rate || '';
+            
+            if(versionEl) versionEl.innerText = req.version || '1';
+            
+            // Update Status Badge visually
+            if(statusBadge) {
+                statusBadge.innerText = req.status || 'Active';
+                statusBadge.className = req.status === 'Complete' 
+                    ? "text-[9px] px-2 py-0.5 rounded-full font-bold uppercase bg-green-100 text-green-700"
+                    : "text-[9px] px-2 py-0.5 rounded-full font-bold uppercase bg-blue-100 text-blue-700";
+            }
+
+            btnEl.innerText = "Update Baseline Budget";
+            // Point to the unified addRequirement function
+            btnEl.onclick = () => window.addRequirement();
+        }
+    }
+    
+    if (panel) panel.classList.add('active');
+};
+
+// Ensure the Close function is also defined for the UI 'X' button
+window.closeReqSlider = () => {
+    const panel = document.getElementById('req-editor-panel');
+    if (panel) panel.classList.remove('active');
+};
+
+// Add a close helper since your HTML calls window.closeReqSlider()
+window.closeReqSlider = () => {
+    document.getElementById('req-editor-panel').classList.remove('active');
+};
+
+// --- HELPER: KEBAB MENU (Updated to call openReqSlider) ---
+function getKabobMenu(item, type) {
+    const isAdmin = (typeof currentUser !== 'undefined' && currentUser?.role === 'admin');
+    const itemId = type === 'req' ? item.req_id : item.step_id;
+    const sliderFunc = type === 'req' ? 'openReqSlider' : 'openTaskSlider';
+
+    return `
+        <div id="kebab-${type}-${itemId}" class="hidden absolute right-0 mt-1 w-40 bg-white border shadow-lg rounded-md z-[110] py-1">
+            <button onclick="event.stopPropagation(); window.${sliderFunc}('${itemId}')" 
+                class="w-full text-left px-4 py-2 text-xs hover:bg-blue-50">
+                ${isAdmin ? 'Edit Details' : 'View Details'}
+            </button>
+            ${isAdmin ? `<button onclick="event.stopPropagation(); window.delete${type === 'req' ? 'Req' : 'Task'}('${itemId}')" class="w-full text-left px-4 py-2 text-xs text-red-600 hover:bg-red-50">Delete</button>` : ''}
+        </div>
+    `;
+}
+
+// --- HELPER: TOGGLE KEBAB ---
+window.toggleKebab = (id) => {
+    document.querySelectorAll('[id^="kebab-"]').forEach(el => el.classList.add('hidden'));
+    const menu = document.getElementById(`kebab-${id}`);
+    if (menu) menu.classList.remove('hidden');
+};
         
         // Note Loading
         async function loadTaskNotes(taskId) {

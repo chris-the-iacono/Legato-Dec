@@ -673,35 +673,37 @@ window.rollupToRequirement = async (reqId = window.selectedReqId, steps = null) 
         window.closeReqSlider = () => document.getElementById('req-editor-panel').classList.remove('active');
         
         window.openReqSlider = async (id = null) => {
-             // Basic implementation to toggle panel
-             document.getElementById('req-editor-panel').classList.add('active');
-             // (Add population logic here if needed based on ID)
-        };
+    // Basic implementation to toggle panel
+    const panel = document.getElementById('req-editor-panel');
+    if (panel) panel.classList.add('active');
+    // Population logic is handled in the version we refined earlier
+};
 
-        function populateDropdowns() {
-            const members = window.teamMembers || [];
-            ['req-assign-select', 'step-assign-select'].forEach(id => {
-                const el = document.getElementById(id);
-                if (!el) return;
-                el.innerHTML = '<option value="">Select Resource</option>';
-                members.forEach(u => {
-                    const opt = document.createElement('option');
-                    opt.value = u.user_id;
-                    opt.textContent = u.full_name || u.email;
-                    el.appendChild(opt);
-                });
-            });
-        }
+function populateDropdowns() {
+    const members = window.teamMembers || [];
+    ['req-assign-select', 'step-assign-select'].forEach(id => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.innerHTML = '<option value="">Select Resource</option>';
+        members.forEach(u => {
+            const opt = document.createElement('option');
+            opt.value = u.user_id;
+            opt.textContent = u.full_name || u.email;
+            el.appendChild(opt);
+        });
+    });
+}
 
-		window.addRequirement = async () => {
+window.addRequirement = async () => {
     // 1. Pull data
     const title = document.getElementById('req-title-input').value;
     const hours = parseFloat(document.getElementById('req-hours-input').value) || 0;
     const rate = parseFloat(document.getElementById('req-applied-rate').value) || window.projectBlendedRate;
+    const assignee = document.getElementById('req-assign-select').value;
 
     const isUpdate = !!window.selectedReqId;
     
-    // 2. Logic for Versioning (Added 'await' and error handling)
+    // 2. Logic for Versioning
     let nextVersion = 1;
     if (isUpdate) {
         const { data: current, error: fetchError } = await supabase
@@ -716,10 +718,10 @@ window.rollupToRequirement = async (reqId = window.selectedReqId, steps = null) 
     }
 
     // 3. Construct Payload
-    // CRITICAL: We separate 'basePayload' from 'insert-only' fields
     const payload = {
         title: title,
         estimated_hours: hours,
+        assigned_to: assignee,
         custom_rate: rate,
         total_cost: hours * rate,
         version: nextVersion,
@@ -729,16 +731,14 @@ window.rollupToRequirement = async (reqId = window.selectedReqId, steps = null) 
     // 4. Send to Supabase
     let result;
     if (isUpdate) {
-        // Only update the core fields, don't re-send ID/Project/Tenant
         result = await supabase.from('requirements')
             .update(payload)
             .eq('req_id', window.selectedReqId);
     } else {
-        // Insert needs the extra context
         const newRecord = { 
             ...payload, 
             project_id: projectId, 
-            tenant_id: tenantId 
+            tenant_id: tenant_id 
         };
         result = await supabase.from('requirements').insert([newRecord]);
     }
@@ -746,31 +746,27 @@ window.rollupToRequirement = async (reqId = window.selectedReqId, steps = null) 
     // 5. Response Handling
     if (result.error) {
         console.error("Save Error:", result.error);
-        // This alert will help you confirm if columns are missing
-        alert(`Could not save: ${result.error.message}\n\nHint: Ensure 'version' and 'custom_rate' columns exist in Supabase.`);
+        alert(`Could not save: ${result.error.message}`);
     } else {
         alert(`Baseline saved as v${nextVersion}`);
-        window.closeReqSlider();
         
-        // Refresh the list - ensure this function exists to redraw the UI
+        // Update the Task Header if this is the currently selected requirement
+        const titleDisplay = document.getElementById('selected-req-title-display');
+        if (titleDisplay && window.selectedReqId) {
+             titleDisplay.innerText = `2. ${title}`;
+        }
+
+        if (typeof window.closeReqSlider === 'function') window.closeReqSlider();
+        
         if (typeof window.loadRequirements === 'function') {
-            window.loadRequirements(); 
+            await window.loadRequirements(); 
         } else {
-            location.reload(); // Fallback if loadRequirements isn't globally available
+            location.reload();
         }
     }
 };
-        
-        window.closeReqSlider(); // Hide the panel
-        
-        // Optional: If you changed hours manually, you might want to re-calculate health
-        if (window.selectedReqId === id) {
-            document.getElementById('selected-req-title-display').innerText = `2. ${title}`;
-        }
-    //}
-};
 
-        // --- REQUIREMENT LIST ENGINE ---
+// --- REQUIREMENT LIST ENGINE ---
 async function loadRequirements() {
     if (!projectId || !tenantId) return;
 
@@ -789,7 +785,6 @@ async function loadRequirements() {
     if (reqs && list) {
         document.getElementById('req-count').innerText = `${reqs.length} ITEMS`;
         list.innerHTML = reqs.map(req => {
-            // Use schema: total_cost (with fallback)
             const displayTotal = req.total_cost || (parseFloat(req.estimated_hours) * (parseFloat(req.custom_rate) || 0));
             const menuHtml = (typeof getKabobMenu === 'function') ? getKabobMenu(req, 'req') : '';
             

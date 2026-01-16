@@ -297,44 +297,48 @@ if (myProfile) {
         // 2. CORE FUNCTIONS (ATTACHED TO WINDOW)
 		// NEW FUNCTION FOR STEP REFRESH 1/13
         window.selectRequirement = async (id) => {
-    // 1. Guard against empty or invalid IDs
-    if (!id || id === 'undefined' || id === 'null') {
-        console.warn("Requirement selection aborted: Invalid ID provided.");
+    // 1. Sanitize and Validate UUID format
+    const cleanId = String(id).trim().replace(/['"]/g, ''); // Remove accidental quotes
+    
+    // Regex to check for standard UUID format
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    
+    if (!uuidRegex.test(cleanId)) {
+        console.error("Selection Blocked: ID is not a valid UUID format.", cleanId);
         return;
     }
 
-    // Force ID to the correct format for the query
-    // If your req_id is an integer, use Number(id). If it's a UUID, use String(id).
-    const queryId = isNaN(id) ? String(id).trim() : Number(id);
-    
-    console.log("Requirement clicked. Querying for ID:", queryId);
-    window.selectedReqId = queryId;
+    console.log("Requirement clicked. Valid UUID:", cleanId);
+    window.selectedReqId = cleanId;
 
     // 2. Fetch Latest Metadata
     const { data: reqData, error } = await supabase
         .from('requirements')
         .select('name, version_number, total_budget')
-        .eq('req_id', queryId)
+        .eq('req_id', cleanId)
         .single();
 
     if (error) {
-        console.error("Error fetching requirement metadata:", error);
-        // If 400 persists, it confirms queryId type mismatch (e.g. sending string to int column)
+        console.error("Supabase Metadata Error:", error);
         return; 
     }
 
-    // 3. Update UI Header
+    // 3. Update UI Header with Version and Budget
     const headerEl = document.getElementById('selected-req-title-display');
     const versionEl = document.getElementById('req-version-display'); 
     const budgetEl = document.getElementById('selected-req-budget-display'); 
 
-    if (reqData) {
-        if (headerEl) headerEl.innerText = `Tasks for: ${reqData.name}`;
-        if (versionEl) versionEl.innerText = reqData.version_number || '1';
-        if (budgetEl) {
-            const amount = reqData.total_budget || 0;
-            budgetEl.innerText = `$${amount.toLocaleString()}`;
-        }
+    if (headerEl && reqData) {
+        headerEl.innerText = `Tasks for: ${reqData.name}`;
+    }
+
+    if (versionEl) {
+        versionEl.innerText = reqData?.version_number || '1';
+    }
+
+    if (budgetEl) {
+        const amount = reqData?.total_budget || 0;
+        budgetEl.innerText = `$${amount.toLocaleString()}`;
     }
 
     // 4. Enable Add Button
@@ -357,8 +361,8 @@ if (myProfile) {
     // 6. Apply Highlight
     document.querySelectorAll('.req-row').forEach(row => {
         row.classList.remove('active-req'); 
-        const rowId = row.getAttribute('data-id');
-        if (String(rowId) === String(queryId)) {
+        const rowId = String(row.getAttribute('data-id')).trim().replace(/['"]/g, '');
+        if (rowId === cleanId) {
             row.classList.add('active-req'); 
         }
     });

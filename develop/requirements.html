@@ -297,43 +297,67 @@ if (myProfile) {
         // 2. CORE FUNCTIONS (ATTACHED TO WINDOW)
 		// NEW FUNCTION FOR STEP REFRESH 1/13
         window.selectRequirement = async (id) => {
-            // FIX: Force ID to string and trim to prevent mismatch
-            const cleanId = String(id).trim();
-            console.log("Requirement clicked ID:", cleanId);
-            window.selectedReqId = cleanId;
+    // 1. Force ID to string and trim to prevent mismatch
+    const cleanId = String(id).trim();
+    console.log("Requirement clicked ID:", cleanId);
+    window.selectedReqId = cleanId;
 
-            // Update UI Header
-            const rowEl = document.querySelector(`.req-row[data-id="${cleanId}"]`);
-            const title = rowEl?.getAttribute('data-title') || "Tasks";
-            const headerEl = document.getElementById('selected-req-title-display');
-            if (headerEl) headerEl.innerText = `2. Tasks for: ${title}`;
+    // 2. Fetch Latest Metadata from Database (New columns: version_number, total_budget)
+    const { data: reqData, error } = await supabase
+        .from('requirements')
+        .select('name, version_number, total_budget')
+        .eq('req_id', cleanId)
+        .single();
 
-            // FIX: Enable Add Button
-            const addTaskBtn = document.getElementById('add-task-btn');
-            if (addTaskBtn) {
-                addTaskBtn.disabled = false;
-                addTaskBtn.style.pointerEvents = 'auto';
-                addTaskBtn.classList.remove('opacity-50', 'cursor-not-allowed');
-            }
+    if (error) {
+        console.error("Error fetching requirement metadata:", error);
+    }
 
-            // Refresh Tasks
-            if (typeof refreshSteps === 'function') {
-                try {
-                    await refreshSteps();
-                } catch (refreshError) {
-                    console.error("Critical failure during refreshSteps:", refreshError);
-                }
-            }
+    // 3. Update UI Header with Version and Budget
+    const headerEl = document.getElementById('selected-req-title-display');
+    const versionEl = document.getElementById('req-version-display'); // In the Requirement Slider or Header
+    const budgetEl = document.getElementById('selected-req-budget-display'); // Header budget display
 
-            // FIX: Apply Highlight (Last step to prevent overwrite)
-            document.querySelectorAll('.req-row').forEach(row => {
-                row.classList.remove('active-req'); // Clean up old highlights
-                if (String(row.getAttribute('data-id')).trim() === cleanId) {
-                    row.classList.add('active-req'); // Apply new highlight
-                }
-            });
-        };
+    if (headerEl && reqData) {
+        headerEl.innerText = `Tasks for: ${reqData.name}`;
+    }
 
+    // Update Version display if the element exists
+    if (versionEl) {
+        versionEl.innerText = reqData?.version_number || '1';
+    }
+
+    // Update Budget display if the element exists
+    if (budgetEl) {
+        const amount = reqData?.total_budget || 0;
+        budgetEl.innerText = `$${amount.toLocaleString()}`;
+    }
+
+    // 4. FIX: Enable Add Button
+    const addTaskBtn = document.getElementById('add-task-btn');
+    if (addTaskBtn) {
+        addTaskBtn.disabled = false;
+        addTaskBtn.style.pointerEvents = 'auto';
+        addTaskBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+    }
+
+    // 5. Refresh Tasks
+    if (typeof refreshSteps === 'function') {
+        try {
+            await refreshSteps();
+        } catch (refreshError) {
+            console.error("Critical failure during refreshSteps:", refreshError);
+        }
+    }
+
+    // 6. FIX: Apply Highlight (Last step to prevent overwrite)
+    document.querySelectorAll('.req-row').forEach(row => {
+        row.classList.remove('active-req'); 
+        if (String(row.getAttribute('data-id')).trim() === cleanId) {
+            row.classList.add('active-req'); 
+        }
+    });
+};
   window.refreshSteps = async () => {
     const reqId = window.selectedReqId;
     if (!reqId) return;
@@ -1000,10 +1024,10 @@ window.openReqSlider = async (id = null) => {
         
         // Fetch extended data including the new columns from our SQL migration
         const { data: req } = await supabase
-            .from('requirements')
-            .select('*')
-            .eq('id', id) // Switched to 'id' per your table schema description
-            .single();
+    .from('requirements')
+    .select('*')
+    .eq('id', id) // This is the error
+    .single();
         
         if (req) {
             titleInput.value = req.name || ''; // Mapping 'name' from your SQL schema

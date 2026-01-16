@@ -297,43 +297,47 @@ if (myProfile) {
         // 2. CORE FUNCTIONS (ATTACHED TO WINDOW)
 		// NEW FUNCTION FOR STEP REFRESH 1/13
         window.selectRequirement = async (id) => {
-    // 1. Force ID to string and trim to prevent mismatch
-    const cleanId = String(id).trim();
-    console.log("Requirement clicked ID:", cleanId);
-    window.selectedReqId = cleanId;
+    // 1. Guard against empty or invalid IDs
+    if (!id || id === 'undefined' || id === 'null') {
+        console.warn("Requirement selection aborted: Invalid ID provided.");
+        return;
+    }
 
-    // 2. Fetch Latest Metadata from Database (New columns: version_number, total_budget)
+    // Force ID to the correct format for the query
+    // If your req_id is an integer, use Number(id). If it's a UUID, use String(id).
+    const queryId = isNaN(id) ? String(id).trim() : Number(id);
+    
+    console.log("Requirement clicked. Querying for ID:", queryId);
+    window.selectedReqId = queryId;
+
+    // 2. Fetch Latest Metadata
     const { data: reqData, error } = await supabase
         .from('requirements')
         .select('name, version_number, total_budget')
-        .eq('req_id', cleanId)
+        .eq('req_id', queryId)
         .single();
 
     if (error) {
         console.error("Error fetching requirement metadata:", error);
+        // If 400 persists, it confirms queryId type mismatch (e.g. sending string to int column)
+        return; 
     }
 
-    // 3. Update UI Header with Version and Budget
+    // 3. Update UI Header
     const headerEl = document.getElementById('selected-req-title-display');
-    const versionEl = document.getElementById('req-version-display'); // In the Requirement Slider or Header
-    const budgetEl = document.getElementById('selected-req-budget-display'); // Header budget display
+    const versionEl = document.getElementById('req-version-display'); 
+    const budgetEl = document.getElementById('selected-req-budget-display'); 
 
-    if (headerEl && reqData) {
-        headerEl.innerText = `Tasks for: ${reqData.name}`;
+    if (reqData) {
+        if (headerEl) headerEl.innerText = `Tasks for: ${reqData.name}`;
+        if (versionEl) versionEl.innerText = reqData.version_number || '1';
+        if (budgetEl) {
+            const amount = reqData.total_budget || 0;
+            budgetEl.innerText = `$${amount.toLocaleString()}`;
+        }
     }
 
-    // Update Version display if the element exists
-    if (versionEl) {
-        versionEl.innerText = reqData?.version_number || '1';
-    }
-
-    // Update Budget display if the element exists
-    if (budgetEl) {
-        const amount = reqData?.total_budget || 0;
-        budgetEl.innerText = `$${amount.toLocaleString()}`;
-    }
-
-    // 4. FIX: Enable Add Button
+    // 4. Enable Add Button
     const addTaskBtn = document.getElementById('add-task-btn');
     if (addTaskBtn) {
         addTaskBtn.disabled = false;
@@ -350,10 +354,11 @@ if (myProfile) {
         }
     }
 
-    // 6. FIX: Apply Highlight (Last step to prevent overwrite)
+    // 6. Apply Highlight
     document.querySelectorAll('.req-row').forEach(row => {
         row.classList.remove('active-req'); 
-        if (String(row.getAttribute('data-id')).trim() === cleanId) {
+        const rowId = row.getAttribute('data-id');
+        if (String(rowId) === String(queryId)) {
             row.classList.add('active-req'); 
         }
     });

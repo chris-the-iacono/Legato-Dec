@@ -102,65 +102,97 @@
         });
 
         async function loadProjects() {
-            // In loadProjects()
-const { data: projects, error } = await supabase
-    .from('projects')
-    .select(`
-        id, name, status, tenant_id,
-        requirements (steps (cost, is_active))
-    `)
-    .eq('tenant_id', sessionData.tenantId);
+    // 1. Expanded Query to get created_at (for Start Date) and status (for Burn/Balance)
+    const { data: projects, error } = await supabase
+        .from('projects')
+        .select(`
+            id, name, title, status, tenant_id, blended_rate, budget_actual,
+            requirements (
+                id, 
+                created_at, 
+                totalBudget,
+                steps (cost, is_active, status)
+            )
+        `)
+        .eq('tenant_id', sessionData.tenantId);
 
-            if (error) {
-                projectContainer.innerHTML = `<p class="text-red-500">Error: ${error.message}</p>`;
-                return;
-            }
+    if (error) {
+        document.getElementById('project-list').innerHTML = `<p class="text-red-500">${error.message}</p>`;
+        return;
+    }
 
-            if (!projects || projects.length === 0) {
-                projectContainer.innerHTML = `<div class="col-span-full text-center py-12 bg-white rounded-lg border-2 border-dashed border-gray-300 text-gray-500 italic">No projects found.</div>`;
-                return;
-            }
+    renderProjectCards(projects);
+}
 
-            renderProjectCards(projects);
-        }
-
-        function renderProjectCards(projects) {
+function renderProjectCards(projects) {
     const projectContainer = document.getElementById('project-list');
-    
-    // Check if the current user is an admin
-    // This assumes sessionData contains your user's role
     const isAdmin = sessionData.role === 'admin';
 
     projectContainer.innerHTML = projects.map(project => {
-        const totalCost = project.requirements?.reduce((acc, req) => {
-            const stepSum = req.steps?.filter(s => s.is_active).reduce((sum, s) => sum + (s.cost || 0), 0);
-            return acc + (stepSum || 0);
+        // A. CALC START DATE: Find earliest requirements.created_at
+        const dates = project.requirements?.map(r => new Date(r.created_at)) || [];
+        const startDate = dates.length ? new Date(Math.min(...dates)).toLocaleDateString() : 'Not Started';
+
+        // B. CALC ESTIMATED COST: Sum of requirement-level rollups
+        const estCost = project.requirements?.reduce((sum, r) => sum + (r.totalBudget || 0), 0) || 0;
+
+        // C. CALC ACTUAL COST & BURN: (Assumes 'Done' tasks = Actual Spend)
+        const actualCost = project.requirements?.reduce((acc, req) => {
+            const doneSum = req.steps?.filter(s => s.is_active && s.status === 'Done')
+                                     .reduce((sum, s) => sum + (s.cost || 0), 0);
+            return acc + (doneSum || 0);
         }, 0) || 0;
 
-        // Create the button only if the user is an admin
-        const inviteBtn = isAdmin ? `
-            <div class="mt-4 pt-4 border-t border-gray-100">
-                <button onclick="event.stopPropagation(); openInviteModal('${project.tenant_id}')" 
-                        class="w-full text-center px-3 py-2 bg-gray-50 text-indigo-600 text-xs font-bold rounded hover:bg-indigo-50 transition-colors border border-dashed border-indigo-200">
-                    + ADD TEAM MEMBER
-                </button>
-            </div>
-        ` : '';
+        const burnPercent = estCost > 0 ? Math.round((actualCost / estCost) * 100) : 0;
+        const balance = estCost - actualCost;
 
         return `
-            <div class="bg-white shadow rounded-lg border border-gray-200 hover:shadow-md transition cursor-pointer" 
+            <div class="bg-white shadow rounded-xl border border-gray-200 overflow-hidden hover:ring-2 hover:ring-indigo-500 transition cursor-pointer" 
                  onclick="openProject('${project.id}', '${project.name}')">
-                <div class="px-4 py-5 sm:p-6">
-                    <div class="flex items-center justify-between mb-2">
-                        <h3 class="text-lg font-bold text-gray-900">${project.name}</h3>
-                        <span class="px-2 py-0.5 text-xs font-bold rounded-full bg-indigo-50 text-indigo-700 uppercase border border-indigo-100">
-                            ${project.status}
-                        </span>
+                <div class="p-6">
+                    <div class="flex justify-between items-start mb-4">
+                        <div>
+                            <h3 class="text-xl font-bold text-gray-900">${project.name}</h3>
+                            <p class="text-xs text-gray-400 font-medium uppercase tracking-wider">${project.title || 'No Title'}</p>
+                        </div>
+                        <span class="text-[10px] font-bold px-2 py-1 rounded bg-indigo-50 text-indigo-700 border border-indigo-100">${project.status}</span>
                     </div>
-                    <p class="text-sm text-gray-500 mb-1">Total Estimate</p>
-                    <p class="text-2xl font-black text-indigo-600">$${totalCost.toLocaleString()}</p>
-                    
-                    ${inviteBtn}
+
+                    <div class="grid grid-cols-2 gap-4 mb-6">
+                        <div>
+                            <p class="text-[10px] text-gray-400 uppercase font-bold">Start Date</p>
+                            <p class="text-sm font-semibold text-gray-700">${startDate}</p>
+                        </div>
+                        <div class="text-right">
+                            <p class="text-[10px] text-gray-400 uppercase font-bold">Burn Rate</p>
+                            <p class="text-sm font-bold text-orange-600">${burnPercent}%</p>
+                        </div>
+                    </div>
+
+                    <div class="space-y-3">
+                        <div class="flex justify-between items-end">
+                            <span class="text-xs text-gray-500">Estimated</span>
+                            <span class="font-mono font-bold text-gray-900">$${estCost.toLocaleString()}</span>
+                        </div>
+                        <div class="flex justify-between items-end">
+                            <span class="text-xs text-gray-500">Actual (Burned)</span>
+                            <span class="font-mono font-bold text-red-600">$${actualCost.toLocaleString()}</span>
+                        </div>
+                        <div class="pt-2 border-t flex justify-between items-end">
+                            <span class="text-xs font-bold text-gray-400 uppercase">Balance Remaining</span>
+                            <span class="font-mono font-bold text-green-600">$${balance.toLocaleString()}</span>
+                        </div>
+                    </div>
+
+                    ${isAdmin ? `
+                        <button onclick="event.stopPropagation(); openInviteModal('${project.tenant_id}')" 
+                                class="mt-6 w-full py-2 text-[10px] font-black text-indigo-600 border border-dashed border-indigo-200 rounded-lg hover:bg-indigo-50 transition">
+                            + MANAGE TEAM
+                        </button>
+                    ` : ''}
+                </div>
+                <div class="h-1 bg-gray-100 w-full">
+                    <div class="h-1 bg-indigo-500" style="width: ${burnPercent}%"></div>
                 </div>
             </div>`;
     }).join('');

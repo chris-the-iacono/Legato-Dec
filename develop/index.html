@@ -91,9 +91,10 @@
             }
         });
 
-        async function loadProjects() {
+        //async function loadProjects() {
     // 1/16 @ 2:07 PM - We use req_id specifically and ensure the join is clean/
-	    // Fetch Projects first
+async function loadProjects() {
+    // Fetch Projects first
     const { data: projects, error: pError } = await supabase
         .from('projects')
         .select('*')
@@ -111,7 +112,8 @@
     }
 
     renderProjectCards(projects);
-}
+}	    
+//}
 
         function renderProjectCards(projects) {
             const projectContainer = document.getElementById('project-list');

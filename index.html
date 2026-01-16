@@ -62,9 +62,9 @@
     </div>
 
     <script type="module">
-        import { supabase } from '/js/config.js';
-        import { checkAccess } from '/js/auth.js';
-        import { renderProjectHeader } from '/js/components.js';
+        import { supabase } from './js/config.js';
+        import { checkAccess } from './js/auth.js';
+        import { renderProjectHeader } from './js/components.js';
 
         let sessionData = null;
 
@@ -91,39 +91,53 @@
             }
         });
 
-        //async function loadProjects() {
-    // 1/16 @ 2:07 PM - We use req_id specifically and ensure the join is clean/
-async function loadProjects() {
-    // Fetch Projects first
-    const { data: projects, error: pError } = await supabase
-        .from('projects')
-        .select('*')
-        .eq('tenant_id', sessionData.tenant_id || sessionData.tenantId);
+        async function loadProjects() {
+            const container = document.getElementById('project-list');
+            const tId = sessionData.tenant_id || sessionData.tenantId;
 
-    if (pError) return console.error(pError);
+            // 1. Fetch Projects first (No join to avoid requirements_1.id error)
+            const { data: projects, error: pError } = await supabase
+                .from('projects')
+                .select('*')
+                .eq('tenant_id', tId);
 
-    // Fetch Requirements separately to avoid the join error
-    for (let proj of projects) {
-        const { data: reqs } = await supabase
-            .from('requirements')
-            .select('req_id, created_at, total_budget, steps(cost, is_active, status)')
-            .eq('project_id', proj.id);
-        proj.requirements = reqs || [];
-    }
+            if (pError) {
+                console.error("Project Load Error:", pError);
+                container.innerHTML = `<p class="text-red-500">${pError.message}</p>`;
+                return;
+            }
 
-    renderProjectCards(projects);
-}	    
-//}
+            // 2. Fetch Requirements for each project separately (The Fail-Safe)
+            for (let proj of projects) {
+                const { data: reqs, error: rError } = await supabase
+                    .from('requirements')
+                    .select('req_id, created_at, total_budget, steps(cost, is_active, status)')
+                    .eq('project_id', proj.id);
+                
+                if (!rError) {
+                    proj.requirements = reqs || [];
+                } else {
+                    console.error(`Req Load Error for Project ${proj.id}:`, rError);
+                    proj.requirements = [];
+                }
+            }
+
+            renderProjectCards(projects);
+        }
 
         function renderProjectCards(projects) {
             const projectContainer = document.getElementById('project-list');
             const isAdmin = sessionData.role === 'admin';
 
+            if (!projects.length) {
+                projectContainer.innerHTML = `<p class="text-gray-500 col-span-full text-center py-10">No projects found.</p>`;
+                return;
+            }
+
             projectContainer.innerHTML = projects.map(project => {
                 const dates = project.requirements?.map(r => new Date(r.created_at)) || [];
                 const startDate = dates.length ? new Date(Math.min(...dates)).toLocaleDateString() : 'Not Started';
 
-                // FIXED: Property name total_budget
                 const estCost = project.requirements?.reduce((sum, r) => sum + (r.total_budget || 0), 0) || 0;
 
                 const actualCost = project.requirements?.reduce((acc, req) => {

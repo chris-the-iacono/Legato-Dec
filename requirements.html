@@ -464,6 +464,16 @@ if (myProfile) {
 
 // --- UPDATED TILE DRAG AND DROP ---
 window.initSortable = () => {
+    // RBAC GUARD: Only Admin, Project Manager, and Team Leader can drag
+    const canSort = ['admin', 'project_manager', 'team_leader'].includes(window.sessionData?.role);
+    
+    if (!canSort) {
+        console.log("RBAC: Sorting disabled for current role.");
+        // We hide the drag handles via CSS (see step 2 below)
+        document.body.classList.add('hide-drag-handles');
+        return;
+    }
+
     const reqList = document.getElementById('req-list');
     if (reqList && typeof Sortable !== 'undefined') {
         if (reqList.sortable) reqList.sortable.destroy();
@@ -476,13 +486,11 @@ window.initSortable = () => {
 
     const stepList = document.getElementById('step-list');
     if (stepList && typeof Sortable !== 'undefined') {
-        // Destroy old instance to prevent "ghosting"
         if (stepList.sortable) stepList.sortable.destroy();
-        
         stepList.sortable = new Sortable(stepList, {
             animation: 150,
             handle: '.cursor-move', 
-            draggable: '.task-card', // Explicitly target the class
+            draggable: '.task-card', 
             ghostClass: 'bg-blue-50',
             onEnd: () => window.saveOrder('steps', stepList)
         });
@@ -490,6 +498,13 @@ window.initSortable = () => {
 };
 
 window.saveOrder = async (table, container) => {
+    // DATABASE SECURITY GUARD: Final check before hitting Supabase
+    const canSort = ['admin', 'project_manager', 'team_leader'].includes(window.sessionData?.role);
+    if (!canSort) {
+        alert("You do not have permission to reorder items.");
+        return;
+    }
+
     const items = Array.from(container.querySelectorAll('[data-id]'));
     const idField = (table === 'requirements') ? 'req_id' : 'step_id';
 
@@ -497,7 +512,6 @@ window.saveOrder = async (table, container) => {
 
     try {
         // STEP 1: Move to negative numbers to clear the unique constraint "slots"
-        // This ensures we don't get the "409 Conflict" or "Unique Constraint" error
         for (let [index, el] of items.entries()) {
             const id = el.getAttribute('data-id');
             await supabase.from(table)
@@ -506,7 +520,6 @@ window.saveOrder = async (table, container) => {
         }
 
         // STEP 2: Move to final positive sequence (10, 20, 30...)
-        // Now that the positive slots are empty, the database will allow these updates
         for (let [index, el] of items.entries()) {
             const id = el.getAttribute('data-id');
             const newOrder = (index + 1) * 10;

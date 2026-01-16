@@ -219,14 +219,13 @@
         </div>
     </section>
 
-    <script type="module">
-	// Added this comment so this file can be re-deployed. 
+    <script type="module"> 
         import { supabase, MODULES } from './js/config.js';
         import { checkAccess } from './js/auth.js';
         import { renderProjectHeader } from './js/components.js';
 
-        let currentUser = null;
-        let projectId = new URLSearchParams(window.location.search).get('id');
+        // We will use window.sessionData globally
+let projectId = new URLSearchParams(window.location.search).get('id');
         let tenantId = null; 
         window.selectedReqId = null; // Ensuring global scope
         window.selectedStepId = null;
@@ -263,14 +262,16 @@
             window.teamMembers = profiles || [];
             
             const myProfile = window.teamMembers.find(p => p.user_id === user.id);
-            if (myProfile) {
-                currentUser = {
-                    id: user.id,
-                    role: myProfile.role,
-                    full_name: myProfile.full_name
-                };
-                tenantId = myProfile.tenant_id;
-            }
+if (myProfile) {
+    // Standardizing the global session object
+    window.sessionData = {
+        user_id: user.id, // Using user_id for consistency with profile table
+        role: myProfile.role,
+        full_name: myProfile.full_name,
+        tenantId: myProfile.tenant_id
+    };
+    tenantId = myProfile.tenant_id;
+}
             
             populateDropdowns();
             
@@ -290,7 +291,7 @@
             loadRequirements();
             if (typeof initSortable === 'function') initSortable();
 
-            console.log("App initialized for:", currentUser?.full_name);
+            console.log("App initialized for:", window.sessionData?.full_name);
         });
 
         // 2. CORE FUNCTIONS (ATTACHED TO WINDOW)
@@ -505,9 +506,14 @@ window.rollupToRequirement = async (reqId = window.selectedReqId, steps = null) 
     let tasks = steps;
     if (!tasks) {
         // Fetch using requirement_id (foreign key)
-        const { data } = await supabase.from('steps')
+        const { data, error: fetchError } = await supabase.from('steps')
             .select('estimated_hours, cost, assigned_to')
             .eq('requirement_id', reqId);
+        
+        if (fetchError) {
+            console.error("Error fetching steps for rollup:", fetchError);
+            return;
+        }
         tasks = data || [];
     }
 
@@ -519,7 +525,8 @@ window.rollupToRequirement = async (reqId = window.selectedReqId, steps = null) 
         const hours = parseFloat(s.estimated_hours) || 0;
         let taskCost = parseFloat(s.cost) || 0;
 
-        // Fallback Calculation logic preserved
+        // Fallback Calculation logic preserved: 
+        // If task cost is 0, calculate based on user hourly cost or project blended rate
         if (taskCost === 0 && hours > 0) {
             const user = members.find(m => m.user_id === s.assigned_to);
             const effectiveRate = (user && parseFloat(user.hourly_cost) > 0) 
@@ -531,21 +538,29 @@ window.rollupToRequirement = async (reqId = window.selectedReqId, steps = null) 
         totalHours += hours;
     });
 
-    // Update Database using schema names: estimated_hours and total_cost
+    // UPDATED: Sync to Database using NEW schema column names
+    // We map 'total_cost' from UI logic to 'total_budget' in the SQL table
     const { error } = await supabase.from('requirements')
         .update({ 
-            estimated_hours: totalHours, // Corrected from total_hours
-            total_cost: calculatedTotalCost,
+            estimated_hours: totalHours, 
+            total_budget: calculatedTotalCost, // Changed from total_cost to match SQL migration
             updated_at: new Date().toISOString()
         })
         .eq('req_id', reqId);
 
     if (!error) {
-        console.log(`Rollup Sync: ${totalHours}h | $${calculatedTotalCost}`);
+        console.log(`Rollup Sync Success: ${totalHours}h | $${calculatedTotalCost}`);
         
-        // Refresh the Requirements list to update the tile on the left
+        // Refresh the Requirements list to update the tile on the left 
+        // and ensure the Project Dashboard (index.html) sees the latest total_budget
         if (typeof window.loadRequirements === 'function') {
-            window.loadRequirements();
+            await window.loadRequirements();
+        }
+
+        // Update the Requirement Header in the Task List view if active
+        const totalBudgetDisplay = document.getElementById('selected-req-budget-display');
+        if (totalBudgetDisplay) {
+            totalBudgetDisplay.innerText = `$${calculatedTotalCost.toLocaleString()}`;
         }
     } else {
         console.error("Rollup Update Error:", error.message);
@@ -560,8 +575,8 @@ window.rollupToRequirement = async (reqId = window.selectedReqId, steps = null) 
     const titleEl = document.getElementById('task-editor-title');
     const btnEl = document.getElementById('task-save-btn');
     
-    // Permissions Check
-    const isAdmin = currentUser?.role === 'admin';
+    // Permissions Check (Standardized)
+const isAdmin = window.sessionData?.role === 'admin';
     document.querySelectorAll('[data-admin-only]').forEach(el => {
         el.disabled = !isAdmin;
         if(!isAdmin) el.classList.add('bg-gray-100', 'cursor-not-allowed');
@@ -635,54 +650,112 @@ window.rollupToRequirement = async (reqId = window.selectedReqId, steps = null) 
 };
 
         window.submitStep = async () => {
-            if (!window.selectedReqId) return alert("Select a requirement first.");
-            
-            const title = document.getElementById('step-title-input')?.value.trim();
-            const assignedId = document.getElementById('step-assign-select')?.value;
-            const hours = parseFloat(document.getElementById('step-hours-input')?.value) || 0;
-            const cost = parseFloat(document.getElementById('step-cost-input')?.value) || 0;
+    // 1. Validation & Pre-checks
+    if (!window.selectedReqId) return alert("Select a requirement first.");
+    
+    const title = document.getElementById('step-title-input')?.value.trim();
+    const assignedId = document.getElementById('step-assign-select')?.value;
+    const hours = parseFloat(document.getElementById('step-hours-input')?.value) || 0;
+    
+    if (!title || !assignedId || hours <= 0) {
+        return alert("Fill all required fields (Title, Assignee, and Hours > 0).");
+    }
 
-            if (!title || !assignedId || hours <= 0) return alert("Fill all required fields.");
+    // 2. MATH LOGIC: Calculate cost based on the assigned user's rate
+    const assignedUser = (window.teamMembers || []).find(m => m.user_id === assignedId);
+    const effectiveRate = (assignedUser && parseFloat(assignedUser.hourly_cost) > 0) 
+        ? parseFloat(assignedUser.hourly_cost) 
+        : (window.projectBlendedRate || 0);
+    
+    const calculatedCost = hours * effectiveRate;
 
-            // Get Next Order
-            const { data: existing } = await supabase.from('steps').select('sequence_order').eq('requirement_id', window.selectedReqId).order('sequence_order', {ascending:false}).limit(1);
-            const nextOrder = (existing?.[0]?.sequence_order || 0) + 10;
+    // 3. SEQUENCE LOGIC: Get Next Order (Maintains drag-and-drop position)
+    const { data: existing } = await supabase
+        .from('steps')
+        .select('sequence_order')
+        .eq('requirement_id', window.selectedReqId)
+        .order('sequence_order', { ascending: false })
+        .limit(1);
+    
+    const nextOrder = (existing?.[0]?.sequence_order || 0) + 10;
 
-            const { data: newStep, error } = await supabase.from('steps').insert([{
-                requirement_id: window.selectedReqId,
-                tenant_id: tenantId,
-                title: title,
-                assigned_to: assignedId,
-                estimated_hours: hours,
-                cost: cost,
-                sequence_order: nextOrder
-            }]).select().single();
+    // 4. PERSISTENCE: Save to Supabase 'steps' table
+    const { data: newStep, error } = await supabase.from('steps').insert([{
+        requirement_id: window.selectedReqId,
+        tenant_id: window.sessionData?.tenantId || tenantId,
+        title: title,
+        assigned_to: assignedId,
+        estimated_hours: hours,
+        cost: calculatedCost, // Persists the calculated math
+        sequence_order: nextOrder,
+        status: 'pending'
+    }]).select().single();
 
-            if (error) return alert("Save failed: " + error.message);
+    if (error) return alert("Save failed: " + error.message);
 
-            // Initial Note
-            await supabase.from('task_notes').insert([{ task_id: newStep.step_id, user_id: currentUser?.id, content: "Task created." }]);
-            
-            window.closeTaskSlider();
-            await window.refreshSteps();
-        };
+    // 5. AUDIT LOG: Create initial note using standardized sessionData
+    await supabase.from('task_notes').insert([{ 
+        task_id: newStep.step_id, 
+        user_id: window.sessionData?.user_id, 
+        content: `Task created. Budgeted at $${calculatedCost.toLocaleString()} (${hours}h @ $${effectiveRate}/h)` 
+    }]);
+
+    // 6. SYNC: Close UI, trigger requirement-level rollup, and refresh list
+    window.closeTaskSlider();
+    
+    // Update the main Requirement total_budget column in the database
+    await window.rollupToRequirement(window.selectedReqId);
+    
+    // Refresh the task list UI
+    if (typeof window.refreshSteps === 'function') {
+        await window.refreshSteps();
+    } else if (typeof loadSteps === 'function') {
+        await loadSteps(window.selectedReqId);
+    }
+};
 
         window.updateStep = async (id) => {
-            const title = document.getElementById('step-title-input')?.value.trim();
-            const assignedId = document.getElementById('step-assign-select')?.value;
-            const hours = parseFloat(document.getElementById('step-hours-input')?.value) || 0;
-            const cost = parseFloat(document.getElementById('step-cost-input')?.value) || 0;
+    // 1. Pull current values from the Step Editor UI
+    const title = document.getElementById('step-title-input')?.value.trim();
+    const assignedId = document.getElementById('step-assign-select')?.value;
+    const hours = parseFloat(document.getElementById('step-hours-input')?.value) || 0;
 
-            const { error } = await supabase.from('steps').update({
-                title, assigned_to: assignedId, estimated_hours: hours, cost, updated_at: new Date().toISOString()
-            }).eq('step_id', id);
+    // 2. MATH LOGIC: Recalculate cost in case assignee or hours changed
+    const assignedUser = (window.teamMembers || []).find(m => m.user_id === assignedId);
+    const effectiveRate = (assignedUser && parseFloat(assignedUser.hourly_cost) > 0) 
+        ? parseFloat(assignedUser.hourly_cost) 
+        : (window.projectBlendedRate || 0);
+    
+    const calculatedCost = hours * effectiveRate;
 
-            if (error) return alert("Update failed: " + error.message);
+    // 3. PERSISTENCE: Update the 'steps' table
+    const { error } = await supabase.from('steps').update({
+        title: title,
+        assigned_to: assignedId,
+        estimated_hours: hours,
+        cost: calculatedCost, // Update with the newly calculated math
+        updated_at: new Date().toISOString()
+    }).eq('step_id', id);
 
-            await appendNoteToActivity(id, `Baseline updated: ${hours}h / $${cost}`);
-            window.closeTaskSlider();
-            await window.refreshSteps();
-        };
+    if (error) return alert("Update failed: " + error.message);
+
+    // 4. AUDIT LOG: Use your existing helper with standardized text
+    // Note: sessionData is handled inside appendNoteToActivity now
+    await appendNoteToActivity(id, `Baseline updated: ${hours}h @ $${effectiveRate}/h (Total: $${calculatedCost.toLocaleString()})`);
+
+    // 5. SYNC: Close UI, trigger requirement-level rollup, and refresh list
+    window.closeTaskSlider();
+    
+    // Crucial: Update the main Requirement's total_budget in the database
+    await window.rollupToRequirement(window.selectedReqId);
+
+    // Refresh the task list UI
+    if (typeof window.refreshSteps === 'function') {
+        await window.refreshSteps();
+    } else if (typeof loadSteps === 'function') {
+        await loadSteps(window.selectedReqId);
+    }
+};
 
         // --- SUPPORTING FUNCTIONS ---
         window.closeTaskSlider = () => document.getElementById('task-editor-panel').classList.remove('active');
@@ -1001,7 +1074,10 @@ window.closeReqSlider = () => {
 
 // --- HELPER: KEBAB MENU (Updated to call openReqSlider) ---
 function getKabobMenu(item, type) {
-    const isAdmin = (typeof currentUser !== 'undefined' && currentUser?.role === 'admin');
+    // STANDARDIZED: Using sessionData to match our enterprise role-checking pattern
+    const isAdmin = window.sessionData?.role === 'admin';
+    
+    // Safety check: handle the different ID names between tables
     const itemId = type === 'req' ? item.req_id : item.step_id;
     const sliderFunc = type === 'req' ? 'openReqSlider' : 'openTaskSlider';
 
@@ -1011,7 +1087,11 @@ function getKabobMenu(item, type) {
                 class="w-full text-left px-4 py-2 text-xs hover:bg-blue-50">
                 ${isAdmin ? 'Edit Details' : 'View Details'}
             </button>
-            ${isAdmin ? `<button onclick="event.stopPropagation(); window.delete${type === 'req' ? 'Req' : 'Task'}('${itemId}')" class="w-full text-left px-4 py-2 text-xs text-red-600 hover:bg-red-50">Delete</button>` : ''}
+            ${isAdmin ? `
+                <button onclick="event.stopPropagation(); window.delete${type === 'req' ? 'Req' : 'Task'}('${itemId}')" 
+                    class="w-full text-left px-4 py-2 text-xs text-red-600 hover:bg-red-50">
+                    Delete
+                </button>` : ''}
         </div>
     `;
 }
@@ -1038,9 +1118,13 @@ window.toggleKebab = (id) => {
         }
         
         async function appendNoteToActivity(taskId, content) {
-            if (!taskId || !content) return;
-            await supabase.from('task_notes').insert([{ task_id: taskId, user_id: currentUser?.id, content: content }]);
-        }
+    if (!taskId || !content) return;
+    await supabase.from('task_notes').insert([{ 
+        task_id: taskId, 
+        user_id: window.sessionData?.user_id, 
+        content: content 
+    }]);
+}
         
         // --- END OF SCRIPT ---
     </script>

@@ -8,48 +8,54 @@
     <script src="https://cdn.tailwindcss.com"></script>
     
     <style>
-        /* Layout & Viewport */
-        .app-container { 
-            height: calc(100vh - 140px); 
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 1.5rem;
-        }
-        .list-viewport { overflow-y: auto; flex-grow: 1; position: relative; }
-        
-        /* Active State Highlights */
-        .active-req { background-color: #f5f3ff !important; border-left: 4px solid #6366f1 !important; }
-        .active-task { background-color: #eff6ff !important; border-left: 4px solid #3b82f6 !important; }
+    /* Layout & Viewport */
+    .app-container { 
+        height: calc(100vh - 140px); 
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1.5rem;
+    }
+    .list-viewport { overflow-y: auto; flex-grow: 1; position: relative; }
+    
+    /* Active State Highlights */
+    .active-req { background-color: #f5f3ff !important; border-left: 4px solid #6366f1 !important; }
+    .active-task { background-color: #eff6ff !important; border-left: 4px solid #3b82f6 !important; }
 
-        /* Status Badges */
-        .status-pending { background-color: #f3f4f6; color: #374151; padding: 2px 8px; border-radius: 9999px; border: 1px solid #e5e7eb; }
-        .status-inprogress { background-color: #eff6ff; color: #2563eb; padding: 2px 8px; border-radius: 9999px; border: 1px solid #dbeafe; }
-        .status-complete { background-color: #f0fdf4; color: #16a34a; padding: 2px 8px; border-radius: 9999px; border: 1px solid #dcfce7; }
+    /* Status Badges */
+    .status-pending { background-color: #f3f4f6; color: #374151; padding: 2px 8px; border-radius: 9999px; border: 1px solid #e5e7eb; }
+    .status-inprogress { background-color: #eff6ff; color: #2563eb; padding: 2px 8px; border-radius: 9999px; border: 1px solid #dbeafe; }
+    .status-complete { background-color: #f0fdf4; color: #16a34a; padding: 2px 8px; border-radius: 9999px; border: 1px solid #dcfce7; }
 
-        /* Slider Animations */
-        .side-slider {
-            position: fixed;
-            top: 0;
-            width: 450px;
-            height: 100vh;
-            background: white;
-            box-shadow: 0 0 40px rgba(0,0,0,0.15);
-            transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-            z-index: 1000;
-            display: flex;
-            flex-direction: column;
-        }
+    /* Slider Animations */
+    .side-slider {
+        position: fixed;
+        top: 0;
+        width: 450px;
+        height: 100vh;
+        background: white;
+        box-shadow: 0 0 40px rgba(0,0,0,0.15);
+        transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        z-index: 1000;
+        display: flex;
+        flex-direction: column;
+    }
 
-        #req-editor-panel { right: 0; transform: translateX(100%); }
-        #req-editor-panel.active { transform: translateX(0); }
+    #req-editor-panel { right: 0; transform: translateX(100%); }
+    #req-editor-panel.active { transform: translateX(0); }
 
-        #task-editor-panel { left: 0; transform: translateX(-100%); }
-        #task-editor-panel.active { transform: translateX(0); }
+    #task-editor-panel { left: 0; transform: translateX(-100%); }
+    #task-editor-panel.active { transform: translateX(0); }
 
-        /* Kebab Menu Animation */
-        [id^="kebab-req-"], [id^="kebab-task-"] { animation: slideIn 0.15s ease-out; }
-        @keyframes slideIn { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
-    </style>
+    /* Kebab Menu Animation */
+    [id^="kebab-req-"], [id^="kebab-task-"] { animation: slideIn 0.15s ease-out; }
+    @keyframes slideIn { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
+
+    /* RBAC: Hide Drag Handles */
+    body.hide-drag-handles .cursor-move {
+        display: none !important;
+        pointer-events: none;
+    }
+</style>
 </head>
 <body class="bg-gray-100 min-h-screen overflow-hidden">
     <div id="main-header"></div>

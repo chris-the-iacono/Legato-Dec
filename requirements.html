@@ -702,19 +702,27 @@ const isAdmin = window.sessionData?.role === 'admin';
     
     const nextOrder = (existing?.[0]?.sequence_order || 0) + 10;
 
-    // 4. PERSISTENCE: Save to Supabase 'steps' table
-    const { data: newStep, error } = await supabase.from('steps').insert([{
-        requirement_id: window.selectedReqId,
-        tenant_id: window.sessionData?.tenantId || tenantId,
-        title: title,
-        assigned_to: assignedId,
-        estimated_hours: hours,
-        cost: calculatedCost, // Persists the calculated math
-        sequence_order: nextOrder,
-        status: 'pending'
-    }]).select().single();
+    // 4. RBAC & PERSISTENCE: Guard and Save to Supabase 'steps' table
+const userRole = window.sessionData?.role;
+const canAddTask = ['admin', 'project_manager', 'team_leader'].includes(userRole);
 
-    if (error) return alert("Save failed: " + error.message);
+if (!canAddTask) {
+    alert("Access Denied: Your role does not have permission to add tasks.");
+    return; // Stop the function here
+}
+
+const { data: newStep, error } = await supabase.from('steps').insert([{
+    requirement_id: window.selectedReqId,
+    tenant_id: window.sessionData?.tenantId || tenantId,
+    title: title,
+    assigned_to: assignedId,
+    estimated_hours: hours,
+    cost: calculatedCost, // Persists the calculated math
+    sequence_order: nextOrder,
+    status: 'pending'
+}]).select().single();
+
+if (error) return alert("Save failed: " + error.message);
 
     // 5. AUDIT LOG: Create initial note using standardized sessionData
     await supabase.from('task_notes').insert([{ 

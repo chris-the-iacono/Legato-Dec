@@ -8,48 +8,54 @@
     <script src="https://cdn.tailwindcss.com"></script>
     
     <style>
-        /* Layout & Viewport */
-        .app-container { 
-            height: calc(100vh - 140px); 
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 1.5rem;
-        }
-        .list-viewport { overflow-y: auto; flex-grow: 1; position: relative; }
-        
-        /* Active State Highlights */
-        .active-req { background-color: #f5f3ff !important; border-left: 4px solid #6366f1 !important; }
-        .active-task { background-color: #eff6ff !important; border-left: 4px solid #3b82f6 !important; }
+    /* Layout & Viewport */
+    .app-container { 
+        height: calc(100vh - 140px); 
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1.5rem;
+    }
+    .list-viewport { overflow-y: auto; flex-grow: 1; position: relative; }
+    
+    /* Active State Highlights */
+    .active-req { background-color: #f5f3ff !important; border-left: 4px solid #6366f1 !important; }
+    .active-task { background-color: #eff6ff !important; border-left: 4px solid #3b82f6 !important; }
 
-        /* Status Badges */
-        .status-pending { background-color: #f3f4f6; color: #374151; padding: 2px 8px; border-radius: 9999px; border: 1px solid #e5e7eb; }
-        .status-inprogress { background-color: #eff6ff; color: #2563eb; padding: 2px 8px; border-radius: 9999px; border: 1px solid #dbeafe; }
-        .status-complete { background-color: #f0fdf4; color: #16a34a; padding: 2px 8px; border-radius: 9999px; border: 1px solid #dcfce7; }
+    /* Status Badges */
+    .status-pending { background-color: #f3f4f6; color: #374151; padding: 2px 8px; border-radius: 9999px; border: 1px solid #e5e7eb; }
+    .status-inprogress { background-color: #eff6ff; color: #2563eb; padding: 2px 8px; border-radius: 9999px; border: 1px solid #dbeafe; }
+    .status-complete { background-color: #f0fdf4; color: #16a34a; padding: 2px 8px; border-radius: 9999px; border: 1px solid #dcfce7; }
 
-        /* Slider Animations */
-        .side-slider {
-            position: fixed;
-            top: 0;
-            width: 450px;
-            height: 100vh;
-            background: white;
-            box-shadow: 0 0 40px rgba(0,0,0,0.15);
-            transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-            z-index: 1000;
-            display: flex;
-            flex-direction: column;
-        }
+    /* Slider Animations */
+    .side-slider {
+        position: fixed;
+        top: 0;
+        width: 450px;
+        height: 100vh;
+        background: white;
+        box-shadow: 0 0 40px rgba(0,0,0,0.15);
+        transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        z-index: 1000;
+        display: flex;
+        flex-direction: column;
+    }
 
-        #req-editor-panel { right: 0; transform: translateX(100%); }
-        #req-editor-panel.active { transform: translateX(0); }
+    #req-editor-panel { right: 0; transform: translateX(100%); }
+    #req-editor-panel.active { transform: translateX(0); }
 
-        #task-editor-panel { left: 0; transform: translateX(-100%); }
-        #task-editor-panel.active { transform: translateX(0); }
+    #task-editor-panel { left: 0; transform: translateX(-100%); }
+    #task-editor-panel.active { transform: translateX(0); }
 
-        /* Kebab Menu Animation */
-        [id^="kebab-req-"], [id^="kebab-task-"] { animation: slideIn 0.15s ease-out; }
-        @keyframes slideIn { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
-    </style>
+    /* Kebab Menu Animation */
+    [id^="kebab-req-"], [id^="kebab-task-"] { animation: slideIn 0.15s ease-out; }
+    @keyframes slideIn { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
+
+    /* RBAC: Hide Drag Handles */
+    body.hide-drag-handles .cursor-move {
+        display: none !important;
+        pointer-events: none;
+    }
+</style>
 </head>
 <body class="bg-gray-100 min-h-screen overflow-hidden">
     <div id="main-header"></div>
@@ -162,62 +168,70 @@
 </section>
 
     <section id="task-editor-panel" class="side-slider">
-        <div class="flex justify-between items-center p-4 border-b bg-blue-50">
+    <div class="flex justify-between items-center p-4 border-b bg-blue-50">
+        <div>
+            <h2 id="task-editor-title" class="font-bold text-lg text-blue-900">Task Details</h2>
+            <p class="text-[10px] text-blue-400 font-bold uppercase">Task Reality & Tracking</p>
+        </div>
+        <button onclick="window.closeTaskSlider()" class="text-gray-400 hover:text-blue-600 transition-colors">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+        </button>
+    </div>
+    
+    <div class="flex-grow overflow-y-auto p-6 space-y-8">
+        <div class="space-y-4 pb-6 border-b border-gray-100">
+            <h3 class="text-[11px] font-black text-gray-400 uppercase tracking-widest">Baseline Estimate</h3>
             <div>
-                <h2 id="task-editor-title" class="font-bold text-lg text-blue-900">Task Details</h2>
-                <p class="text-[10px] text-blue-400 font-bold uppercase">Task Reality & Tracking</p>
+                <label class="text-[10px] font-bold text-gray-400 uppercase ml-1">Task Title</label>
+                <input type="text" id="step-title-input" data-admin-only class="w-full border-gray-200 rounded-lg text-sm p-3 border">
             </div>
-            <button onclick="window.closeTaskSlider()" class="text-gray-400 hover:text-blue-600 transition-colors">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
-            </button>
-        </div>
-        
-        <div class="flex-grow overflow-y-auto p-6 space-y-8">
-            <div class="space-y-4 pb-6 border-b border-gray-100">
-                <h3 class="text-[11px] font-black text-gray-400 uppercase tracking-widest">Baseline Estimate</h3>
-                <div>
-                    <label class="text-[10px] font-bold text-gray-400 uppercase ml-1">Task Title</label>
-                    <input type="text" id="step-title-input" data-admin-only class="w-full border-gray-200 rounded-lg text-sm p-3 border">
+            <div class="grid grid-cols-2 gap-4">
+                <div class="flex flex-col">
+                    <label class="text-[10px] font-bold text-gray-400 uppercase mb-1 ml-1">Responsible</label>
+                    <select id="step-assign-select" data-admin-only onchange="window.handleUserSelection('step')" class="border-gray-200 rounded-lg text-sm p-3 bg-gray-50 border"></select>
                 </div>
-                <div class="grid grid-cols-2 gap-4">
+                <div class="grid grid-cols-2 gap-2">
                     <div class="flex flex-col">
-                        <label class="text-[10px] font-bold text-gray-400 uppercase mb-1 ml-1">Responsible</label>
-                        <select id="step-assign-select" data-admin-only onchange="window.handleUserSelection('step')" class="border-gray-200 rounded-lg text-sm p-3 bg-gray-50 border"></select>
+                        <label class="text-[10px] font-bold text-gray-400 uppercase mb-1 ml-1">Est. Hrs</label>
+                        <input type="number" id="step-hours-input" data-admin-only class="border-gray-200 rounded-lg text-sm p-3 border">
                     </div>
-                    <div class="grid grid-cols-2 gap-2">
-                        <div class="flex flex-col">
-                            <label class="text-[10px] font-bold text-gray-400 uppercase mb-1 ml-1">Est. Hrs</label>
-                            <input type="number" id="step-hours-input" data-admin-only class="border-gray-200 rounded-lg text-sm p-3 border">
-                        </div>
-                        <div class="flex flex-col">
-                            <label class="text-[10px] font-bold text-gray-400 uppercase mb-1 ml-1">Est. Cost</label>
-                            <input type="number" id="step-cost-input" readonly class="bg-gray-50 border-gray-200 rounded-lg text-sm p-3 font-mono border">
-                        </div>
+                    <div class="flex flex-col">
+                        <label class="text-[10px] font-bold text-gray-400 uppercase mb-1 ml-1">Est. Cost</label>
+                        <input type="number" id="step-cost-input" readonly class="bg-gray-50 border-gray-200 rounded-lg text-sm p-3 font-mono border">
                     </div>
                 </div>
-                <button id="task-save-btn" data-admin-only onclick="window.submitStep()" class="w-full bg-blue-600 text-white py-2 rounded-lg text-xs font-bold hover:bg-blue-700 transition-all">Save Baseline Changes</button>
             </div>
-
-            <div id="log-time-section" class="bg-green-50/50 p-4 rounded-xl border border-green-100 space-y-4">
-                <h3 class="text-[11px] font-black text-green-600 uppercase tracking-widest">Log Actual Work</h3>
-                <div class="grid grid-cols-2 gap-3">
-                    <input type="number" id="log-hours" step="0.25" placeholder="Hours" class="p-2 border rounded-lg text-sm">
-                    <input type="date" id="log-date" class="p-2 border rounded-lg text-sm text-gray-500">
-                </div>
-                <button onclick="window.saveTimeLog()" class="w-full bg-green-600 text-white py-2 rounded-lg text-xs font-bold hover:bg-green-700">Save Time Log</button>
-            </div>
-
-            <div class="space-y-4">
-                <h3 class="text-[11px] font-black text-gray-400 uppercase tracking-widest">Activity & Notes</h3>
-                <div id="notes-container" class="space-y-3 max-h-48 overflow-y-auto pr-2">
-                    </div>
-                <div class="flex gap-2">
-                    <input type="text" id="new-note-input" placeholder="Append a note..." class="flex-grow p-2 border rounded-lg text-sm">
-                    <button type="button" onclick="window.appendNote()" class="bg-gray-800 text-white px-4 py-2 rounded-lg text-xs font-bold hover:bg-black">Add</button>
-                </div>
+            
+            <div class="space-y-3 pt-2">
+                <button id="task-save-btn" data-admin-only onclick="window.submitStep()" class="w-full bg-blue-600 text-white py-3 rounded-lg text-xs font-bold hover:bg-blue-700 transition-all shadow-md">
+                    Save Baseline Changes
+                </button>
+                
+                <button id="delete-task-btn" data-admin-only class="w-full bg-white text-red-600 border border-red-100 py-2 rounded-lg text-[10px] font-bold hover:bg-red-50 transition-all uppercase tracking-wider">
+                    Remove Task from Baseline
+                </button>
             </div>
         </div>
-    </section>
+
+        <div id="log-time-section" class="bg-green-50/50 p-4 rounded-xl border border-green-100 space-y-4">
+            <h3 class="text-[11px] font-black text-green-600 uppercase tracking-widest">Log Actual Work</h3>
+            <div class="grid grid-cols-2 gap-3">
+                <input type="number" id="log-hours" step="0.25" placeholder="Hours" class="p-2 border rounded-lg text-sm">
+                <input type="date" id="log-date" class="p-2 border rounded-lg text-sm text-gray-500">
+            </div>
+            <button onclick="window.saveTimeLog()" class="w-full bg-green-600 text-white py-2 rounded-lg text-xs font-bold hover:bg-green-700">Save Time Log</button>
+        </div>
+
+        <div class="space-y-4">
+            <h3 class="text-[11px] font-black text-gray-400 uppercase tracking-widest">Activity & Notes</h3>
+            <div id="notes-container" class="space-y-3 max-h-48 overflow-y-auto pr-2"></div>
+            <div class="flex gap-2">
+                <input type="text" id="new-note-input" placeholder="Append a note..." class="flex-grow p-2 border rounded-lg text-sm">
+                <button type="button" onclick="window.appendNote()" class="bg-gray-800 text-white px-4 py-2 rounded-lg text-xs font-bold hover:bg-black">Add</button>
+            </div>
+        </div>
+    </div>
+</section>
 
     <script type="module"> 
         import { supabase, MODULES } from './js/config.js';
@@ -297,43 +311,70 @@ if (myProfile) {
         // 2. CORE FUNCTIONS (ATTACHED TO WINDOW)
 		// NEW FUNCTION FOR STEP REFRESH 1/13
         window.selectRequirement = async (id) => {
-            // FIX: Force ID to string and trim to prevent mismatch
-            const cleanId = String(id).trim();
-            console.log("Requirement clicked ID:", cleanId);
-            window.selectedReqId = cleanId;
+    const cleanId = String(id).trim().replace(/['"]/g, '');
+    
+    // Validation
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(cleanId)) {
+        console.error("Invalid UUID:", cleanId);
+        return;
+    }
 
-            // Update UI Header
-            const rowEl = document.querySelector(`.req-row[data-id="${cleanId}"]`);
-            const title = rowEl?.getAttribute('data-title') || "Tasks";
-            const headerEl = document.getElementById('selected-req-title-display');
-            if (headerEl) headerEl.innerText = `2. Tasks for: ${title}`;
+    console.log("Attempting fetch for UUID:", cleanId);
+    window.selectedReqId = cleanId;
 
-            // FIX: Enable Add Button
-            const addTaskBtn = document.getElementById('add-task-btn');
-            if (addTaskBtn) {
-                addTaskBtn.disabled = false;
-                addTaskBtn.style.pointerEvents = 'auto';
-                addTaskBtn.classList.remove('opacity-50', 'cursor-not-allowed');
-            }
+    // USE SELECT '*' TO ELIMINATE COLUMN NAME ERRORS
+    const { data: reqData, error } = await supabase
+        .from('requirements')
+        .select('*') 
+        .eq('req_id', cleanId)
+        .single();
 
-            // Refresh Tasks
-            if (typeof refreshSteps === 'function') {
-                try {
-                    await refreshSteps();
-                } catch (refreshError) {
-                    console.error("Critical failure during refreshSteps:", refreshError);
-                }
-            }
+    if (error) {
+        console.error("Supabase Metadata Error:", error.message, error.details, error.hint);
+        return; 
+    }
 
-            // FIX: Apply Highlight (Last step to prevent overwrite)
-            document.querySelectorAll('.req-row').forEach(row => {
-                row.classList.remove('active-req'); // Clean up old highlights
-                if (String(row.getAttribute('data-id')).trim() === cleanId) {
-                    row.classList.add('active-req'); // Apply new highlight
-                }
-            });
-        };
+    // --- UI UPDATES: Metadata Display ---
+    const headerEl = document.getElementById('selected-req-title-display');
+    const versionEl = document.getElementById('req-version-display'); 
+    const budgetEl = document.getElementById('selected-req-budget-display'); 
 
+    if (reqData) {
+        if (headerEl) headerEl.innerText = `Tasks for: ${reqData.name}`;
+        if (versionEl) versionEl.innerText = reqData.version_number || '1';
+        if (budgetEl) {
+            const amount = reqData.total_budget || 0;
+            budgetEl.innerText = `$${amount.toLocaleString()}`;
+        }
+    }
+
+    // --- NEW: BUTTON UNLOCK LOGIC ---
+    const addTaskBtn = document.getElementById('add-task-btn');
+    if (addTaskBtn) {
+        // RBAC: Check if current user is allowed to add tasks
+        const userRole = window.sessionData?.role;
+        const canAddTask = ['admin', 'project_manager', 'team_leader'].includes(userRole);
+
+        if (canAddTask) {
+            addTaskBtn.disabled = false;
+            addTaskBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+            addTaskBtn.classList.add('opacity-100', 'cursor-pointer');
+        } else {
+            // Keep locked for team_members even if requirement is selected
+            addTaskBtn.disabled = true;
+            addTaskBtn.classList.add('opacity-50', 'cursor-not-allowed');
+        }
+    }
+
+    // Refresh steps
+    if (typeof refreshSteps === 'function') await refreshSteps();
+
+    // Highlighting logic
+    document.querySelectorAll('.req-row').forEach(row => {
+        row.classList.toggle('active-req', String(row.getAttribute('data-id')).includes(cleanId));
+    });
+};
   window.refreshSteps = async () => {
     const reqId = window.selectedReqId;
     if (!reqId) return;
@@ -440,6 +481,16 @@ if (myProfile) {
 
 // --- UPDATED TILE DRAG AND DROP ---
 window.initSortable = () => {
+    // RBAC GUARD: Only Admin, Project Manager, and Team Leader can drag
+    const canSort = ['admin', 'project_manager', 'team_leader'].includes(window.sessionData?.role);
+    
+    if (!canSort) {
+        console.log("RBAC: Sorting disabled for current role.");
+        // We hide the drag handles via CSS (see step 2 below)
+        document.body.classList.add('hide-drag-handles');
+        return;
+    }
+
     const reqList = document.getElementById('req-list');
     if (reqList && typeof Sortable !== 'undefined') {
         if (reqList.sortable) reqList.sortable.destroy();
@@ -452,13 +503,11 @@ window.initSortable = () => {
 
     const stepList = document.getElementById('step-list');
     if (stepList && typeof Sortable !== 'undefined') {
-        // Destroy old instance to prevent "ghosting"
         if (stepList.sortable) stepList.sortable.destroy();
-        
         stepList.sortable = new Sortable(stepList, {
             animation: 150,
             handle: '.cursor-move', 
-            draggable: '.task-card', // Explicitly target the class
+            draggable: '.task-card', 
             ghostClass: 'bg-blue-50',
             onEnd: () => window.saveOrder('steps', stepList)
         });
@@ -466,6 +515,13 @@ window.initSortable = () => {
 };
 
 window.saveOrder = async (table, container) => {
+    // DATABASE SECURITY GUARD: Final check before hitting Supabase
+    const canSort = ['admin', 'project_manager', 'team_leader'].includes(window.sessionData?.role);
+    if (!canSort) {
+        alert("You do not have permission to reorder items.");
+        return;
+    }
+
     const items = Array.from(container.querySelectorAll('[data-id]'));
     const idField = (table === 'requirements') ? 'req_id' : 'step_id';
 
@@ -473,7 +529,6 @@ window.saveOrder = async (table, container) => {
 
     try {
         // STEP 1: Move to negative numbers to clear the unique constraint "slots"
-        // This ensures we don't get the "409 Conflict" or "Unique Constraint" error
         for (let [index, el] of items.entries()) {
             const id = el.getAttribute('data-id');
             await supabase.from(table)
@@ -482,7 +537,6 @@ window.saveOrder = async (table, container) => {
         }
 
         // STEP 2: Move to final positive sequence (10, 20, 30...)
-        // Now that the positive slots are empty, the database will allow these updates
         for (let [index, el] of items.entries()) {
             const id = el.getAttribute('data-id');
             const newOrder = (index + 1) * 10;
@@ -501,14 +555,18 @@ window.saveOrder = async (table, container) => {
 
         // --- ROLLUP ENGINE (VERIFIED SCHEMA NAMES) ---
 window.rollupToRequirement = async (reqId = window.selectedReqId, steps = null) => {
+    // 1. Sanitize the UUID to prevent 400 errors
     if (!reqId) return;
+    const cleanReqId = String(reqId).trim().replace(/['"]/g, '');
     
     let tasks = steps;
     if (!tasks) {
         // Fetch using requirement_id (foreign key)
+        // Optimization: Added is_active filter to ensure only valid tasks roll up
         const { data, error: fetchError } = await supabase.from('steps')
             .select('estimated_hours, cost, assigned_to')
-            .eq('requirement_id', reqId);
+            .eq('requirement_id', cleanReqId)
+            .eq('is_active', true); 
         
         if (fetchError) {
             console.error("Error fetching steps for rollup:", fetchError);
@@ -538,26 +596,24 @@ window.rollupToRequirement = async (reqId = window.selectedReqId, steps = null) 
         totalHours += hours;
     });
 
-    // UPDATED: Sync to Database using NEW schema column names
-    // We map 'total_cost' from UI logic to 'total_budget' in the SQL table
+    // 2. Sync to Database using verified column name 'total_budget'
     const { error } = await supabase.from('requirements')
         .update({ 
             estimated_hours: totalHours, 
-            total_budget: calculatedTotalCost, // Changed from total_cost to match SQL migration
+            total_budget: calculatedTotalCost, 
             updated_at: new Date().toISOString()
         })
-        .eq('req_id', reqId);
+        .eq('req_id', cleanReqId); // Use sanitized cleanReqId
 
     if (!error) {
         console.log(`Rollup Sync Success: ${totalHours}h | $${calculatedTotalCost}`);
         
-        // Refresh the Requirements list to update the tile on the left 
-        // and ensure the Project Dashboard (index.html) sees the latest total_budget
+        // 3. UI Sync: Refresh Requirements list tiles
         if (typeof window.loadRequirements === 'function') {
             await window.loadRequirements();
         }
 
-        // Update the Requirement Header in the Task List view if active
+        // 4. UI Sync: Update the Header display in the Task viewport
         const totalBudgetDisplay = document.getElementById('selected-req-budget-display');
         if (totalBudgetDisplay) {
             totalBudgetDisplay.innerText = `$${calculatedTotalCost.toLocaleString()}`;
@@ -645,7 +701,25 @@ const isAdmin = window.sessionData?.role === 'admin';
         btnEl.innerText = "Save Task";
         btnEl.onclick = () => window.submitStep();
     }
+  // --- DELETE BUTTON INITIALIZATION ---
+const delBtn = document.getElementById('delete-task-btn');
+if (delBtn) {
+    // 1. RBAC: Only show the delete button if user is Admin, PM, or TL
+    const userRole = window.sessionData?.role;
+    const canDelete = ['admin', 'project_manager', 'team_leader'].includes(userRole);
     
+    // 2. Logic: Only show delete if we are EDITING an existing task (id exists)
+    if (id && canDelete) {
+        delBtn.style.display = 'block';
+        delBtn.onclick = async () => {
+            // This triggers the soft-delete and budget rollup
+            await window.deleteStep(id);
+        };
+    } else {
+        // Hide if it's a new task or the user lacks permissions
+        delBtn.style.display = 'none';
+    }
+}  
     panel.classList.add('active');
 };
 
@@ -679,19 +753,27 @@ const isAdmin = window.sessionData?.role === 'admin';
     
     const nextOrder = (existing?.[0]?.sequence_order || 0) + 10;
 
-    // 4. PERSISTENCE: Save to Supabase 'steps' table
-    const { data: newStep, error } = await supabase.from('steps').insert([{
-        requirement_id: window.selectedReqId,
-        tenant_id: window.sessionData?.tenantId || tenantId,
-        title: title,
-        assigned_to: assignedId,
-        estimated_hours: hours,
-        cost: calculatedCost, // Persists the calculated math
-        sequence_order: nextOrder,
-        status: 'pending'
-    }]).select().single();
+    // 4. RBAC & PERSISTENCE: Guard and Save to Supabase 'steps' table
+const userRole = window.sessionData?.role;
+const canAddTask = ['admin', 'project_manager', 'team_leader'].includes(userRole);
 
-    if (error) return alert("Save failed: " + error.message);
+if (!canAddTask) {
+    alert("Access Denied: Your role does not have permission to add tasks.");
+    return; // Stop the function here
+}
+
+const { data: newStep, error } = await supabase.from('steps').insert([{
+    requirement_id: window.selectedReqId,
+    tenant_id: window.sessionData?.tenantId || tenantId,
+    title: title,
+    assigned_to: assignedId,
+    estimated_hours: hours,
+    cost: calculatedCost, // Persists the calculated math
+    sequence_order: nextOrder,
+    status: 'pending'
+}]).select().single();
+
+if (error) return alert("Save failed: " + error.message);
 
     // 5. AUDIT LOG: Create initial note using standardized sessionData
     await supabase.from('task_notes').insert([{ 
@@ -715,6 +797,15 @@ const isAdmin = window.sessionData?.role === 'admin';
 };
 
         window.updateStep = async (id) => {
+    // 0. RBAC GUARD: Only Admin, PM, or TL can trigger this database update
+    const canUpdate = ['admin', 'project_manager', 'team_leader'].includes(window.sessionData?.role);
+    if (!canUpdate) {
+        alert("Access Denied: You do not have permission to modify task details.");
+        return;
+    }
+
+    const cleanStepId = String(id).trim().replace(/['"]/g, '');
+
     // 1. Pull current values from the Step Editor UI
     const title = document.getElementById('step-title-input')?.value.trim();
     const assignedId = document.getElementById('step-assign-select')?.value;
@@ -735,26 +826,32 @@ const isAdmin = window.sessionData?.role === 'admin';
         estimated_hours: hours,
         cost: calculatedCost, // Update with the newly calculated math
         updated_at: new Date().toISOString()
-    }).eq('step_id', id);
+    }).eq('step_id', cleanStepId);
 
     if (error) return alert("Update failed: " + error.message);
 
-    // 4. AUDIT LOG: Use your existing helper with standardized text
-    // Note: sessionData is handled inside appendNoteToActivity now
-    await appendNoteToActivity(id, `Baseline updated: ${hours}h @ $${effectiveRate}/h (Total: $${calculatedCost.toLocaleString()})`);
+    // 4. AUDIT LOG: Record the budget change in the activity feed
+    if (typeof appendNoteToActivity === 'function') {
+        await appendNoteToActivity(cleanStepId, `Baseline updated: ${hours}h @ $${effectiveRate}/h (Total: $${calculatedCost.toLocaleString()})`);
+    }
 
     // 5. SYNC: Close UI, trigger requirement-level rollup, and refresh list
-    window.closeTaskSlider();
+    if (typeof window.closeTaskSlider === 'function') {
+        window.closeTaskSlider();
+    }
     
-    // Crucial: Update the main Requirement's total_budget in the database
+    // --- THE CRITICAL ROLLUP ---
+    // Recalculates the parent requirement's total_budget based on this update
     await window.rollupToRequirement(window.selectedReqId);
 
-    // Refresh the task list UI
+    // Refresh the task list UI to show the new cost/hours
     if (typeof window.refreshSteps === 'function') {
         await window.refreshSteps();
     } else if (typeof loadSteps === 'function') {
         await loadSteps(window.selectedReqId);
     }
+
+    console.log(`Task ${cleanStepId} updated and budget rolled up.`);
 };
 
         // --- SUPPORTING FUNCTIONS ---
@@ -946,17 +1043,16 @@ async function loadRequirements() {
     if (typeof window.initSortable === 'function') window.initSortable();
 }
 
-// --- NEW/FIXED Jan 15: THE SLIDER POPULATION FUNCTION ---
 window.openReqSlider = async (id = null) => {
     const panel = document.getElementById('req-editor-panel');
     const titleEl = document.getElementById('req-editor-title');
     const btnEl = document.getElementById('req-save-btn');
     const versionEl = document.getElementById('req-version-display');
     const statusBadge = document.getElementById('req-status-badge');
-    const historyContainer = document.getElementById('req-history-list'); // Assumes this ID exists for history
+    const historyContainer = document.getElementById('req-history-list');
 
-    // 0. Permission Check: Determine if the current user is an admin
-    const isAdmin = window.sessionData?.role === 'admin';
+    // 0. Permission Check: Admin, PM, and TL can edit. Team Member cannot.
+    const canEdit = ['admin', 'project_manager', 'team_leader'].includes(window.sessionData?.role);
 
     // 1. Reset Form Fields
     const titleInput = document.getElementById('req-title-input');
@@ -971,14 +1067,15 @@ window.openReqSlider = async (id = null) => {
     if (versionEl) versionEl.innerText = '0';
     if (historyContainer) historyContainer.innerHTML = '';
 
-    // --- APPLY ADMIN-ONLY LOCKS ---
-    // Rule: Only admin can edit Name (Title) and Assignee
-    titleInput.readOnly = !isAdmin;
-    if (assignSelect) assignSelect.disabled = !isAdmin;
+    // --- APPLY RBAC LOCKS ---
+    // Rule: Restricted roles see ReadOnly fields and no Save button
+    titleInput.readOnly = !canEdit;
+    if (assignSelect) assignSelect.disabled = !canEdit;
+    if (hoursInput) hoursInput.readOnly = !canEdit;
+    if (rateInput) rateInput.readOnly = !canEdit;
     
-    // Non-admins cannot see the save/update button
     if (btnEl) {
-        btnEl.style.display = isAdmin ? 'block' : 'none';
+        btnEl.style.display = canEdit ? 'block' : 'none';
     }
 
     if (!id) {
@@ -986,8 +1083,7 @@ window.openReqSlider = async (id = null) => {
         window.selectedReqId = null; 
         titleEl.innerText = "Add New Requirement";
         btnEl.innerText = "Create Requirement";
-        
-        btnEl.onclick = () => window.addRequirement();
+        btnEl.onclick = () => window.addRequirement(); // Ensure addRequirement exists
         
         if(statusBadge) {
             statusBadge.innerText = 'Draft';
@@ -995,31 +1091,35 @@ window.openReqSlider = async (id = null) => {
         }
     } else {
         // --- MODE: EDIT EXISTING ---
-        window.selectedReqId = id; 
+        const cleanId = String(id).trim().replace(/['"]/g, '');
+        window.selectedReqId = cleanId; 
         titleEl.innerText = "Requirement Details";
         
-        // Fetch extended data including the new columns from our SQL migration
-        const { data: req } = await supabase
+        // Fetch using the CORRECT column name: req_id
+        const { data: req, error } = await supabase
             .from('requirements')
             .select('*')
-            .eq('id', id) // Switched to 'id' per your table schema description
+            .eq('req_id', cleanId) // FIX: Changed from 'id' to 'req_id'
             .single();
         
+        if (error) {
+            console.error("Error fetching requirement:", error.message);
+            return;
+        }
+        
         if (req) {
-            titleInput.value = req.name || ''; // Mapping 'name' from your SQL schema
+            titleInput.value = req.name || '';
             if (assignSelect) assignSelect.value = req.assigned_to || '';
             hoursInput.value = req.estimated_hours || 0;
             rateInput.value = req.custom_rate || '';
             
-            // Display version from the new version_number column
             if(versionEl) versionEl.innerText = req.version_number || '1';
             
-            // Render History if available
             if (historyContainer && req.requirement_history) {
-                renderHistoryList(req.requirement_history);
+                // Assuming renderHistoryList is defined globally
+                if (typeof renderHistoryList === 'function') renderHistoryList(req.requirement_history);
             }
             
-            // Update Status Badge visually
             if(statusBadge) {
                 statusBadge.innerText = req.status || 'Active';
                 statusBadge.className = req.status === 'Complete' 
@@ -1028,7 +1128,7 @@ window.openReqSlider = async (id = null) => {
             }
 
             btnEl.innerText = "Update Baseline Budget";
-            btnEl.onclick = () => window.addRequirement();
+            btnEl.onclick = () => window.addRequirement(); // Assuming addRequirement handles updates too
         }
     }
     

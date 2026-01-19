@@ -168,62 +168,70 @@
 </section>
 
     <section id="task-editor-panel" class="side-slider">
-        <div class="flex justify-between items-center p-4 border-b bg-blue-50">
+    <div class="flex justify-between items-center p-4 border-b bg-blue-50">
+        <div>
+            <h2 id="task-editor-title" class="font-bold text-lg text-blue-900">Task Details</h2>
+            <p class="text-[10px] text-blue-400 font-bold uppercase">Task Reality & Tracking</p>
+        </div>
+        <button onclick="window.closeTaskSlider()" class="text-gray-400 hover:text-blue-600 transition-colors">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+        </button>
+    </div>
+    
+    <div class="flex-grow overflow-y-auto p-6 space-y-8">
+        <div class="space-y-4 pb-6 border-b border-gray-100">
+            <h3 class="text-[11px] font-black text-gray-400 uppercase tracking-widest">Baseline Estimate</h3>
             <div>
-                <h2 id="task-editor-title" class="font-bold text-lg text-blue-900">Task Details</h2>
-                <p class="text-[10px] text-blue-400 font-bold uppercase">Task Reality & Tracking</p>
+                <label class="text-[10px] font-bold text-gray-400 uppercase ml-1">Task Title</label>
+                <input type="text" id="step-title-input" data-admin-only class="w-full border-gray-200 rounded-lg text-sm p-3 border">
             </div>
-            <button onclick="window.closeTaskSlider()" class="text-gray-400 hover:text-blue-600 transition-colors">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
-            </button>
-        </div>
-        
-        <div class="flex-grow overflow-y-auto p-6 space-y-8">
-            <div class="space-y-4 pb-6 border-b border-gray-100">
-                <h3 class="text-[11px] font-black text-gray-400 uppercase tracking-widest">Baseline Estimate</h3>
-                <div>
-                    <label class="text-[10px] font-bold text-gray-400 uppercase ml-1">Task Title</label>
-                    <input type="text" id="step-title-input" data-admin-only class="w-full border-gray-200 rounded-lg text-sm p-3 border">
+            <div class="grid grid-cols-2 gap-4">
+                <div class="flex flex-col">
+                    <label class="text-[10px] font-bold text-gray-400 uppercase mb-1 ml-1">Responsible</label>
+                    <select id="step-assign-select" data-admin-only onchange="window.handleUserSelection('step')" class="border-gray-200 rounded-lg text-sm p-3 bg-gray-50 border"></select>
                 </div>
-                <div class="grid grid-cols-2 gap-4">
+                <div class="grid grid-cols-2 gap-2">
                     <div class="flex flex-col">
-                        <label class="text-[10px] font-bold text-gray-400 uppercase mb-1 ml-1">Responsible</label>
-                        <select id="step-assign-select" data-admin-only onchange="window.handleUserSelection('step')" class="border-gray-200 rounded-lg text-sm p-3 bg-gray-50 border"></select>
+                        <label class="text-[10px] font-bold text-gray-400 uppercase mb-1 ml-1">Est. Hrs</label>
+                        <input type="number" id="step-hours-input" data-admin-only class="border-gray-200 rounded-lg text-sm p-3 border">
                     </div>
-                    <div class="grid grid-cols-2 gap-2">
-                        <div class="flex flex-col">
-                            <label class="text-[10px] font-bold text-gray-400 uppercase mb-1 ml-1">Est. Hrs</label>
-                            <input type="number" id="step-hours-input" data-admin-only class="border-gray-200 rounded-lg text-sm p-3 border">
-                        </div>
-                        <div class="flex flex-col">
-                            <label class="text-[10px] font-bold text-gray-400 uppercase mb-1 ml-1">Est. Cost</label>
-                            <input type="number" id="step-cost-input" readonly class="bg-gray-50 border-gray-200 rounded-lg text-sm p-3 font-mono border">
-                        </div>
+                    <div class="flex flex-col">
+                        <label class="text-[10px] font-bold text-gray-400 uppercase mb-1 ml-1">Est. Cost</label>
+                        <input type="number" id="step-cost-input" readonly class="bg-gray-50 border-gray-200 rounded-lg text-sm p-3 font-mono border">
                     </div>
                 </div>
-                <button id="task-save-btn" data-admin-only onclick="window.submitStep()" class="w-full bg-blue-600 text-white py-2 rounded-lg text-xs font-bold hover:bg-blue-700 transition-all">Save Baseline Changes</button>
             </div>
-
-            <div id="log-time-section" class="bg-green-50/50 p-4 rounded-xl border border-green-100 space-y-4">
-                <h3 class="text-[11px] font-black text-green-600 uppercase tracking-widest">Log Actual Work</h3>
-                <div class="grid grid-cols-2 gap-3">
-                    <input type="number" id="log-hours" step="0.25" placeholder="Hours" class="p-2 border rounded-lg text-sm">
-                    <input type="date" id="log-date" class="p-2 border rounded-lg text-sm text-gray-500">
-                </div>
-                <button onclick="window.saveTimeLog()" class="w-full bg-green-600 text-white py-2 rounded-lg text-xs font-bold hover:bg-green-700">Save Time Log</button>
-            </div>
-
-            <div class="space-y-4">
-                <h3 class="text-[11px] font-black text-gray-400 uppercase tracking-widest">Activity & Notes</h3>
-                <div id="notes-container" class="space-y-3 max-h-48 overflow-y-auto pr-2">
-                    </div>
-                <div class="flex gap-2">
-                    <input type="text" id="new-note-input" placeholder="Append a note..." class="flex-grow p-2 border rounded-lg text-sm">
-                    <button type="button" onclick="window.appendNote()" class="bg-gray-800 text-white px-4 py-2 rounded-lg text-xs font-bold hover:bg-black">Add</button>
-                </div>
+            
+            <div class="space-y-3 pt-2">
+                <button id="task-save-btn" data-admin-only onclick="window.submitStep()" class="w-full bg-blue-600 text-white py-3 rounded-lg text-xs font-bold hover:bg-blue-700 transition-all shadow-md">
+                    Save Baseline Changes
+                </button>
+                
+                <button id="delete-task-btn" data-admin-only class="w-full bg-white text-red-600 border border-red-100 py-2 rounded-lg text-[10px] font-bold hover:bg-red-50 transition-all uppercase tracking-wider">
+                    Remove Task from Baseline
+                </button>
             </div>
         </div>
-    </section>
+
+        <div id="log-time-section" class="bg-green-50/50 p-4 rounded-xl border border-green-100 space-y-4">
+            <h3 class="text-[11px] font-black text-green-600 uppercase tracking-widest">Log Actual Work</h3>
+            <div class="grid grid-cols-2 gap-3">
+                <input type="number" id="log-hours" step="0.25" placeholder="Hours" class="p-2 border rounded-lg text-sm">
+                <input type="date" id="log-date" class="p-2 border rounded-lg text-sm text-gray-500">
+            </div>
+            <button onclick="window.saveTimeLog()" class="w-full bg-green-600 text-white py-2 rounded-lg text-xs font-bold hover:bg-green-700">Save Time Log</button>
+        </div>
+
+        <div class="space-y-4">
+            <h3 class="text-[11px] font-black text-gray-400 uppercase tracking-widest">Activity & Notes</h3>
+            <div id="notes-container" class="space-y-3 max-h-48 overflow-y-auto pr-2"></div>
+            <div class="flex gap-2">
+                <input type="text" id="new-note-input" placeholder="Append a note..." class="flex-grow p-2 border rounded-lg text-sm">
+                <button type="button" onclick="window.appendNote()" class="bg-gray-800 text-white px-4 py-2 rounded-lg text-xs font-bold hover:bg-black">Add</button>
+            </div>
+        </div>
+    </div>
+</section>
 
     <script type="module"> 
         import { supabase, MODULES } from './js/config.js';
@@ -676,7 +684,25 @@ const isAdmin = window.sessionData?.role === 'admin';
         btnEl.innerText = "Save Task";
         btnEl.onclick = () => window.submitStep();
     }
+  // --- DELETE BUTTON INITIALIZATION ---
+const delBtn = document.getElementById('delete-task-btn');
+if (delBtn) {
+    // 1. RBAC: Only show the delete button if user is Admin, PM, or TL
+    const userRole = window.sessionData?.role;
+    const canDelete = ['admin', 'project_manager', 'team_leader'].includes(userRole);
     
+    // 2. Logic: Only show delete if we are EDITING an existing task (id exists)
+    if (id && canDelete) {
+        delBtn.style.display = 'block';
+        delBtn.onclick = async () => {
+            // This triggers the soft-delete and budget rollup
+            await window.deleteStep(id);
+        };
+    } else {
+        // Hide if it's a new task or the user lacks permissions
+        delBtn.style.display = 'none';
+    }
+}  
     panel.classList.add('active');
 };
 
@@ -754,6 +780,15 @@ if (error) return alert("Save failed: " + error.message);
 };
 
         window.updateStep = async (id) => {
+    // 0. RBAC GUARD: Only Admin, PM, or TL can trigger this database update
+    const canUpdate = ['admin', 'project_manager', 'team_leader'].includes(window.sessionData?.role);
+    if (!canUpdate) {
+        alert("Access Denied: You do not have permission to modify task details.");
+        return;
+    }
+
+    const cleanStepId = String(id).trim().replace(/['"]/g, '');
+
     // 1. Pull current values from the Step Editor UI
     const title = document.getElementById('step-title-input')?.value.trim();
     const assignedId = document.getElementById('step-assign-select')?.value;
@@ -774,26 +809,32 @@ if (error) return alert("Save failed: " + error.message);
         estimated_hours: hours,
         cost: calculatedCost, // Update with the newly calculated math
         updated_at: new Date().toISOString()
-    }).eq('step_id', id);
+    }).eq('step_id', cleanStepId);
 
     if (error) return alert("Update failed: " + error.message);
 
-    // 4. AUDIT LOG: Use your existing helper with standardized text
-    // Note: sessionData is handled inside appendNoteToActivity now
-    await appendNoteToActivity(id, `Baseline updated: ${hours}h @ $${effectiveRate}/h (Total: $${calculatedCost.toLocaleString()})`);
+    // 4. AUDIT LOG: Record the budget change in the activity feed
+    if (typeof appendNoteToActivity === 'function') {
+        await appendNoteToActivity(cleanStepId, `Baseline updated: ${hours}h @ $${effectiveRate}/h (Total: $${calculatedCost.toLocaleString()})`);
+    }
 
     // 5. SYNC: Close UI, trigger requirement-level rollup, and refresh list
-    window.closeTaskSlider();
+    if (typeof window.closeTaskSlider === 'function') {
+        window.closeTaskSlider();
+    }
     
-    // Crucial: Update the main Requirement's total_budget in the database
+    // --- THE CRITICAL ROLLUP ---
+    // Recalculates the parent requirement's total_budget based on this update
     await window.rollupToRequirement(window.selectedReqId);
 
-    // Refresh the task list UI
+    // Refresh the task list UI to show the new cost/hours
     if (typeof window.refreshSteps === 'function') {
         await window.refreshSteps();
     } else if (typeof loadSteps === 'function') {
         await loadSteps(window.selectedReqId);
     }
+
+    console.log(`Task ${cleanStepId} updated and budget rolled up.`);
 };
 
         // --- SUPPORTING FUNCTIONS ---

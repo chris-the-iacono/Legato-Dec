@@ -315,8 +315,8 @@ if (myProfile) {
     const { data: reqData, error } = await supabase
         .from('requirements')
         //.select('name, version_number, total_budget')
-		.select('name, total_budget')
-		//.select('name, version_number, total_budget')
+		//.select('name, total_budget')
+		//.select('name, version_number')
         .eq('req_id', cleanId)
         .single();
 

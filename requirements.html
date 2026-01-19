@@ -332,11 +332,10 @@ if (myProfile) {
 
     if (error) {
         console.error("Supabase Metadata Error:", error.message, error.details, error.hint);
-        // This will now print the SPECIFIC reason for the 400 error in the console
         return; 
     }
 
-    // UI Updates
+    // --- UI UPDATES: Metadata Display ---
     const headerEl = document.getElementById('selected-req-title-display');
     const versionEl = document.getElementById('req-version-display'); 
     const budgetEl = document.getElementById('selected-req-budget-display'); 
@@ -347,6 +346,24 @@ if (myProfile) {
         if (budgetEl) {
             const amount = reqData.total_budget || 0;
             budgetEl.innerText = `$${amount.toLocaleString()}`;
+        }
+    }
+
+    // --- NEW: BUTTON UNLOCK LOGIC ---
+    const addTaskBtn = document.getElementById('add-task-btn');
+    if (addTaskBtn) {
+        // RBAC: Check if current user is allowed to add tasks
+        const userRole = window.sessionData?.role;
+        const canAddTask = ['admin', 'project_manager', 'team_leader'].includes(userRole);
+
+        if (canAddTask) {
+            addTaskBtn.disabled = false;
+            addTaskBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+            addTaskBtn.classList.add('opacity-100', 'cursor-pointer');
+        } else {
+            // Keep locked for team_members even if requirement is selected
+            addTaskBtn.disabled = true;
+            addTaskBtn.classList.add('opacity-50', 'cursor-not-allowed');
         }
     }
 

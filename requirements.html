@@ -297,76 +297,51 @@ if (myProfile) {
         // 2. CORE FUNCTIONS (ATTACHED TO WINDOW)
 		// NEW FUNCTION FOR STEP REFRESH 1/13
         window.selectRequirement = async (id) => {
-    // 1. Sanitize and Validate UUID format
-    const cleanId = String(id).trim().replace(/['"]/g, ''); // Remove accidental quotes
+    const cleanId = String(id).trim().replace(/['"]/g, '');
     
-    // Regex to check for standard UUID format
+    // Validation
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    
     if (!uuidRegex.test(cleanId)) {
-        console.error("Selection Blocked: ID is not a valid UUID format.", cleanId);
+        console.error("Invalid UUID:", cleanId);
         return;
     }
 
-    console.log("Requirement clicked. Valid UUID:", cleanId);
+    console.log("Attempting fetch for UUID:", cleanId);
     window.selectedReqId = cleanId;
 
-    // 2. Fetch Latest Metadata
+    // USE SELECT '*' TO ELIMINATE COLUMN NAME ERRORS
     const { data: reqData, error } = await supabase
         .from('requirements')
-        //.select('name, version_number, total_budget')
-		//.select('name, total_budget')
-		//.select('name, version_number')
+        .select('*') 
         .eq('req_id', cleanId)
         .single();
 
     if (error) {
-        console.error("Supabase Metadata Error:", error);
+        console.error("Supabase Metadata Error:", error.message, error.details, error.hint);
+        // This will now print the SPECIFIC reason for the 400 error in the console
         return; 
     }
 
-    // 3. Update UI Header with Version and Budget
+    // UI Updates
     const headerEl = document.getElementById('selected-req-title-display');
     const versionEl = document.getElementById('req-version-display'); 
     const budgetEl = document.getElementById('selected-req-budget-display'); 
 
-    if (headerEl && reqData) {
-        headerEl.innerText = `Tasks for: ${reqData.name}`;
-    }
-
-    if (versionEl) {
-        versionEl.innerText = reqData?.version_number || '1';
-    }
-
-    if (budgetEl) {
-        const amount = reqData?.total_budget || 0;
-        budgetEl.innerText = `$${amount.toLocaleString()}`;
-    }
-
-    // 4. Enable Add Button
-    const addTaskBtn = document.getElementById('add-task-btn');
-    if (addTaskBtn) {
-        addTaskBtn.disabled = false;
-        addTaskBtn.style.pointerEvents = 'auto';
-        addTaskBtn.classList.remove('opacity-50', 'cursor-not-allowed');
-    }
-
-    // 5. Refresh Tasks
-    if (typeof refreshSteps === 'function') {
-        try {
-            await refreshSteps();
-        } catch (refreshError) {
-            console.error("Critical failure during refreshSteps:", refreshError);
+    if (reqData) {
+        if (headerEl) headerEl.innerText = `Tasks for: ${reqData.name}`;
+        if (versionEl) versionEl.innerText = reqData.version_number || '1';
+        if (budgetEl) {
+            const amount = reqData.total_budget || 0;
+            budgetEl.innerText = `$${amount.toLocaleString()}`;
         }
     }
 
-    // 6. Apply Highlight
+    // Refresh steps
+    if (typeof refreshSteps === 'function') await refreshSteps();
+
+    // Highlighting logic
     document.querySelectorAll('.req-row').forEach(row => {
-        row.classList.remove('active-req'); 
-        const rowId = String(row.getAttribute('data-id')).trim().replace(/['"]/g, '');
-        if (rowId === cleanId) {
-            row.classList.add('active-req'); 
-        }
+        row.classList.toggle('active-req', String(row.getAttribute('data-id')).includes(cleanId));
     });
 };
   window.refreshSteps = async () => {

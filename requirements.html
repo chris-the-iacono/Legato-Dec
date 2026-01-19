@@ -983,17 +983,16 @@ async function loadRequirements() {
     if (typeof window.initSortable === 'function') window.initSortable();
 }
 
-// --- NEW/FIXED Jan 15: THE SLIDER POPULATION FUNCTION ---
 window.openReqSlider = async (id = null) => {
     const panel = document.getElementById('req-editor-panel');
     const titleEl = document.getElementById('req-editor-title');
     const btnEl = document.getElementById('req-save-btn');
     const versionEl = document.getElementById('req-version-display');
     const statusBadge = document.getElementById('req-status-badge');
-    const historyContainer = document.getElementById('req-history-list'); // Assumes this ID exists for history
+    const historyContainer = document.getElementById('req-history-list');
 
-    // 0. Permission Check: Determine if the current user is an admin
-    const isAdmin = window.sessionData?.role === 'admin';
+    // 0. Permission Check: Admin, PM, and TL can edit. Team Member cannot.
+    const canEdit = ['admin', 'project_manager', 'team_leader'].includes(window.sessionData?.role);
 
     // 1. Reset Form Fields
     const titleInput = document.getElementById('req-title-input');
@@ -1008,14 +1007,15 @@ window.openReqSlider = async (id = null) => {
     if (versionEl) versionEl.innerText = '0';
     if (historyContainer) historyContainer.innerHTML = '';
 
-    // --- APPLY ADMIN-ONLY LOCKS ---
-    // Rule: Only admin can edit Name (Title) and Assignee
-    titleInput.readOnly = !isAdmin;
-    if (assignSelect) assignSelect.disabled = !isAdmin;
+    // --- APPLY RBAC LOCKS ---
+    // Rule: Restricted roles see ReadOnly fields and no Save button
+    titleInput.readOnly = !canEdit;
+    if (assignSelect) assignSelect.disabled = !canEdit;
+    if (hoursInput) hoursInput.readOnly = !canEdit;
+    if (rateInput) rateInput.readOnly = !canEdit;
     
-    // Non-admins cannot see the save/update button
     if (btnEl) {
-        btnEl.style.display = isAdmin ? 'block' : 'none';
+        btnEl.style.display = canEdit ? 'block' : 'none';
     }
 
     if (!id) {
@@ -1023,8 +1023,7 @@ window.openReqSlider = async (id = null) => {
         window.selectedReqId = null; 
         titleEl.innerText = "Add New Requirement";
         btnEl.innerText = "Create Requirement";
-        
-        btnEl.onclick = () => window.addRequirement();
+        btnEl.onclick = () => window.addRequirement(); // Ensure addRequirement exists
         
         if(statusBadge) {
             statusBadge.innerText = 'Draft';
@@ -1032,31 +1031,35 @@ window.openReqSlider = async (id = null) => {
         }
     } else {
         // --- MODE: EDIT EXISTING ---
-        window.selectedReqId = id; 
+        const cleanId = String(id).trim().replace(/['"]/g, '');
+        window.selectedReqId = cleanId; 
         titleEl.innerText = "Requirement Details";
         
-        // Fetch extended data including the new columns from our SQL migration
-        const { data: req } = await supabase
-    .from('requirements')
-    .select('*')
-    .eq('id', id) // This is the error
-    .single();
+        // Fetch using the CORRECT column name: req_id
+        const { data: req, error } = await supabase
+            .from('requirements')
+            .select('*')
+            .eq('req_id', cleanId) // FIX: Changed from 'id' to 'req_id'
+            .single();
+        
+        if (error) {
+            console.error("Error fetching requirement:", error.message);
+            return;
+        }
         
         if (req) {
-            titleInput.value = req.name || ''; // Mapping 'name' from your SQL schema
+            titleInput.value = req.name || '';
             if (assignSelect) assignSelect.value = req.assigned_to || '';
             hoursInput.value = req.estimated_hours || 0;
             rateInput.value = req.custom_rate || '';
             
-            // Display version from the new version_number column
             if(versionEl) versionEl.innerText = req.version_number || '1';
             
-            // Render History if available
             if (historyContainer && req.requirement_history) {
-                renderHistoryList(req.requirement_history);
+                // Assuming renderHistoryList is defined globally
+                if (typeof renderHistoryList === 'function') renderHistoryList(req.requirement_history);
             }
             
-            // Update Status Badge visually
             if(statusBadge) {
                 statusBadge.innerText = req.status || 'Active';
                 statusBadge.className = req.status === 'Complete' 
@@ -1065,7 +1068,7 @@ window.openReqSlider = async (id = null) => {
             }
 
             btnEl.innerText = "Update Baseline Budget";
-            btnEl.onclick = () => window.addRequirement();
+            btnEl.onclick = () => window.addRequirement(); // Assuming addRequirement handles updates too
         }
     }
     

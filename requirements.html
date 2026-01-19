@@ -530,14 +530,18 @@ window.saveOrder = async (table, container) => {
 
         // --- ROLLUP ENGINE (VERIFIED SCHEMA NAMES) ---
 window.rollupToRequirement = async (reqId = window.selectedReqId, steps = null) => {
+    // 1. Sanitize the UUID to prevent 400 errors
     if (!reqId) return;
+    const cleanReqId = String(reqId).trim().replace(/['"]/g, '');
     
     let tasks = steps;
     if (!tasks) {
         // Fetch using requirement_id (foreign key)
+        // Optimization: Added is_active filter to ensure only valid tasks roll up
         const { data, error: fetchError } = await supabase.from('steps')
             .select('estimated_hours, cost, assigned_to')
-            .eq('requirement_id', reqId);
+            .eq('requirement_id', cleanReqId)
+            .eq('is_active', true); 
         
         if (fetchError) {
             console.error("Error fetching steps for rollup:", fetchError);
@@ -567,26 +571,24 @@ window.rollupToRequirement = async (reqId = window.selectedReqId, steps = null) 
         totalHours += hours;
     });
 
-    // UPDATED: Sync to Database using NEW schema column names
-    // We map 'total_cost' from UI logic to 'total_budget' in the SQL table
+    // 2. Sync to Database using verified column name 'total_budget'
     const { error } = await supabase.from('requirements')
         .update({ 
             estimated_hours: totalHours, 
-            total_budget: calculatedTotalCost, // Changed from total_cost to match SQL migration
+            total_budget: calculatedTotalCost, 
             updated_at: new Date().toISOString()
         })
-        .eq('req_id', reqId);
+        .eq('req_id', cleanReqId); // Use sanitized cleanReqId
 
     if (!error) {
         console.log(`Rollup Sync Success: ${totalHours}h | $${calculatedTotalCost}`);
         
-        // Refresh the Requirements list to update the tile on the left 
-        // and ensure the Project Dashboard (index.html) sees the latest total_budget
+        // 3. UI Sync: Refresh Requirements list tiles
         if (typeof window.loadRequirements === 'function') {
             await window.loadRequirements();
         }
 
-        // Update the Requirement Header in the Task List view if active
+        // 4. UI Sync: Update the Header display in the Task viewport
         const totalBudgetDisplay = document.getElementById('selected-req-budget-display');
         if (totalBudgetDisplay) {
             totalBudgetDisplay.innerText = `$${calculatedTotalCost.toLocaleString()}`;

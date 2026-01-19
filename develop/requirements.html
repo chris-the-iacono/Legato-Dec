@@ -798,7 +798,10 @@ if (error) return alert("Save failed: " + error.message);
 
         window.updateStep = async (id) => {
     // 0. RBAC GUARD: Only Admin, PM, or TL can trigger this database update
-    const canUpdate = ['admin', 'project_manager', 'team_leader'].includes(window.sessionData?.role);
+    const userRole = window.sessionData?.role;
+    const userEmail = window.sessionData?.email || 'Unknown User';
+    const canUpdate = ['admin', 'project_manager', 'team_leader'].includes(userRole);
+    
     if (!canUpdate) {
         alert("Access Denied: You do not have permission to modify task details.");
         return;
@@ -807,32 +810,37 @@ if (error) return alert("Save failed: " + error.message);
     const cleanStepId = String(id).trim().replace(/['"]/g, '');
 
     // 1. Pull current values from the Step Editor UI
-    const title = document.getElementById('step-title-input')?.value.trim();
+    const titleInput = document.getElementById('step-title-input')?.value.trim();
     const assignedId = document.getElementById('step-assign-select')?.value;
     const hours = parseFloat(document.getElementById('step-hours-input')?.value) || 0;
 
-    // 2. MATH LOGIC: Recalculate cost in case assignee or hours changed
+    // 2. MATH LOGIC: Automated Rate Fallback (User Rate -> Blended Rate)
+    // Preservation: We find the user in window.teamMembers to get their specific hourly_cost
     const assignedUser = (window.teamMembers || []).find(m => m.user_id === assignedId);
-    const effectiveRate = (assignedUser && parseFloat(assignedUser.hourly_cost) > 0) 
-        ? parseFloat(assignedUser.hourly_cost) 
-        : (window.projectBlendedRate || 0);
+    
+    const userRate = assignedUser ? parseFloat(assignedUser.hourly_cost) : 0;
+    const effectiveRate = (userRate > 0) ? userRate : (window.projectBlendedRate || 0);
     
     const calculatedCost = hours * effectiveRate;
 
-    // 3. PERSISTENCE: Update the 'steps' table
+    console.log(`Rollup Logic - Task: ${cleanStepId} | Rate: $${effectiveRate} | Cost: $${calculatedCost}`);
+
+    // 3. PERSISTENCE: Update the 'steps' table with audit details
     const { error } = await supabase.from('steps').update({
-        title: title,
+        title: titleInput,
         assigned_to: assignedId,
         estimated_hours: hours,
-        cost: calculatedCost, // Update with the newly calculated math
-        updated_at: new Date().toISOString()
+        cost: calculatedCost, // Persisting the automated math
+        updated_at: new Date().toISOString(),
+        last_edited_by: userEmail // Capturing "By Whom" for the record
     }).eq('step_id', cleanStepId);
 
     if (error) return alert("Update failed: " + error.message);
 
-    // 4. AUDIT LOG: Record the budget change in the activity feed
+    // 4. AUDIT LOG: Record the budget change in the activity feed with standardized text
     if (typeof appendNoteToActivity === 'function') {
-        await appendNoteToActivity(cleanStepId, `Baseline updated: ${hours}h @ $${effectiveRate}/h (Total: $${calculatedCost.toLocaleString()})`);
+        const auditMessage = `Baseline updated by ${userEmail}: ${hours}h @ $${effectiveRate}/h (Total: $${calculatedCost.toLocaleString()})`;
+        await appendNoteToActivity(cleanStepId, auditMessage);
     }
 
     // 5. SYNC: Close UI, trigger requirement-level rollup, and refresh list
@@ -841,7 +849,7 @@ if (error) return alert("Save failed: " + error.message);
     }
     
     // --- THE CRITICAL ROLLUP ---
-    // Recalculates the parent requirement's total_budget based on this update
+    // Recalculates the parent requirement's total_budget in the 'requirements' table
     await window.rollupToRequirement(window.selectedReqId);
 
     // Refresh the task list UI to show the new cost/hours
@@ -851,7 +859,7 @@ if (error) return alert("Save failed: " + error.message);
         await loadSteps(window.selectedReqId);
     }
 
-    console.log(`Task ${cleanStepId} updated and budget rolled up.`);
+    console.log(`Task ${cleanStepId} updated successfully. Budget rolled up to Requirement ${window.selectedReqId}.`);
 };
 
         // --- SUPPORTING FUNCTIONS ---

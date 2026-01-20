@@ -631,30 +631,31 @@ window.rollupToRequirement = async (reqId = window.selectedReqId, steps = null) 
     const titleEl = document.getElementById('task-editor-title');
     const btnEl = document.getElementById('task-save-btn');
     
-    // Permissions Check (Standardized)
-const isAdmin = window.sessionData?.role === 'admin';
+    // 1. Permissions Check (Standardized)
+    const isAdmin = window.sessionData?.role === 'admin';
     document.querySelectorAll('[data-admin-only]').forEach(el => {
         el.disabled = !isAdmin;
         if(!isAdmin) el.classList.add('bg-gray-100', 'cursor-not-allowed');
     });
 
-    // Reset Form
+    // 2. Reset Form Fields
     document.getElementById('step-title-input').value = '';
     document.getElementById('step-assign-select').value = '';
     document.getElementById('step-hours-input').value = 0;
     document.getElementById('step-cost-input').value = "0.00";
     document.getElementById('notes-container').innerHTML = '<p class="text-xs text-gray-400 italic">No activity yet.</p>';
     
-    // Clear any existing Actuals Summary display
+    // Clear any existing Actuals Summary display to prevent UI blocking/stacking
     const existingSummary = document.getElementById('actuals-summary-display');
     if (existingSummary) existingSummary.remove();
 
     if (id) {
+        // --- MODE: EDIT EXISTING ---
         window.selectedStepId = id;
         titleEl.innerText = "Task Details";
         btnEl.innerText = "Update Baseline Changes";
         
-        // 1. Fetch Task Details (Verified Schema: steps)
+        // Fetch Task Details
         const { data: step } = await supabase.from('steps').select('*').eq('step_id', id).single();
         if (step) {
             document.getElementById('step-title-input').value = step.title;
@@ -666,11 +667,11 @@ const isAdmin = window.sessionData?.role === 'admin';
             if (typeof loadTaskNotes === 'function') loadTaskNotes(id);
         }
 
-        // 2. Fetch and Display Actuals (Verified Schema: time_logs)
+        // Fetch and Display Actuals (time_logs)
         const { data: logs } = await supabase
             .from('time_logs')
-            .select('hours_spent, calculated_cost') // Corrected from hours_logged, billing_amount
-            .eq('task_id', id); // Corrected from step_id
+            .select('hours_spent, calculated_cost')
+            .eq('task_id', id);
 
         const totalActualHrs = logs?.reduce((sum, l) => sum + (parseFloat(l.hours_spent) || 0), 0) || 0;
         const totalActualCost = logs?.reduce((sum, l) => sum + (parseFloat(l.calculated_cost) || 0), 0) || 0;
@@ -696,30 +697,31 @@ const isAdmin = window.sessionData?.role === 'admin';
         }
 
     } else {
+        // --- MODE: ADD NEW ---
         window.selectedStepId = null;
         titleEl.innerText = "Add New Task";
         btnEl.innerText = "Save Task";
         btnEl.onclick = () => window.submitStep();
     }
-  // --- DELETE BUTTON INITIALIZATION ---
-const delBtn = document.getElementById('delete-task-btn');
-if (delBtn) {
-    // 1. RBAC: Only show the delete button if user is Admin, PM, or TL
-    const userRole = window.sessionData?.role;
-    const canDelete = ['admin', 'project_manager', 'team_leader'].includes(userRole);
-    
-    // 2. Logic: Only show delete if we are EDITING an existing task (id exists)
-    if (id && canDelete) {
-        delBtn.style.display = 'block';
-        delBtn.onclick = async () => {
-            // This triggers the soft-delete and budget rollup
-            await window.deleteStep(id);
-        };
-    } else {
-        // Hide if it's a new task or the user lacks permissions
-        delBtn.style.display = 'none';
+
+    // --- DELETE BUTTON INITIALIZATION ---
+    const delBtn = document.getElementById('delete-task-btn');
+    if (delBtn) {
+        const userRole = window.sessionData?.role;
+        const canDelete = ['admin', 'project_manager', 'team_leader'].includes(userRole);
+        
+        // Only show if we are editing an existing task AND have permission
+        if (id && canDelete) {
+            delBtn.style.display = 'block';
+            delBtn.onclick = async () => {
+                const confirmed = confirm("Are you sure you want to remove this task from the baseline?");
+                if (confirmed) await window.deleteStep(id);
+            };
+        } else {
+            delBtn.style.display = 'none';
+        }
     }
-}  
+    
     panel.classList.add('active');
 };
 

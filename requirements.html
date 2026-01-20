@@ -379,11 +379,15 @@ if (myProfile) {
     const reqId = window.selectedReqId;
     if (!reqId) return;
 
-    // 1. Fetch Steps
+    // 1. Fetch Steps with Expanded Assignee Details & Active Filter
     const { data: steps, error } = await supabase
         .from('steps')
-        .select(`*, assignee:assigned_to(email)`) 
+        .select(`
+            *, 
+            assignee:assigned_to(email, full_name, avatar_url)
+        `) 
         .eq('requirement_id', reqId) 
+        .eq('is_active', true) // Only show tasks that haven't been soft-deleted
         .order('sequence_order', { ascending: true });
 
     if (error) {
@@ -393,12 +397,18 @@ if (myProfile) {
 
     // 2. Fetch Time Logs using correct schema: task_id, hours_spent, calculated_cost
     const stepIds = steps?.map(s => s.step_id) || [];
-    const { data: logs } = await supabase
-        .from('time_logs')
-        .select('task_id, hours_spent, calculated_cost')
-        .in('task_id', stepIds);
+    let logs = [];
+    
+    if (stepIds.length > 0) {
+        const { data: logData, error: logError } = await supabase
+            .from('time_logs')
+            .select('task_id, hours_spent, calculated_cost')
+            .in('task_id', stepIds);
+        
+        if (!logError) logs = logData;
+    }
 
-    // Update Task Counter
+    // Update Task Counter UI
     const taskCountEl = document.getElementById('task-count');
     if (taskCountEl) taskCountEl.innerText = `${steps?.length || 0} TASKS`;
 
@@ -429,6 +439,9 @@ if (myProfile) {
             const healthClass = actHrs > estHrs ? 'text-red-500 font-black' : 'text-green-600 font-bold';
             const menuHtml = (typeof getKabobMenu === 'function') ? getKabobMenu(s, 'task') : '';
             
+            // Logic for Display Name: Use Full Name if available, otherwise Email
+            const displayName = s.assignee?.full_name || s.assignee?.email || 'Unassigned';
+            
             return `
                 <div class="task-card active-task-row p-4 mb-3 bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md cursor-pointer group flex justify-between items-center" 
                      data-id="${s.step_id}" onclick="window.openTaskSlider('${s.step_id}')">
@@ -441,7 +454,7 @@ if (myProfile) {
                                 <span class="text-[9px] bg-blue-100 text-blue-600 px-1.5 rounded font-bold uppercase">v${s.version || 1}</span>
                             </div>
                             <p class="text-[10px] text-gray-400 uppercase font-bold">
-                                Est: ${estHrs}h | 
+                                ${displayName} • Est: ${estHrs}h | 
                                 <span class="${healthClass}">Act: ${actHrs.toFixed(1)}h</span>
                             </p>
                         </div>
@@ -468,15 +481,17 @@ if (myProfile) {
         }
     }).join('');
 
-    // --- CRITICAL FIX: The Delay ---
+    // Re-bind Sortable (Wait for DOM paint)
     setTimeout(() => {
         if (typeof window.initSortable === 'function') {
             window.initSortable();
-            console.log("Sortable re-bound to Tasks");
         }
     }, 50);
 
-    if (typeof rollupToRequirement === 'function') window.rollupToRequirement(reqId, steps);
+    // Final Background Rollup Sync
+    if (typeof window.rollupToRequirement === 'function') {
+        window.rollupToRequirement(reqId, steps);
+    }
 };
 
 // --- UPDATED TILE DRAG AND DROP ---
@@ -555,14 +570,13 @@ window.saveOrder = async (table, container) => {
 
         // --- ROLLUP ENGINE (VERIFIED SCHEMA NAMES) ---
 window.rollupToRequirement = async (reqId = window.selectedReqId, steps = null) => {
-    // 1. Sanitize the UUID to prevent 400 errors
+    // 1. Sanitize the UUID
     if (!reqId) return;
     const cleanReqId = String(reqId).trim().replace(/['"]/g, '');
     
     let tasks = steps;
     if (!tasks) {
         // Fetch using requirement_id (foreign key)
-        // Optimization: Added is_active filter to ensure only valid tasks roll up
         const { data, error: fetchError } = await supabase.from('steps')
             .select('estimated_hours, cost, assigned_to')
             .eq('requirement_id', cleanReqId)
@@ -583,8 +597,7 @@ window.rollupToRequirement = async (reqId = window.selectedReqId, steps = null) 
         const hours = parseFloat(s.estimated_hours) || 0;
         let taskCost = parseFloat(s.cost) || 0;
 
-        // Fallback Calculation logic preserved: 
-        // If task cost is 0, calculate based on user hourly cost or project blended rate
+        // Fallback Logic: If DB cost is 0, calculate based on user rate or blended rate
         if (taskCost === 0 && hours > 0) {
             const user = members.find(m => m.user_id === s.assigned_to);
             const effectiveRate = (user && parseFloat(user.hourly_cost) > 0) 
@@ -596,30 +609,44 @@ window.rollupToRequirement = async (reqId = window.selectedReqId, steps = null) 
         totalHours += hours;
     });
 
-    // 2. Sync to Database using verified column name 'total_budget'
+    // 2. Sync to Database
     const { error } = await supabase.from('requirements')
         .update({ 
             estimated_hours: totalHours, 
             total_budget: calculatedTotalCost, 
             updated_at: new Date().toISOString()
         })
-        .eq('req_id', cleanReqId); // Use sanitized cleanReqId
+        .eq('req_id', cleanReqId);
 
-    if (!error) {
-        console.log(`Rollup Sync Success: ${totalHours}h | $${calculatedTotalCost}`);
-        
-        // 3. UI Sync: Refresh Requirements list tiles
-        if (typeof window.loadRequirements === 'function') {
-            await window.loadRequirements();
-        }
-
-        // 4. UI Sync: Update the Header display in the Task viewport
-        const totalBudgetDisplay = document.getElementById('selected-req-budget-display');
-        if (totalBudgetDisplay) {
-            totalBudgetDisplay.innerText = `$${calculatedTotalCost.toLocaleString()}`;
-        }
-    } else {
+    if (error) {
         console.error("Rollup Update Error:", error.message);
+        return;
+    }
+
+    console.log(`Rollup Sync Success: ${totalHours}h | $${calculatedTotalCost}`);
+
+    // --- 3. UI SYNC (THE "INSTANT" MERGE) ---
+    
+    // A. Update the Header display immediately
+    const totalBudgetDisplay = document.getElementById('selected-req-budget-display');
+    if (totalBudgetDisplay) {
+        totalBudgetDisplay.innerText = `$${calculatedTotalCost.toLocaleString()}`;
+    }
+
+    // B. Target the specific Sidebar Tile for an instant update (no flicker)
+    const tile = document.querySelector(`.req-row[data-id="${cleanReqId}"]`);
+    if (tile) {
+        const hourBadge = tile.querySelector('.hour-badge'); 
+        const budgetBadge = tile.querySelector('.budget-display');
+        if (hourBadge) hourBadge.innerText = `${totalHours}h`;
+        if (budgetBadge) budgetBadge.innerText = `$${calculatedTotalCost.toLocaleString()}`;
+    }
+
+    // C. Background Refresh (Optional: keep the list in sync globally)
+    if (typeof window.loadRequirements === 'function') {
+        // We call this without 'await' so the UI feels instant, 
+        // while the data refreshes in the background.
+        window.loadRequirements();
     }
 };
 
@@ -726,9 +753,18 @@ window.rollupToRequirement = async (reqId = window.selectedReqId, steps = null) 
 };
 
         window.submitStep = async () => {
-    // 1. Validation & Pre-checks
+    // 1. RBAC GUARD: Ensure user has permissions before any logic runs
+    const userRole = window.sessionData?.role;
+    const canAddTask = ['admin', 'project_manager', 'team_leader'].includes(userRole);
+
+    if (!canAddTask) {
+        alert("Access Denied: Your role does not have permission to add tasks.");
+        return;
+    }
+
     if (!window.selectedReqId) return alert("Select a requirement first.");
     
+    // 2. DATA PULLING & VALIDATION
     const title = document.getElementById('step-title-input')?.value.trim();
     const assignedId = document.getElementById('step-assign-select')?.value;
     const hours = parseFloat(document.getElementById('step-hours-input')?.value) || 0;
@@ -737,15 +773,15 @@ window.rollupToRequirement = async (reqId = window.selectedReqId, steps = null) 
         return alert("Fill all required fields (Title, Assignee, and Hours > 0).");
     }
 
-    // 2. MATH LOGIC: Calculate cost based on the assigned user's rate
+    // 3. MATH LOGIC: Automated Costing Engine
     const assignedUser = (window.teamMembers || []).find(m => m.user_id === assignedId);
-    const effectiveRate = (assignedUser && parseFloat(assignedUser.hourly_cost) > 0) 
-        ? parseFloat(assignedUser.hourly_cost) 
-        : (window.projectBlendedRate || 0);
+    const userRate = assignedUser ? parseFloat(assignedUser.hourly_cost) : 0;
+    const blendedRate = parseFloat(window.projectBlendedRate) || 0;
+    const effectiveRate = (userRate > 0) ? userRate : blendedRate;
     
     const calculatedCost = hours * effectiveRate;
 
-    // 3. SEQUENCE LOGIC: Get Next Order (Maintains drag-and-drop position)
+    // 4. SEQUENCE LOGIC: Get Next Order for sorting
     const { data: existing } = await supabase
         .from('steps')
         .select('sequence_order')
@@ -755,34 +791,43 @@ window.rollupToRequirement = async (reqId = window.selectedReqId, steps = null) 
     
     const nextOrder = (existing?.[0]?.sequence_order || 0) + 10;
 
-    // 4. RBAC & PERSISTENCE: Guard and Save to Supabase 'steps' table
-const userRole = window.sessionData?.role;
-const canAddTask = ['admin', 'project_manager', 'team_leader'].includes(userRole);
+    // 5. PERSISTENCE: Save to Supabase
+    const { data: newStep, error } = await supabase.from('steps').insert([{
+        requirement_id: window.selectedReqId,
+        tenant_id: window.sessionData?.tenantId, // CRITICAL: Maintains multi-tenancy
+        title: title,
+        assigned_to: assignedId,
+        estimated_hours: hours,
+        cost: calculatedCost,
+        sequence_order: nextOrder,
+        status: 'pending',
+        created_by: window.sessionData?.email // Audit trail
+    }]).select().single();
 
-if (!canAddTask) {
-    alert("Access Denied: Your role does not have permission to add tasks.");
-    return; // Stop the function here
-}
+    if (error) return alert("Save failed: " + error.message);
 
-const { data: newStep, error } = await supabase.from('steps').insert([{
-    requirement_id: window.selectedReqId,
-    tenant_id: window.sessionData?.tenantId || tenantId,
-    title: title,
-    assigned_to: assignedId,
-    estimated_hours: hours,
-    cost: calculatedCost, // Persists the calculated math
-    sequence_order: nextOrder,
-    status: 'pending'
-}]).select().single();
-
-if (error) return alert("Save failed: " + error.message);
-
-    // 5. AUDIT LOG: Create initial note using standardized sessionData
+    // 6. AUDIT LOG: Direct insertion into task_notes
     await supabase.from('task_notes').insert([{ 
         task_id: newStep.step_id, 
         user_id: window.sessionData?.user_id, 
         content: `Task created. Budgeted at $${calculatedCost.toLocaleString()} (${hours}h @ $${effectiveRate}/h)` 
     }]);
+
+    // 7. SYNC: Close UI and Trigger the Rollup
+    if (typeof window.closeTaskSlider === 'function') window.closeTaskSlider();
+    
+    // Use the consolidated rollup we verified earlier
+    await window.rollupToRequirement(window.selectedReqId);
+
+    // Refresh the task list viewport
+    if (typeof window.refreshSteps === 'function') {
+        await window.refreshSteps();
+    } else if (typeof loadSteps === 'function') {
+        await loadSteps(window.selectedReqId);
+    }
+    
+    console.log("New Task saved and requirement budget updated.");
+};
 
     // 6. SYNC: Close UI, trigger requirement-level rollup, and refresh list
     window.closeTaskSlider();

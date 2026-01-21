@@ -828,21 +828,9 @@ window.rollupToRequirement = async (reqId = window.selectedReqId, steps = null) 
     }
     
     console.log("New Task saved and requirement budget updated.");
-};
+}; // This correctly closes submitStep
 
     // 6. SYNC: Close UI, trigger requirement-level rollup, and refresh list
-    window.closeTaskSlider();
-    
-    // Update the main Requirement total_budget column in the database
-    await window.rollupToRequirement(window.selectedReqId);
-    
-    // Refresh the task list UI
-    if (typeof window.refreshSteps === 'function') {
-        await window.refreshSteps();
-    } else if (typeof loadSteps === 'function') {
-        await loadSteps(window.selectedReqId);
-    }
-};
 
         // --- 1. CONSOLIDATED TASK UPDATE LOGIC ---
 window.updateStep = async (id) => {

@@ -3,89 +3,37 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Requirements | Project Manager</title>
+    <title>Requirements & Tasks | Project Budget Manager</title>
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
-    
     <style>
-    /* Layout & Viewport */
-    .app-container { 
-        height: calc(100vh - 140px); 
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 1.5rem;
-    }
-    .list-viewport { overflow-y: auto; flex-grow: 1; position: relative; }
-    
-    /* Active State Highlights */
-    .active-req { background-color: #f5f3ff !important; border-left: 4px solid #6366f1 !important; }
-    .active-task { background-color: #eff6ff !important; border-left: 4px solid #3b82f6 !important; }
-
-    /* Status Badges */
-    .status-pending { background-color: #f3f4f6; color: #374151; padding: 2px 8px; border-radius: 9999px; border: 1px solid #e5e7eb; }
-    .status-inprogress { background-color: #eff6ff; color: #2563eb; padding: 2px 8px; border-radius: 9999px; border: 1px solid #dbeafe; }
-    .status-complete { background-color: #f0fdf4; color: #16a34a; padding: 2px 8px; border-radius: 9999px; border: 1px solid #dcfce7; }
-
-    /* Slider Animations */
-    .side-slider {
-        position: fixed;
-        top: 0;
-        width: 450px;
-        height: 100vh;
-        background: white;
-        box-shadow: 0 0 40px rgba(0,0,0,0.15);
-        transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-        z-index: 1000;
-        display: flex;
-        flex-direction: column;
-    }
-
-    #req-editor-panel { right: 0; transform: translateX(100%); }
-    #req-editor-panel.active { transform: translateX(0); }
-
-    #task-editor-panel { left: 0; transform: translateX(-100%); }
-    #task-editor-panel.active { transform: translateX(0); }
-
-    /* Kebab Menu Animation */
-    [id^="kebab-req-"], [id^="kebab-task-"] { animation: slideIn 0.15s ease-out; }
-    @keyframes slideIn { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
-
-    /* RBAC: Hide Drag Handles */
-    body.hide-drag-handles .cursor-move {
-        display: none !important;
-        pointer-events: none;
-    }
-</style>
+        .app-container { height: calc(100vh - 140px); display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+        .list-viewport { overflow-y: auto; flex-grow: 1; position: relative; }
+        .active-req { background-color: #f5f3ff !important; border-left: 4px solid #6366f1 !important; }
+        .active-task { background-color: #eff6ff !important; border-left: 4px solid #3b82f6 !important; }
+        .side-slider { position: fixed; top: 0; width: 450px; height: 100vh; background: white; box-shadow: 0 0 40px rgba(0,0,0,0.15); transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1); z-index: 1000; display: flex; flex-direction: column; }
+        #req-editor-panel { right: 0; transform: translateX(100%); }
+        #req-editor-panel.active { transform: translateX(0); }
+        #task-editor-panel { left: 0; transform: translateX(-100%); }
+        #task-editor-panel.active { transform: translateX(0); }
+        .cursor-move { cursor: move; }
+        /* Disable Canvas as per instructions */
+        canvas { display: none !important; }
+    </style>
 </head>
 <body class="bg-gray-100 min-h-screen overflow-hidden">
     <div id="main-header"></div>
-    
     <main class="max-w-7xl mx-auto p-4 lg:p-6">
         <div class="app-container">
             <section class="bg-white rounded-xl shadow-sm border border-gray-200 flex flex-col overflow-hidden">
                 <div class="px-4 py-4 border-b bg-gray-50/80 flex justify-between items-center">
                     <div>
-                        <h3 class="font-bold text-gray-800">1. Requirements</h3>
-                        <p class="text-[9px] text-gray-400 font-bold uppercase tracking-wider">Project Backlog</p>
+                        <h3 class="font-bold text-gray-800">1. Requirements (Project Budgets)</h3>
+                        <p id="req-count" class="text-[9px] text-gray-400 font-bold uppercase tracking-wider">0 ITEMS</p>
                     </div>
-                    <div class="flex items-center gap-2">
-                        <span id="req-count" class="text-[10px] bg-gray-200 text-gray-600 px-2 py-1 rounded-full font-bold">0 ITEMS</span>
-                        <button onclick="window.openReqSlider()" class="bg-indigo-600 text-white p-1.5 rounded-lg hover:bg-indigo-700 transition shadow-md">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
-                        </button>
-                    </div>
-                </div>
-                <div id="bulk-actions" class="hidden bg-indigo-50 p-2 border-b flex justify-between items-center transition-all">
-                    <span id="selected-count" class="text-xs font-bold text-indigo-700 ml-2">0 selected</span>
-                    <div class="flex gap-2">
-                        <select id="bulk-status-select" class="text-xs border-gray-300 rounded p-1">
-                            <option value="">Change to...</option>
-                            <option value="Pending">Pending</option>
-                            <option value="In Progress">In Progress</option>
-                            <option value="Complete">Complete</option>
-                        </select>
-                        <button onclick="window.applyBulkStatus()" class="bg-indigo-600 text-white px-3 py-1 rounded text-xs font-bold hover:bg-indigo-700">Apply</button>
-                    </div>
+                    <button onclick="window.openReqSlider()" class="bg-indigo-600 text-white p-1.5 rounded-lg hover:bg-indigo-700 shadow-md">
+                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                    </button>
                 </div>
                 <ul id="req-list" class="list-viewport divide-y divide-gray-100"></ul>
             </section>
@@ -94,1617 +42,176 @@
                 <div class="px-4 py-4 border-b bg-blue-50/80 flex justify-between items-center">
                     <div>
                         <h3 id="selected-req-title-display" class="font-bold text-gray-800">2. Task Breakdown</h3>
-                        <p id="selected-req-meta" class="text-[9px] text-blue-500 font-bold uppercase tracking-wider">Select a requirement to view tasks</p>
+                        <p id="selected-req-budget-display" class="text-[10px] text-blue-600 font-black">$0.00</p>
                     </div>
-                    <div class="flex items-center gap-2">
-                        <span id="task-count" class="text-[10px] bg-blue-100 text-blue-600 px-2 py-1 rounded-full font-bold">0 TASKS</span>
-                        <button id="add-task-btn" onclick="window.openTaskSlider()" class="bg-blue-600 text-white p-1.5 rounded-lg hover:bg-blue-700 transition shadow-md opacity-50 cursor-not-allowed" disabled>
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
-                        </button>
-                    </div>
+                    <button id="add-task-btn" onclick="window.openTaskSlider()" disabled class="bg-blue-600 text-white p-1.5 rounded-lg opacity-50 cursor-not-allowed">
+                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                    </button>
                 </div>
                 <ul id="step-list" class="list-viewport divide-y divide-gray-100"></ul>
             </section>
         </div>
     </main>
 
-    <section id="req-editor-panel" class="side-slider">
-    <div class="flex justify-between items-center p-4 border-b bg-indigo-50">
-        <div>
-            <h2 id="req-editor-title" class="font-bold text-lg text-indigo-900">Requirement Details</h2>
-            <div class="flex gap-2 items-center">
-                <p class="text-[10px] text-indigo-400 font-bold uppercase">Budget Version: <span id="req-version-display">0</span></p>
-                <span id="req-status-badge" class="text-[9px] px-2 py-0.5 rounded-full font-bold uppercase bg-green-100 text-green-700">Active</span>
-            </div>
+    <div id="req-editor-panel" class="side-slider">
+        <div class="p-4 border-b bg-indigo-50 flex justify-between items-center">
+            <h2 id="req-editor-title" class="font-bold">Requirement Details</h2>
+            <button onclick="window.closeReqSlider()">&times;</button>
         </div>
-        <button onclick="window.closeReqSlider()" class="text-gray-400 hover:text-indigo-600 transition-colors">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-        </button>
-    </div>
-    
-    <!-- Added h-full and flex-col to ensure history stays at bottom or scrolls properly -->
-    <div class="p-6 space-y-6 overflow-y-auto h-[calc(100vh-80px)]">
-        <div class="space-y-4">
-            <div>
-                <label class="text-[11px] font-bold text-gray-500 uppercase ml-1">Title</label>
-                <input type="text" id="req-title-input" data-admin-only placeholder="e.g. Database Migration" class="w-full border-gray-200 rounded-lg text-sm p-3 border outline-none focus:ring-2 focus:ring-indigo-500 disabled:bg-gray-50 disabled:text-gray-400">
-            </div>
-            
-            <div class="grid grid-cols-2 gap-4">
-                <div class="flex flex-col">
-                    <label class="text-[11px] font-bold text-gray-500 uppercase mb-1 ml-1">Accountable</label>
-                    <select id="req-assign-select" data-admin-only onchange="window.handleUserSelection('req')" class="bg-white border-gray-200 rounded-lg text-sm p-3 border disabled:bg-gray-50"></select>
-                </div>
-                <div class="flex flex-col">
-                    <label class="text-[11px] font-bold text-gray-500 uppercase mb-1 ml-1">Applied Rate</label>
-                    <input type="number" id="req-applied-rate" readonly class="bg-gray-100 border-gray-200 rounded-lg text-sm p-3 font-mono text-gray-500 border">
-                </div>
-            </div>
-
-            <div>
-                <label class="text-[11px] font-bold text-gray-500 uppercase mb-1 ml-1">Estimated Budget (Hours)</label>
-                <input type="number" id="req-hours-input" data-admin-only placeholder="0" class="w-full border-gray-200 rounded-lg text-sm p-3 border disabled:bg-gray-50">
-            </div>
-
-            <div class="pt-4" id="req-admin-actions">
-                <button id="req-save-btn" onclick="window.addRequirement()" class="w-full bg-indigo-600 text-white py-3 rounded-lg text-sm font-bold hover:bg-indigo-700 shadow-lg transition-all">
-                    Update Baseline Budget
-                </button>
-                <p class="text-[10px] text-gray-400 text-center mt-2 italic">Note: Saving will create a new timestamped baseline version.</p>
-            </div>
-        </div>
-
-        <!-- NEW: Dedicated History Section -->
-        <div id="req-history-section" class="mt-10 pt-8 border-t border-gray-100">
-            <h3 class="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4">Baseline History & Audit Trail</h3>
-            <div id="req-history-list" class="space-y-4">
-                <!-- History items will be injected here by renderHistoryList() -->
-                <p class="text-xs text-gray-400 italic text-center py-4">No history records found.</p>
-            </div>
+        <div class="p-6 space-y-4">
+            <input type="text" id="req-title-input" placeholder="Title" class="w-full p-2 border rounded">
+            <select id="req-assign-select" class="w-full p-2 border rounded"></select>
+            <input type="number" id="req-hours-input" placeholder="Hours" class="w-full p-2 border rounded">
+            <input type="number" id="req-applied-rate" placeholder="Rate" class="w-full p-2 border rounded">
+            <button id="req-save-btn" class="w-full bg-indigo-600 text-white py-2 rounded">Save Requirement</button>
+            <div id="req-history-list" class="mt-4 text-xs space-y-2"></div>
         </div>
     </div>
-</section>
 
-    <section id="task-editor-panel" class="side-slider">
-    <div class="flex justify-between items-center p-4 border-b bg-blue-50">
-        <div>
-            <h2 id="task-editor-title" class="font-bold text-lg text-blue-900">Task Details</h2>
-            <p class="text-[10px] text-blue-400 font-bold uppercase">Task Reality & Tracking</p>
+    <div id="task-editor-panel" class="side-slider">
+        <div class="p-4 border-b bg-blue-50 flex justify-between items-center">
+            <h2 id="task-editor-title" class="font-bold">Task Details</h2>
+            <button onclick="window.closeTaskSlider()">&times;</button>
         </div>
-        <button onclick="window.closeTaskSlider()" class="text-gray-400 hover:text-blue-600 transition-colors">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
-        </button>
-    </div>
-    
-    <div class="flex-grow overflow-y-auto p-6 space-y-8">
-        <div class="space-y-4 pb-6 border-b border-gray-100">
-            <h3 class="text-[11px] font-black text-gray-400 uppercase tracking-widest">Baseline Estimate</h3>
-            <div>
-                <label class="text-[10px] font-bold text-gray-400 uppercase ml-1">Task Title</label>
-                <input type="text" id="step-title-input" data-admin-only class="w-full border-gray-200 rounded-lg text-sm p-3 border">
+        <div class="p-6 space-y-4">
+            <input type="text" id="step-title-input" class="w-full p-2 border rounded">
+            <select id="step-assign-select" class="w-full p-2 border rounded"></select>
+            <div class="grid grid-cols-2 gap-2">
+                <input type="number" id="step-hours-input" class="p-2 border rounded">
+                <input type="text" id="step-cost-input" readonly class="p-2 border rounded bg-gray-50">
             </div>
-            <div class="grid grid-cols-2 gap-4">
-                <div class="flex flex-col">
-                    <label class="text-[10px] font-bold text-gray-400 uppercase mb-1 ml-1">Responsible</label>
-                    <select id="step-assign-select" data-admin-only onchange="window.handleUserSelection('step')" class="border-gray-200 rounded-lg text-sm p-3 bg-gray-50 border"></select>
-                </div>
-                <div class="grid grid-cols-2 gap-2">
-                    <div class="flex flex-col">
-                        <label class="text-[10px] font-bold text-gray-400 uppercase mb-1 ml-1">Est. Hrs</label>
-                        <input type="number" id="step-hours-input" data-admin-only class="border-gray-200 rounded-lg text-sm p-3 border">
-                    </div>
-                    <div class="flex flex-col">
-                        <label class="text-[10px] font-bold text-gray-400 uppercase mb-1 ml-1">Est. Cost</label>
-                        <input type="number" id="step-cost-input" readonly class="bg-gray-50 border-gray-200 rounded-lg text-sm p-3 font-mono border">
-                    </div>
-                </div>
-            </div>
-            
-            <div class="space-y-3 pt-2">
-                <button id="task-save-btn" data-admin-only onclick="window.submitStep()" class="w-full bg-blue-600 text-white py-3 rounded-lg text-xs font-bold hover:bg-blue-700 transition-all shadow-md">
-                    Save Baseline Changes
-                </button>
-                
-                <button id="delete-task-btn" data-admin-only class="w-full bg-white text-red-600 border border-red-100 py-2 rounded-lg text-[10px] font-bold hover:bg-red-50 transition-all uppercase tracking-wider">
-                    Remove Task from Baseline
-                </button>
-            </div>
-        </div>
-
-        <div id="log-time-section" class="bg-green-50/50 p-4 rounded-xl border border-green-100 space-y-4">
-            <h3 class="text-[11px] font-black text-green-600 uppercase tracking-widest">Log Actual Work</h3>
-            <div class="grid grid-cols-2 gap-3">
-                <input type="number" id="log-hours" step="0.25" placeholder="Hours" class="p-2 border rounded-lg text-sm">
-                <input type="date" id="log-date" class="p-2 border rounded-lg text-sm text-gray-500">
-            </div>
-            <button onclick="window.saveTimeLog()" class="w-full bg-green-600 text-white py-2 rounded-lg text-xs font-bold hover:bg-green-700">Save Time Log</button>
-        </div>
-
-        <div class="space-y-4">
-            <h3 class="text-[11px] font-black text-gray-400 uppercase tracking-widest">Activity & Notes</h3>
-            <div id="notes-container" class="space-y-3 max-h-48 overflow-y-auto pr-2"></div>
-            <div class="flex gap-2">
-                <input type="text" id="new-note-input" placeholder="Append a note..." class="flex-grow p-2 border rounded-lg text-sm">
-                <button type="button" onclick="window.appendNote()" class="bg-gray-800 text-white px-4 py-2 rounded-lg text-xs font-bold hover:bg-black">Add</button>
-            </div>
+            <button id="task-save-btn" class="w-full bg-blue-600 text-white py-2 rounded">Save Task</button>
+            <button id="delete-task-btn" class="w-full text-red-600 text-xs hidden">Delete Task</button>
+            <div id="log-time-section" class="pt-4 border-t"></div>
+            <div id="notes-container" class="space-y-2"></div>
         </div>
     </div>
-</section>
+	<script type="module">
+    import { supabase } from './js/config.js';
 
+    // Globals
+    let projectId = new URLSearchParams(window.location.search).get('id');
+    let tenantId = null;
+    window.selectedReqId = null;
+    window.projectBlendedRate = 0;
+    window.teamMembers = [];
 
-<script type="module"> 
-        import { supabase, MODULES } from './js/config.js';
-        import { checkAccess } from './js/auth.js';
-        import { renderProjectHeader } from './js/components.js';
+    // --- INITIALIZATION ---
+    document.addEventListener('DOMContentLoaded', async () => {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return window.location.href = 'login.html';
 
-        // We will use window.sessionData globally
-let projectId = new URLSearchParams(window.location.search).get('id');
-        let tenantId = null; 
-        window.selectedReqId = null; // Ensuring global scope
-        window.selectedStepId = null;
-        window.projectBlendedRate = 0;
-        window.teamMembers = [];
+        const { data: proj } = await supabase.from('projects').select('*').eq('id', projectId).single();
+        window.projectBlendedRate = proj?.blended_rate || 0;
 
-        // 1. AUTH & INITIALIZATION
-        document.addEventListener('DOMContentLoaded', async () => {
-            const { data: { user }, error: authError } = await supabase.auth.getUser();
-            
-            if (authError || !user) {
-                console.error("No active session found.");
-                window.location.href = 'login.html';
-                return;
-            }
-
-            // Get Project ID
-            const urlParams = new URLSearchParams(window.location.search);
-            projectId = urlParams.get('id') || localStorage.getItem('selected_project_id');
-            
-            if (!projectId || projectId === "undefined") {
-                console.error("No Project ID found.");
-                window.location.href = 'index.html';
-                return;
-            }
-
-            // Fetch Project Data
-            const { data: proj } = await supabase.from('projects').select('blended_rate, name').eq('id', projectId).single();
-            window.projectBlendedRate = proj?.blended_rate || 0;
-            const projectName = proj?.name || localStorage.getItem('selected_project_name');
-
-            // Fetch Profiles
-            const { data: profiles } = await supabase.from('user_profiles').select('user_id, email, full_name, hourly_cost, tenant_id, role'); 
-            window.teamMembers = profiles || [];
-            
-            const myProfile = window.teamMembers.find(p => p.user_id === user.id);
-if (myProfile) {
-    // Standardizing the global session object
-    window.sessionData = {
-        user_id: user.id, // Using user_id for consistency with profile table
-        role: myProfile.role,
-        full_name: myProfile.full_name,
-        tenantId: myProfile.tenant_id
-    };
-    tenantId = myProfile.tenant_id;
-}
-            
-            populateDropdowns();
-            
-            // Header Rendering (Using your specific session structure)
-            try {
-                if (typeof renderProjectHeader === 'function') {
-                    const sessionForHeader = { 
-                        user: { ...user, user_metadata: user.user_metadata || {} }, 
-                        modules: { module_requirements: true, module_risks: true, module_issues: true, module_changes: true } 
-                    };
-                    renderProjectHeader(sessionForHeader, 'requirements', projectName);
-                }
-            } catch (headerError) {
-                console.error("Header Error:", headerError.message);
-            }
-            
-            loadRequirements();
-            if (typeof initSortable === 'function') initSortable();
-
-            console.log("App initialized for:", window.sessionData?.full_name);
-        });
-
-
-
-function populateDropdowns() {
-    const members = window.teamMembers || [];
-    ['req-assign-select', 'step-assign-select'].forEach(id => {
-        const el = document.getElementById(id);
-        if (!el) return;
-        el.innerHTML = '<option value="">Select Resource</option>';
-        members.forEach(u => {
-            const opt = document.createElement('option');
-            opt.value = u.user_id;
-            opt.textContent = u.full_name || u.email;
-            el.appendChild(opt);
-        });
-    });
-}
-
-window.selectRequirement = async (id) => {
-    // 1. Sanitization: Remove extra quotes/whitespace from UUID
-    const cleanId = String(id).trim().replace(/['"]/g, '');
-    
-    // 2. Strict Validation: Ensure valid UUID format before database call
-    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    if (!uuidRegex.test(cleanId)) {
-        console.error("Invalid UUID detected:", cleanId);
-        return;
-    }
-
-    console.log("Requirement Selected. Fetching metadata for:", cleanId);
-    window.selectedReqId = cleanId;
-
-    // 3. Database Fetch: Get parent metadata (Project Budget & Version)
-    const { data: reqData, error } = await supabase
-        .from('requirements')
-        .select('*') 
-        .eq('req_id', cleanId)
-        .single();
-
-    if (error) {
-        console.error("Supabase Metadata Error:", error.message, error.details);
-        return; 
-    }
-
-    // 4. UI Updates: Update Header, Version, and Budget displays
-    const headerEl = document.getElementById('selected-req-title-display');
-    const versionEl = document.getElementById('req-version-display'); 
-    const budgetEl = document.getElementById('selected-req-budget-display'); 
-
-    if (reqData) {
-        if (headerEl) headerEl.innerText = `Tasks for: ${reqData.name}`;
-        if (versionEl) versionEl.innerText = reqData.version_number || '1';
-        if (budgetEl) {
-            const amount = reqData.total_budget || 0;
-            budgetEl.innerText = `$${amount.toLocaleString()}`;
-        }
-    }
-
-    // 5. RBAC & Button Unlock: Only allow authorized roles to add tasks
-    const addTaskBtn = document.getElementById('add-task-btn');
-    if (addTaskBtn) {
-        const userRole = window.sessionData?.role;
-        const canAddTask = ['admin', 'project_manager', 'team_leader'].includes(userRole);
-
-        if (canAddTask) {
-            addTaskBtn.disabled = false;
-            addTaskBtn.classList.remove('opacity-50', 'cursor-not-allowed');
-            addTaskBtn.classList.add('opacity-100', 'cursor-pointer');
-        } else {
-            addTaskBtn.disabled = true;
-            addTaskBtn.classList.add('opacity-50', 'cursor-not-allowed');
-            addTaskBtn.classList.remove('opacity-100', 'cursor-pointer');
-        }
-    }
-
-    // 6. Refresh Child Steps
-    if (typeof refreshSteps === 'function') await refreshSteps();
-
-    // 7. Visual Highlighting: Update list styles to show selection
-    document.querySelectorAll('.req-row').forEach(row => {
-        // Use inclusive matching for data-id to ensure compatibility with various DOM renderers
-        const rowId = String(row.getAttribute('data-id')).trim().replace(/['"]/g, '');
-        row.classList.toggle('active-req', rowId === cleanId);
-    });
-};
-<<<<<<< Updated upstream
-  //Tuesday, January 20, 2026 at 3:10 PM EST
-  window.refreshSteps = async () => {
-    const reqId = window.selectedReqId;
-    if (!reqId) return;
-
-    // 1. Fetch Steps with Expanded Assignee Details & Active Filter
-    const { data: steps, error } = await supabase
-        .from('steps')
-        .select(`
-            *, 
-            assignee:assigned_to(email, full_name, avatar_url)
-        `) 
-        .eq('requirement_id', reqId) 
-        .eq('is_active', true) // Only show tasks that haven't been soft-deleted
-        .order('sequence_order', { ascending: true });
-
-    if (error) {
-        console.error("Step Fetch Error:", error.message);
-        return;
-    }
-
-    // 2. Fetch Time Logs using correct schema: task_id, hours_spent, calculated_cost
-    const stepIds = steps?.map(s => s.step_id) || [];
-    let logs = [];
-    
-    if (stepIds.length > 0) {
-        const { data: logData, error: logError } = await supabase
-            .from('time_logs')
-            .select('task_id, hours_spent, calculated_cost')
-            .in('task_id', stepIds);
+        const { data: members } = await supabase.from('user_profiles').select('*');
+        window.teamMembers = members || [];
         
-        if (!logError) logs = logData;
-    }
+        const myProfile = members.find(m => m.user_id === user.id);
+        window.sessionData = { ...user, role: myProfile?.role, tenantId: myProfile?.tenant_id, full_name: myProfile?.full_name };
+        tenantId = myProfile?.tenant_id;
 
-    // Update Task Counter UI
-    const taskCountEl = document.getElementById('task-count');
-    if (taskCountEl) taskCountEl.innerText = `${steps?.length || 0} TASKS`;
+        populateDropdowns();
+        loadRequirements();
+    });
 
-    const list = document.getElementById('step-list');
-    if (!list) return;
+    // --- REQUIREMENT ENGINE ---
+    window.selectRequirement = async (id) => {
+        const cleanId = String(id).trim().replace(/['"]/g, ''); // UUID Sanitization
+        window.selectedReqId = cleanId;
 
-    // Empty State
-    if (!steps || steps.length === 0) {
-        list.innerHTML = `
-            <div class="p-10 text-center bg-gray-50 rounded-xl border-2 border-dashed border-gray-200">
-                <p class="text-gray-500 mb-4">No tasks found for this requirement.</p>
-                <button onclick="window.openTaskSlider()" class="bg-indigo-600 text-white px-4 py-2 rounded-lg font-bold text-sm hover:bg-indigo-700 transition-colors">
-                    + Add Your First Task
-                </button>
-            </div>`;
-        return;
-    }
+        document.querySelectorAll('.req-row').forEach(el => el.classList.remove('active-req'));
+        const activeRow = document.querySelector(`[data-id="${cleanId}"]`);
+        if (activeRow) activeRow.classList.add('active-req');
 
-    // Render Tasks
-    list.innerHTML = steps.map(s => {
-        try {
-            // Aggregate logs using task_id (which matches step_id)
-            const taskLogs = logs?.filter(l => l.task_id === s.step_id) || [];
-            const actHrs = taskLogs.reduce((sum, l) => sum + (parseFloat(l.hours_spent) || 0), 0);
-            const actCost = taskLogs.reduce((sum, l) => sum + (parseFloat(l.calculated_cost) || 0), 0);
-            
-            const estHrs = s.estimated_hours || 0;
-            const healthClass = actHrs > estHrs ? 'text-red-500 font-black' : 'text-green-600 font-bold';
-            const menuHtml = (typeof getKabobMenu === 'function') ? getKabobMenu(s, 'task') : '';
-            
-            // Logic for Display Name: Use Full Name if available, otherwise Email
-            const displayName = s.assignee?.full_name || s.assignee?.email || 'Unassigned';
-            
-            return `
-                <div class="task-card active-task-row p-4 mb-3 bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md cursor-pointer group flex justify-between items-center" 
-                     data-id="${s.step_id}" onclick="window.openTaskSlider('${s.step_id}')">
-                    
-                    <div class="flex items-center gap-3">
-                        <span class="cursor-move text-gray-300 font-bold p-1 group-hover:text-indigo-400">::</span>
-                        <div>
-                            <div class="flex items-center gap-2">
-                                <p class="text-sm font-bold text-gray-800 group-hover:text-indigo-600 transition-colors">${s.title}</p>
-                                <span class="text-[9px] bg-blue-100 text-blue-600 px-1.5 rounded font-bold uppercase">v${s.version || 1}</span>
-                            </div>
-                            <p class="text-[10px] text-gray-400 uppercase font-bold">
-                                ${displayName} • Est: ${estHrs}h | 
-                                <span class="${healthClass}">Act: ${actHrs.toFixed(1)}h</span>
-                            </p>
-                        </div>
-                    </div>
-
-                    <div class="flex items-center gap-4">
-                        <div class="text-right mr-2">
-                            <p class="text-sm font-mono font-black text-indigo-600">$${actCost.toLocaleString()}</p>
-                            <p class="text-[9px] text-gray-400 font-bold uppercase">Actuals</p>
-                        </div>
-                        <div class="relative kebab-container">
-                            <button onclick="event.stopPropagation(); toggleKebab('task-${s.step_id}')" class="p-1 text-gray-400 hover:text-indigo-600">
-                                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                                </svg>
-                            </button>
-                            ${menuHtml}
-                        </div>
-                    </div>
-                </div>`;
-        } catch (e) { 
-            console.error("Error rendering task row:", e);
-            return ''; 
+        const { data: req } = await supabase.from('requirements').select('*').eq('req_id', cleanId).single();
+        if (req) {
+            document.getElementById('selected-req-title-display').innerText = `2. ${req.name}`;
+            document.getElementById('selected-req-budget-display').innerText = `$${(req.total_budget || 0).toLocaleString()}`;
         }
-    }).join('');
 
-    // Re-bind Sortable (Wait for DOM paint)
-    setTimeout(() => {
-        if (typeof window.initSortable === 'function') {
-            window.initSortable();
-        }
-    }, 50);
+        const btn = document.getElementById('add-task-btn');
+        btn.disabled = false;
+        btn.classList.remove('opacity-50', 'cursor-not-allowed');
 
-    // Final Background Rollup Sync
-    if (typeof window.rollupToRequirement === 'function') {
-        window.rollupToRequirement(reqId, steps);
-    }
-};
+        refreshSteps();
+    };
 
-// --- UPDATED TILE DRAG AND DROP ---
-window.initSortable = () => {
-    // RBAC GUARD: Only Admin, Project Manager, and Team Leader can drag
-    const canSort = ['admin', 'project_manager', 'team_leader'].includes(window.sessionData?.role);
-=======
-
-function getKabobMenu(item, type) {
-    // 1. RBAC Check: Match enterprise role-checking pattern
-    const isAdmin = window.sessionData?.role === 'admin';
->>>>>>> Stashed changes
-    
-    // 2. ID Mapping: Handle schema differences between 'requirements' and 'steps'
-    const itemId = type === 'req' ? item.req_id : item.step_id;
-    const sliderFunc = type === 'req' ? 'openReqSlider' : 'openTaskSlider';
-
-    // 3. UI Construction: Dynamic labeling and permission-based buttons
-    return `
-        <div id="kebab-${type}-${itemId}" 
-             class="hidden absolute right-0 mt-1 w-40 bg-white border border-gray-200 shadow-xl rounded-md z-[110] py-1 text-gray-700"
-             onclick="event.stopPropagation();">
-            
-            <button onclick="event.stopPropagation(); window.${sliderFunc}('${itemId}')" 
-                    class="w-full text-left px-4 py-2 text-xs hover:bg-blue-50 transition-colors">
-                <span class="flex items-center">
-                    ${isAdmin ? 'Edit Details' : 'View Details'}
-                </span>
-            </button>
-
-            ${isAdmin ? `
-                <div class="border-t border-gray-100 my-1"></div>
-                <button onclick="event.stopPropagation(); window.delete${type === 'req' ? 'Req' : 'Task'}('${itemId}')" 
-                        class="w-full text-left px-4 py-2 text-xs text-red-600 hover:bg-red-50 transition-colors font-medium">
-                    Delete
-                </button>
-            ` : ''}
-        </div>
-    `;
-}
-
-window.toggleKebab = (id) => {
-    // 1. Close all open menus first (Global Reset)
-    // The selector matches any ID starting with "kebab-"
-    document.querySelectorAll('[id^="kebab-"]').forEach(el => el.classList.add('hidden'));
-    
-    // 2. Locate the specific menu using its full ID
-    // Note: 'id' here should be the combined '${type}-${itemId}' from Function 17
-    const menu = document.getElementById(`kebab-${id}`);
-    
-    // 3. Toggle visibility
-    if (menu) {
-        menu.classList.remove('hidden');
-    }
-};
-
-window.closeTaskSlider = async () => {
-    // 1. UI: Hide the panel
-    const panel = document.getElementById('task-editor-panel');
-    if (panel) panel.classList.remove('active');
-
-    // 2. Data Sync: Update the Requirement total_budget column
-    // This ensures that any changes made while the slider was open are rolled up
-    if (window.selectedReqId) {
-        console.log("Closing Task Slider: Triggering final budget rollup...");
-        await window.rollupToRequirement(window.selectedReqId);
-    }
-    
-    // 3. UI Refresh: Update the task list (Steps)
-    // Supports both 'refreshSteps' and the legacy 'loadSteps' fallback
-    if (typeof window.refreshSteps === 'function') {
-        await window.refreshSteps();
-    } else if (typeof loadSteps === 'function') {
-        await loadSteps(window.selectedReqId);
-    }
-
-    // 4. Cleanup: Clear the selected step context
-    window.selectedStepId = null;
-};
-
-window.closeReqSlider = () => {
-    // 1. UI: Hide the panel
-    const panel = document.getElementById('req-editor-panel');
-    if (panel) {
-        panel.classList.remove('active');
-    } else {
-        // Fallback for direct ID access
-        document.getElementById('req-editor-panel')?.classList.remove('active');
-    }
-
-    // 2. Clear visual highlights in the menu if necessary
-    // Note: We typically keep window.selectedReqId active so the tasks remain visible
-};
-
-window.rollupToRequirement = async (reqId = window.selectedReqId, steps = null) => {
-    // 1. Sanitize the UUID
-    if (!reqId) return;
-    const cleanReqId = String(reqId).trim().replace(/['"]/g, '');
-    
-    let tasks = steps;
-    if (!tasks) {
-        // Fetch using requirement_id (foreign key)
-<<<<<<< Updated upstream
-=======
-        // Optimization: Filter for is_active = true to exclude deleted/inactive tasks
->>>>>>> Stashed changes
-        const { data, error: fetchError } = await supabase.from('steps')
+    window.rollupToRequirement = async (reqId) => {
+        const cleanReqId = String(reqId).trim().replace(/['"]/g, '');
+        
+        const { data: tasks, error } = await supabase.from('steps')
             .select('estimated_hours, cost, assigned_to')
             .eq('requirement_id', cleanReqId)
-            .eq('is_active', true); 
-        
-        if (fetchError) {
-            console.error("Error fetching steps for rollup:", fetchError);
-            return;
-        }
-        tasks = data || [];
-    }
+            .eq('is_active', true);
 
-    let calculatedTotalCost = 0;
-    let totalHours = 0;
-    const members = window.teamMembers || [];
+        if (error) return console.error("Rollup Error:", error);
 
-    // Aggregation Logic
-    tasks.forEach(s => {
-        const hours = parseFloat(s.estimated_hours) || 0;
-        let taskCost = parseFloat(s.cost) || 0;
+        let totalCost = 0;
+        let totalHours = 0;
 
-<<<<<<< Updated upstream
-        // Fallback Logic: If DB cost is 0, calculate based on user rate or blended rate
-=======
-        // Requirement [2026-01-01]: Fallback Calculation logic
-        // If task cost is 0, calculate based on user hourly cost or project blended rate
->>>>>>> Stashed changes
-        if (taskCost === 0 && hours > 0) {
-            const user = members.find(m => m.user_id === s.assigned_to);
-            const effectiveRate = (user && parseFloat(user.hourly_cost) > 0) 
-                ? parseFloat(user.hourly_cost) 
-                : (window.projectBlendedRate || 0);
-            taskCost = hours * effectiveRate;
-        }
-        calculatedTotalCost += taskCost;
-        totalHours += hours;
-    });
+        tasks.forEach(task => {
+            const hrs = parseFloat(task.estimated_hours) || 0;
+            let cost = parseFloat(task.cost) || 0;
 
-    // 2. Sync to Database
-    const { error } = await supabase.from('requirements')
-        .update({ 
-            estimated_hours: totalHours, 
-            total_budget: calculatedTotalCost, 
+            // Fallback Calculation logic
+            if (cost === 0 && hrs > 0) {
+                const user = window.teamMembers.find(m => m.user_id === task.assigned_to);
+                const rate = (user && parseFloat(user.hourly_cost) > 0) ? user.hourly_cost : window.projectBlendedRate;
+                cost = hrs * rate;
+            }
+            totalCost += cost;
+            totalHours += hrs;
+        });
+
+        await supabase.from('requirements').update({
+            estimated_hours: totalHours,
+            total_budget: totalCost,
             updated_at: new Date().toISOString()
-        })
-        .eq('req_id', cleanReqId);
+        }).eq('req_id', cleanReqId);
 
-<<<<<<< Updated upstream
-    if (error) {
-=======
-    if (!error) {
-        console.log(`Rollup Sync Success: ${totalHours}h | $${calculatedTotalCost}`);
+        loadRequirements(); // Sync UI
+        document.getElementById('selected-req-budget-display').innerText = `$${totalCost.toLocaleString()}`;
+    };
+
+    // --- UI ENGINE ---
+    async function loadRequirements() {
+        const { data: reqs } = await supabase.from('requirements').select(`*, assignee:assigned_to(full_name)`).eq('project_id', projectId).order('sequence_order');
+        const list = document.getElementById('req-list');
+        document.getElementById('req-count').innerText = `${reqs?.length || 0} ITEMS`;
         
-        // 3. UI Sync: Refresh Requirements list tiles (Parent View)
-        if (typeof window.loadRequirements === 'function') {
-            await window.loadRequirements();
-        }
-
-        // 4. UI Sync: Update the Header display in the Task viewport
-        const totalBudgetDisplay = document.getElementById('selected-req-budget-display');
-        if (totalBudgetDisplay) {
-            totalBudgetDisplay.innerText = `$${calculatedTotalCost.toLocaleString()}`;
-        }
-    } else {
->>>>>>> Stashed changes
-        console.error("Rollup Update Error:", error.message);
-        return;
-    }
-
-    console.log(`Rollup Sync Success: ${totalHours}h | $${calculatedTotalCost}`);
-
-    // --- 3. UI SYNC (THE "INSTANT" MERGE) ---
-    
-    // A. Update the Header display immediately
-    const totalBudgetDisplay = document.getElementById('selected-req-budget-display');
-    if (totalBudgetDisplay) {
-        totalBudgetDisplay.innerText = `$${calculatedTotalCost.toLocaleString()}`;
-    }
-
-    // B. Target the specific Sidebar Tile for an instant update (no flicker)
-    const tile = document.querySelector(`.req-row[data-id="${cleanReqId}"]`);
-    if (tile) {
-        const hourBadge = tile.querySelector('.hour-badge'); 
-        const budgetBadge = tile.querySelector('.budget-display');
-        if (hourBadge) hourBadge.innerText = `${totalHours}h`;
-        if (budgetBadge) budgetBadge.innerText = `$${calculatedTotalCost.toLocaleString()}`;
-    }
-
-    // C. Background Refresh (Optional: keep the list in sync globally)
-    if (typeof window.loadRequirements === 'function') {
-        // We call this without 'await' so the UI feels instant, 
-        // while the data refreshes in the background.
-        window.loadRequirements();
-    }
-};
-
-
-async function appendNoteToActivity(taskId, content) {
-    // 1. Validation & Sanitization
-    if (!taskId || !content) {
-        console.warn("Audit Log skipped: Missing taskId or content.");
-        return;
-    }
-    
-    // UUID Fix: Sanitize the ID to ensure no quoted strings from the DOM enter the DB
-    const cleanTaskId = String(taskId).trim().replace(/['"]/g, '');
-
-    // 2. Data Preparation
-    // Uses the logged-in user's ID, or NULL if this is an automated system event
-    const authorId = window.sessionData?.user_id || null;
-
-    try {
-        // 3. Persist to 'task_notes' table
-        const { error } = await supabase.from('task_notes').insert([{ 
-            task_id: cleanTaskId, 
-            user_id: authorId, 
-            content: content.trim()
-        }]);
-
-        if (error) throw error;
-        
-        console.log(`Audit Log Entry Created: ${content.substring(0, 30)}...`);
-    } catch (err) {
-        // Strategic Choice: Log the error to console but do not alert the user.
-        // We do not want an audit failure to block the user from saving their work.
-        console.error("Critical Audit Logging Error:", err.message);
-    }
-}
-
-window.openTaskSlider = async (id = null) => {
-    // 1. Context Check
-    if (!window.selectedReqId) return alert("Select a requirement first.");
-    
-    const panel = document.getElementById('task-editor-panel');
-    const titleEl = document.getElementById('task-editor-title');
-    const btnEl = document.getElementById('task-save-btn');
-    const delBtn = document.getElementById('delete-task-btn');
-    
-<<<<<<< Updated upstream
-    // 1. Permissions Check (Standardized)
-    const isAdmin = window.sessionData?.role === 'admin';
-=======
-    // 2. Permissions Check (Standardized Enterprise Pattern)
-    const isAdmin = window.sessionData?.role === 'admin';
-    const userRole = window.sessionData?.role;
-    const isAuthorizedModifier = ['admin', 'project_manager', 'team_leader'].includes(userRole);
-
->>>>>>> Stashed changes
-    document.querySelectorAll('[data-admin-only]').forEach(el => {
-        el.disabled = !isAdmin;
-        if(!isAdmin) el.classList.add('bg-gray-100', 'cursor-not-allowed');
-    });
-
-<<<<<<< Updated upstream
-    // 2. Reset Form Fields
-=======
-    // 3. Reset Form State
->>>>>>> Stashed changes
-    document.getElementById('step-title-input').value = '';
-    document.getElementById('step-assign-select').value = '';
-    document.getElementById('step-hours-input').value = 0;
-    document.getElementById('step-cost-input').value = "0.00";
-    document.getElementById('notes-container').innerHTML = '<p class="text-xs text-gray-400 italic">No activity yet.</p>';
-    
-<<<<<<< Updated upstream
-    // Clear any existing Actuals Summary display to prevent UI blocking/stacking
-=======
-    // Clean up previous Actuals display to prevent stacking
->>>>>>> Stashed changes
-    const existingSummary = document.getElementById('actuals-summary-display');
-    if (existingSummary) existingSummary.remove();
-
-    if (id) {
-<<<<<<< Updated upstream
-        // --- MODE: EDIT EXISTING ---
-        window.selectedStepId = id;
-        titleEl.innerText = "Task Details";
-        btnEl.innerText = "Update Baseline Changes";
-        
-        // Fetch Task Details
-        const { data: step } = await supabase.from('steps').select('*').eq('step_id', id).single();
-=======
-        // --- EDIT MODE ---
-        const cleanId = String(id).trim().replace(/['"]/g, '');
-        window.selectedStepId = cleanId;
-        titleEl.innerText = "Task Details";
-        btnEl.innerText = "Update Baseline Changes";
-        
-        // A. Fetch Task Details (Baseline)
-        const { data: step } = await supabase.from('steps').select('*').eq('step_id', cleanId).single();
->>>>>>> Stashed changes
-        if (step) {
-            document.getElementById('step-title-input').value = step.title;
-            document.getElementById('step-assign-select').value = step.assigned_to;
-            document.getElementById('step-hours-input').value = step.estimated_hours;
-            document.getElementById('step-cost-input').value = step.cost;
-            
-            btnEl.onclick = () => window.updateStep(cleanId);
-            if (typeof loadTaskNotes === 'function') loadTaskNotes(cleanId);
-        }
-
-<<<<<<< Updated upstream
-        // Fetch and Display Actuals (time_logs)
-        const { data: logs } = await supabase
-            .from('time_logs')
-            .select('hours_spent, calculated_cost')
-            .eq('task_id', id);
-=======
-        // B. Fetch and Display Actuals (Health Score Data)
-        const { data: logs } = await supabase
-            .from('time_logs')
-            .select('hours_spent, calculated_cost') 
-            .eq('task_id', cleanId); 
->>>>>>> Stashed changes
-
-        const totalActualHrs = logs?.reduce((sum, l) => sum + (parseFloat(l.hours_spent) || 0), 0) || 0;
-        const totalActualCost = logs?.reduce((sum, l) => sum + (parseFloat(l.calculated_cost) || 0), 0) || 0;
-
-        const logSection = document.getElementById('log-time-section');
-        if (logSection) {
-            const summaryDiv = document.createElement('div');
-            summaryDiv.id = 'actuals-summary-display';
-            summaryDiv.className = "mb-6 p-4 bg-blue-50 rounded-xl border border-blue-100 shadow-sm";
-            summaryDiv.innerHTML = `
-                <div class="flex justify-between items-center">
-                    <div>
-                        <p class="text-[10px] font-black text-blue-400 uppercase tracking-wider">Total Actual Hours</p>
-                        <p class="text-lg font-black text-blue-700">${totalActualHrs.toFixed(2)} <span class="text-xs font-normal">hrs</span></p>
-                    </div>
-                    <div class="text-right">
-                        <p class="text-[10px] font-black text-blue-400 uppercase tracking-wider">Total Actual Cost</p>
-                        <p class="text-lg font-black text-blue-700">$${totalActualCost.toLocaleString(undefined, {minimumFractionDigits: 2})}</p>
-                    </div>
+        list.innerHTML = reqs.map(req => `
+            <li class="req-row p-4 hover:bg-gray-50 flex justify-between items-center cursor-pointer border-l-4 border-transparent transition-all" 
+                data-id="${req.req_id}" onclick="window.selectRequirement('${req.req_id}')">
+                <div>
+                    <p class="text-sm font-bold text-gray-800">${req.name}</p>
+                    <p class="text-[10px] text-gray-400 font-bold uppercase">${req.assignee?.full_name || 'Unassigned'} | ${req.estimated_hours}h</p>
                 </div>
-            `;
-            logSection.parentNode.insertBefore(summaryDiv, logSection);
-        }
-
-        // C. Delete Button RBAC Logic
-        if (delBtn) {
-            if (isAuthorizedModifier) {
-                delBtn.style.display = 'block';
-                delBtn.onclick = async () => {
-                    if(confirm("Are you sure you want to delete this task?")) {
-                        await window.deleteTask(cleanId);
-                    }
-                };
-            } else {
-                delBtn.style.display = 'none';
-            }
-        }
-
-    } else {
-<<<<<<< Updated upstream
-        // --- MODE: ADD NEW ---
-=======
-        // --- NEW TASK MODE ---
->>>>>>> Stashed changes
-        window.selectedStepId = null;
-        titleEl.innerText = "Add New Task";
-        btnEl.innerText = "Save Task";
-        btnEl.onclick = () => window.submitStep();
-        if (delBtn) delBtn.style.display = 'none';
+                <p class="text-sm font-mono font-bold text-indigo-600">$${(req.total_budget || 0).toLocaleString()}</p>
+            </li>
+        `).join('');
     }
 
-<<<<<<< Updated upstream
-    // --- DELETE BUTTON INITIALIZATION ---
-    const delBtn = document.getElementById('delete-task-btn');
-    if (delBtn) {
-        const userRole = window.sessionData?.role;
-        const canDelete = ['admin', 'project_manager', 'team_leader'].includes(userRole);
-        
-        // Only show if we are editing an existing task AND have permission
-        if (id && canDelete) {
-            delBtn.style.display = 'block';
-            delBtn.onclick = async () => {
-                const confirmed = confirm("Are you sure you want to remove this task from the baseline?");
-                if (confirmed) await window.deleteStep(id);
-            };
-        } else {
-            delBtn.style.display = 'none';
-        }
-    }
-    
-    panel.classList.add('active');
-};
-
-        window.submitStep = async () => {
-    // 1. RBAC GUARD: Ensure user has permissions before any logic runs
-    const userRole = window.sessionData?.role;
-    const canAddTask = ['admin', 'project_manager', 'team_leader'].includes(userRole);
-
-    if (!canAddTask) {
-        alert("Access Denied: Your role does not have permission to add tasks.");
-        return;
+    async function refreshSteps() {
+        const { data: steps } = await supabase.from('steps').select('*').eq('requirement_id', window.selectedReqId).eq('is_active', true).order('sequence_order');
+        const list = document.getElementById('step-list');
+        list.innerHTML = steps.map(s => `
+            <li class="p-4 flex justify-between items-center hover:bg-blue-50 cursor-pointer" onclick="window.openTaskSlider('${s.step_id}')">
+                <span class="text-sm font-medium">${s.title}</span>
+                <span class="text-xs font-mono">$${(s.cost || 0).toLocaleString()}</span>
+            </li>
+        `).join('');
     }
 
-=======
-    panel.classList.add('active');
-};
-
-async function loadTaskNotes(taskId) {
-    // 1. Sanitization: Prevent the 400 'quoted string' error
-    const cleanId = String(taskId).trim().replace(/['"]/g, '');
-    
-    // 2. Database Fetch: Join with user_profiles to get the poster's name
-    const { data: notes, error } = await supabase
-        .from('task_notes')
-        .select(`*, user_profiles(full_name)`)
-        .eq('task_id', cleanId)
-        .order('created_at', { ascending: true });
-
-    if (error) {
-        console.error("Audit Feed Error:", error.message);
-        return;
+    function populateDropdowns() {
+        const options = '<option value="">Select Resource</option>' + window.teamMembers.map(m => `<option value="${m.user_id}">${m.full_name}</option>`).join('');
+        document.getElementById('req-assign-select').innerHTML = options;
+        document.getElementById('step-assign-select').innerHTML = options;
     }
 
-    const container = document.getElementById('notes-container');
-    if (!container) return;
-
-    // 3. UI Rendering
-    if (!notes || notes.length === 0) {
-        // Essential: Clear the container and show an empty state
-        container.innerHTML = `
-            <div class="flex flex-col items-center justify-center py-4 opacity-40">
-                <svg class="w-8 h-8 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 7z"/></svg>
-                <p class="text-[10px] uppercase font-bold tracking-widest">No Activity Yet</p>
-            </div>`;
-        return;
-    }
-
-    // 4. Map and Render notes with an enterprise "Feed" style
-    container.innerHTML = notes.map(n => `
-        <div class="p-2 bg-gray-50 rounded border border-gray-100 mb-2 shadow-sm">
-            <div class="flex justify-between items-start mb-1">
-                <p class="text-[10px] font-black text-indigo-600 uppercase tracking-tighter">
-                    ${n.user_profiles?.full_name || 'System Auto-Log'}
-                </p>
-                <p class="text-[8px] text-gray-400 font-mono">
-                    ${new Date(n.created_at).toLocaleDateString()} ${new Date(n.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                </p>
-            </div>
-            <p class="text-xs text-gray-700 leading-snug">${n.content}</p>
-        </div>
-    `).join('');
-}
-
-window.appendNote = async () => {
-    // 1. Context Check
-    if (!window.selectedStepId) return alert("No task selected.");
-    
-    // 2. Input Retrieval
-    const inputEl = document.getElementById('step-note-input');
-    const content = inputEl?.value.trim();
-
-    if (!content) return; // Silent return if empty
-
-    // 3. Execution
-    try {
-        // Call Function 21 to handle the Supabase insertion
-        await appendNoteToActivity(window.selectedStepId, content);
-        
-        // 4. UI Cleanup
-        if (inputEl) inputEl.value = ''; // Clear the input field
-        
-        // 5. Refresh Feed
-        if (typeof loadTaskNotes === 'function') {
-            await loadTaskNotes(window.selectedStepId);
-        }
-        
-        console.log("Manual note added successfully.");
-    } catch (err) {
-        console.error("Failed to append note:", err.message);
-        alert("Error saving note. Please try again.");
-    }
-};
-
-window.submitStep = async () => {
-    // 1. Validation & Sanitization
->>>>>>> Stashed changes
-    if (!window.selectedReqId) return alert("Select a requirement first.");
-    const cleanReqId = String(window.selectedReqId).trim().replace(/['"]/g, '');
-    
-    // 2. DATA PULLING & VALIDATION
-    const title = document.getElementById('step-title-input')?.value.trim();
-    const assignedId = document.getElementById('step-assign-select')?.value;
-    const hours = parseFloat(document.getElementById('step-hours-input')?.value) || 0;
-    
-    if (!title || !assignedId || hours <= 0) {
-        return alert("Fill all required fields (Title, Assignee, and Hours > 0).");
-    }
-
-<<<<<<< Updated upstream
-    // 3. MATH LOGIC: Automated Costing Engine
-=======
-    // 2. MATH LOGIC: Calculate cost based on the assigned user's rate
-    // Requirement [2026-01-01]: Totals are treated as project budgets
->>>>>>> Stashed changes
-    const assignedUser = (window.teamMembers || []).find(m => m.user_id === assignedId);
-    const userRate = assignedUser ? parseFloat(assignedUser.hourly_cost) : 0;
-    const blendedRate = parseFloat(window.projectBlendedRate) || 0;
-    const effectiveRate = (userRate > 0) ? userRate : blendedRate;
-    
-    const calculatedCost = hours * effectiveRate;
-
-    // 4. SEQUENCE LOGIC: Get Next Order for sorting
-    const { data: existing } = await supabase
-        .from('steps')
-        .select('sequence_order')
-        .eq('requirement_id', cleanReqId)
-        .order('sequence_order', { ascending: false })
-        .limit(1);
-    
-    const nextOrder = (existing?.[0]?.sequence_order || 0) + 10;
-
-<<<<<<< Updated upstream
-    // 5. PERSISTENCE: Save to Supabase
-    const { data: newStep, error } = await supabase.from('steps').insert([{
-        requirement_id: window.selectedReqId,
-        tenant_id: window.sessionData?.tenantId, // CRITICAL: Maintains multi-tenancy
-        title: title,
-        assigned_to: assignedId,
-        estimated_hours: hours,
-        cost: calculatedCost,
-        sequence_order: nextOrder,
-        status: 'pending',
-        created_by: window.sessionData?.email // Audit trail
-    }]).select().single();
-
-    if (error) return alert("Save failed: " + error.message);
-
-    // 6. AUDIT LOG: Direct insertion into task_notes
-    await supabase.from('task_notes').insert([{ 
-        task_id: newStep.step_id, 
-        user_id: window.sessionData?.user_id, 
-        content: `Task created. Budgeted at $${calculatedCost.toLocaleString()} (${hours}h @ $${effectiveRate}/h)` 
-    }]);
-
-    // 7. SYNC: Close UI and Trigger the Rollup
-    if (typeof window.closeTaskSlider === 'function') window.closeTaskSlider();
-    
-    // Use the consolidated rollup we verified earlier
-    await window.rollupToRequirement(window.selectedReqId);
-
-    // Refresh the task list viewport
-    if (typeof window.refreshSteps === 'function') {
-        await window.refreshSteps();
-    } else if (typeof loadSteps === 'function') {
-        await loadSteps(window.selectedReqId);
-    }
-    
-    console.log("New Task saved and requirement budget updated.");
-}; // This correctly closes submitStep
-
-    // 6. SYNC: Close UI, trigger requirement-level rollup, and refresh list
-
-        // --- 1. CONSOLIDATED TASK UPDATE LOGIC ---
-window.updateStep = async (id) => {
-    const userRole = window.sessionData?.role;
-    const userEmail = window.sessionData?.email || 'Unknown User';
-    
-    // RBAC Check
-    if (!['admin', 'project_manager', 'team_leader'].includes(userRole)) {
-        alert("Access Denied: You do not have permission to modify tasks.");
-=======
-    // 4. RBAC Check: Ensure only authorized roles can modify the baseline
-    const userRole = window.sessionData?.role;
-    const canAddTask = ['admin', 'project_manager', 'team_leader'].includes(userRole);
-
-    if (!canAddTask) {
-        return alert("Access Denied: Your role does not have permission to add tasks to the baseline.");
-    }
-
-    // 5. PERSISTENCE: Save to Supabase 'steps' table
-    const { data: newStep, error } = await supabase.from('steps').insert([{
-        requirement_id: cleanReqId,
-        tenant_id: window.sessionData?.tenantId,
-        title: title,
-        assigned_to: assignedId,
-        estimated_hours: hours,
-        cost: calculatedCost, 
-        sequence_order: nextOrder,
-        status: 'pending'
-    }]).select().single();
-
-    if (error) return alert("Save failed: " + error.message);
-
-    // 6. AUDIT LOG: Use our standardized Activity Log engine
-    await appendNoteToActivity(
-        newStep.step_id, 
-        `Task created. Budgeted at $${calculatedCost.toLocaleString()} (${hours}h @ $${effectiveRate}/h)`
-    );
-
-    // 7. SYNC: Trigger Rollup and UI refresh via the close helper
-    // This calls Function 9, which handles the rollup and list refresh
-    await window.closeTaskSlider();
-};
-
-window.updateStep = async (id) => {
-    // 0. RBAC GUARD: Only Admin, PM, or TL can trigger this database update
-    const canUpdate = ['admin', 'project_manager', 'team_leader'].includes(window.sessionData?.role);
-    if (!canUpdate) {
-        alert("Access Denied: You do not have permission to modify task details.");
->>>>>>> Stashed changes
-        return;
-    }
-
-    const cleanStepId = String(id).trim().replace(/['"]/g, '');
-
-    // 1. Pull current values
-    const titleInput = document.getElementById('step-title-input')?.value.trim();
-    const assignedId = document.getElementById('step-assign-select')?.value;
-    const hours = parseFloat(document.getElementById('step-hours-input')?.value) || 0;
-
-<<<<<<< Updated upstream
-    // 2. MATH: Rate Fallback (User Rate -> Project Blended Rate)
-=======
-    // 2. MATH LOGIC: Recalculate cost in case assignee or hours changed
-    // Requirement [2026-01-01]: Ensure budget totals remain accurate based on current rates
->>>>>>> Stashed changes
-    const assignedUser = (window.teamMembers || []).find(m => m.user_id === assignedId);
-    const userRate = assignedUser ? parseFloat(assignedUser.hourly_cost) : 0;
-    const effectiveRate = (userRate > 0) ? userRate : (window.projectBlendedRate || 0);
-    const calculatedCost = hours * effectiveRate;
-
-    // 3. PERSISTENCE
-    const { error } = await supabase.from('steps').update({
-        title: titleInput,
-        assigned_to: assignedId,
-        estimated_hours: hours,
-<<<<<<< Updated upstream
-        cost: calculatedCost,
-        updated_at: new Date().toISOString(),
-        last_edited_by: userEmail
-=======
-        cost: calculatedCost, 
-        updated_at: new Date().toISOString()
->>>>>>> Stashed changes
-    }).eq('step_id', cleanStepId);
-
-    if (error) return alert("Update failed: " + error.message);
-
-    // 4. AUDIT LOG
-    if (typeof appendNoteToActivity === 'function') {
-<<<<<<< Updated upstream
-        const auditMessage = `Baseline updated by ${userEmail}: ${hours}h @ $${effectiveRate}/h (Total: $${calculatedCost.toLocaleString()})`;
-        await appendNoteToActivity(cleanStepId, auditMessage);
-    }
-
-    // 5. SYNC: Close UI, trigger rollup to Requirement, and refresh list
-    window.closeTaskSlider();
-=======
-        await appendNoteToActivity(
-            cleanStepId, 
-            `Baseline updated: ${hours}h @ $${effectiveRate}/h (Total: $${calculatedCost.toLocaleString()})`
-        );
-    }
-
-    // 5. SYNC: Close UI, trigger requirement-level rollup, and refresh list
-    // We call closeTaskSlider which handles the first pass of UI cleanup
-    if (typeof window.closeTaskSlider === 'function') {
-        await window.closeTaskSlider();
-    }
->>>>>>> Stashed changes
-    
-    if (window.selectedReqId) {
-        await window.rollupToRequirement(window.selectedReqId);
-    }
-
-<<<<<<< Updated upstream
-=======
-    // Final UI Refresh to ensure totals across the screen are perfectly in sync
->>>>>>> Stashed changes
-    if (typeof window.refreshSteps === 'function') {
-        await window.refreshSteps();
-    }
-};
-
-<<<<<<< Updated upstream
-        // --- SUPPORTING FUNCTIONS ---
-window.closeTaskSlider = () => {
-    const panel = document.getElementById('task-editor-panel');
-    if (panel) {
-        panel.classList.remove('active');
-        window.selectedStepId = null; // Essential to prevent update-on-create bugs
-    }
-};
-
-window.closeReqSlider = () => {
-    const panel = document.getElementById('req-editor-panel');
-    if (panel) {
-        panel.classList.remove('active');
-        window.selectedReqId = null; // Clean up state
-    }
-};    
-
-
-function populateDropdowns() {
-    const members = window.teamMembers || [];
-    ['req-assign-select', 'step-assign-select'].forEach(id => {
-        const el = document.getElementById(id);
-        if (!el) return;
-        el.innerHTML = '<option value="">Select Resource</option>';
-        members.forEach(u => {
-            const opt = document.createElement('option');
-            opt.value = u.user_id;
-            opt.textContent = u.full_name || u.email;
-            el.appendChild(opt);
-        });
-    });
-    console.log("Dropdowns populated.");
-}
-
-window.addRequirement = async () => {
-    // 0. Admin Permission Guard
-    const isAdmin = window.sessionData?.role === 'admin';
-    if (!isAdmin) {
-        console.error("Access Denied: Non-admin attempt to save requirement.");
-=======
-window.initSortable = () => {
-    // 1. RBAC GUARD: Only Admin, Project Manager, and Team Leader can drag
-    const canSort = ['admin', 'project_manager', 'team_leader'].includes(window.sessionData?.role);
-    
-    if (!canSort) {
-        console.log("RBAC: Sorting disabled for current role.");
-        // CSS Hook: Allows you to hide handle icons globally for read-only users
-        document.body.classList.add('hide-drag-handles');
->>>>>>> Stashed changes
-        return;
-    }
-
-    // Ensure we don't have a 'hide' class lingering if an admin logs in
-    document.body.classList.remove('hide-drag-handles');
-
-    // 2. REQUIREMENT LIST SORTING (Parent Items)
-    const reqList = document.getElementById('req-list');
-    if (reqList && typeof Sortable !== 'undefined') {
-        // Destroy existing instance to prevent memory leaks and duplicate events
-        if (reqList.sortable) reqList.sortable.destroy();
-        
-        reqList.sortable = new Sortable(reqList, {
-            animation: 150,
-            handle: '.cursor-move', // Specific handle class for better UX
-            onEnd: () => window.saveOrder('requirements', reqList)
-        });
-    }
-
-    // 3. STEP LIST SORTING (Child Items)
-    const stepList = document.getElementById('step-list');
-    if (stepList && typeof Sortable !== 'undefined') {
-        if (stepList.sortable) stepList.sortable.destroy();
-        
-        stepList.sortable = new Sortable(stepList, {
-            animation: 150,
-            handle: '.cursor-move', 
-            // Ensures we only drag the items themselves, not headers or 'add' buttons
-            draggable: 'li, .task-card', 
-            ghostClass: 'bg-blue-50', // Visual feedback during drag
-            onEnd: () => window.saveOrder('steps', stepList)
-        });
-    }
-};
-
-window.saveOrder = async (table, container) => {
-    // 1. RBAC GUARD: Final check before hitting Supabase
-    const canSort = ['admin', 'project_manager', 'team_leader'].includes(window.sessionData?.role);
-    if (!canSort) {
-        alert("You do not have permission to reorder items.");
-        return;
-    }
-
-    const items = Array.from(container.querySelectorAll('[data-id]'));
-    const idField = (table === 'requirements') ? 'req_id' : 'step_id';
-
-    console.log(`Starting constraint-safe save for ${table}...`);
-
-    try {
-        // STEP 1: Temporary Negatives
-        // This clears the "slots" so we don't hit unique constraint errors during the swap.
-        for (let [index, el] of items.entries()) {
-            const rawId = el.getAttribute('data-id');
-            const cleanId = String(rawId).trim().replace(/['"]/g, ''); // Standardized UUID Sanitization
-            
-            await supabase.from(table)
-                .update({ sequence_order: -(index + 1) })
-                .eq(idField, cleanId);
-        }
-
-        // STEP 2: Final Positives (Standardized 10-base indexing)
-        for (let [index, el] of items.entries()) {
-            const rawId = el.getAttribute('data-id');
-            const cleanId = String(rawId).trim().replace(/['"]/g, '');
-            const newOrder = (index + 1) * 10;
-            
-            const { error } = await supabase.from(table)
-                .update({ sequence_order: newOrder })
-                .eq(idField, cleanId);
-            
-            if (error) console.error(`Error updating order for ${cleanId}:`, error.message);
-        }
-
-        console.log(`${table} order saved successfully.`);
-        
-        // Final UI Sync: Refresh list to ensure sequence data is current
-        if (table === 'requirements' && typeof window.loadRequirements === 'function') {
-            await window.loadRequirements();
-        } else if (table === 'steps' && typeof window.refreshSteps === 'function') {
-            await window.refreshSteps();
-        }
-
-    } catch (err) {
-        console.error("Save Order Critical Error:", err);
-    }
-};
-
-window.openReqSlider = async (id = null) => {
-    const panel = document.getElementById('req-editor-panel');
-    const titleEl = document.getElementById('req-editor-title');
-    const btnEl = document.getElementById('req-save-btn');
-    const versionEl = document.getElementById('req-version-display');
-    const statusBadge = document.getElementById('req-status-badge');
-    const historyContainer = document.getElementById('req-history-list');
-
-    // 0. Permission Check: Admin, PM, and TL can edit. Team Member can only view.
-    const userRole = window.sessionData?.role;
-    const canEdit = ['admin', 'project_manager', 'team_leader'].includes(userRole);
-
-    // 1. Reset Form Fields
-    const titleInput = document.getElementById('req-title-input');
-    const hoursInput = document.getElementById('req-hours-input');
-    const rateInput = document.getElementById('req-applied-rate');
-    const assignSelect = document.getElementById('req-assign-select');
-
-    if (titleInput) titleInput.value = '';
-    if (hoursInput) hoursInput.value = 0;
-    if (rateInput) rateInput.value = '';
-    if (assignSelect) assignSelect.selectedIndex = 0;
-    if (versionEl) versionEl.innerText = '0';
-    if (historyContainer) historyContainer.innerHTML = '<p class="text-[10px] text-gray-400 italic">No history available.</p>';
-
-    // --- APPLY RBAC LOCKS ---
-    if (titleInput) titleInput.readOnly = !canEdit;
-    if (hoursInput) hoursInput.readOnly = !canEdit;
-    if (rateInput) rateInput.readOnly = !canEdit;
-    if (assignSelect) assignSelect.disabled = !canEdit;
-    
-    if (btnEl) {
-        btnEl.style.display = canEdit ? 'block' : 'none';
-    }
-
-    if (!id) {
-        // --- MODE: CREATE NEW ---
-        window.selectedReqId = null; 
-        titleEl.innerText = "Add New Requirement";
-        btnEl.innerText = "Create Requirement";
-        btnEl.onclick = () => window.addRequirement(); 
-        
-        if (statusBadge) {
-            statusBadge.innerText = 'Draft';
-            statusBadge.className = "text-[9px] px-2 py-0.5 rounded-full font-bold uppercase bg-gray-100 text-gray-600";
-        }
-    } else {
-        // --- MODE: EDIT EXISTING ---
-        const cleanId = String(id).trim().replace(/['"]/g, '');
-        window.selectedReqId = cleanId; 
-        titleEl.innerText = "Requirement Details";
-        
-        // A. Fetch the Main Requirement Data
-        const { data: req, error: reqError } = await supabase
-            .from('requirements')
-            .select('*')
-            .eq('req_id', cleanId) 
-            .single();
-        
-        if (reqError) {
-            console.error("Error fetching requirement:", reqError.message);
-            return;
-        }
-
-        // B. NEW: Fetch the Audit History from the dedicated SQL table
-        const { data: historyRows, error: historyError } = await supabase
-            .from('requirement_history')
-            .select('*')
-            .eq('requirement_id', cleanId)
-            .order('version_number', { ascending: false });
-
-        if (historyError) {
-            console.error("Error fetching history:", historyError.message);
-        }
-        
-        if (req) {
-            if (titleInput) titleInput.value = req.name || '';
-            if (assignSelect) assignSelect.value = req.assigned_to || '';
-            if (hoursInput) hoursInput.value = req.estimated_hours || 0;
-            if (rateInput) rateInput.value = req.blended_rate || req.custom_rate || '';
-            
-            if (versionEl) versionEl.innerText = req.version_number || '1';
-            
-            // C. Render the History using Function 15
-            if (typeof renderHistoryList === 'function') {
-                renderHistoryList(historyRows || []);
-            }
-            
-            if (statusBadge) {
-                statusBadge.innerText = req.status || 'Active';
-                statusBadge.className = req.status === 'Complete' 
-                    ? "text-[9px] px-2 py-0.5 rounded-full font-bold uppercase bg-green-100 text-green-700"
-                    : "text-[9px] px-2 py-0.5 rounded-full font-bold uppercase bg-blue-100 text-blue-700";
-            }
-
-            btnEl.innerText = "Update Baseline Budget";
-            btnEl.onclick = () => window.addRequirement(); 
-        }
-    }
-    
-    if (panel) panel.classList.add('active');
-};
-
-window.addRequirement = async () => {
-    // 0. RBAC GUARD
-    const canSave = ['admin', 'project_manager', 'team_leader'].includes(window.sessionData?.role);
-    if (!canSave) return alert("Access Denied.");
-
-    // 1. Pull UI Data
-    const name = document.getElementById('req-title-input')?.value.trim(); 
-    const hours = parseFloat(document.getElementById('req-hours-input')?.value) || 0;
-    const rate = parseFloat(document.getElementById('req-applied-rate')?.value) || 0;
-    const assigneeId = document.getElementById('req-assign-select')?.value;
-    
-    const assignDropdown = document.getElementById('req-assign-select');
-    const assigneeName = assignDropdown?.options[assignDropdown.selectedIndex]?.text || 'Unassigned';
-
-    const isUpdate = !!window.selectedReqId;
-    const cleanReqId = isUpdate ? String(window.selectedReqId).trim().replace(/['"]/g, '') : null;
-    
-    let nextVersion = 1;
-    let currentTotalBudget = hours * rate;
-
-    try {
-        // 2. Versioning: Fetch previous version from the MAIN table
-        if (isUpdate) {
-            const { data: current } = await supabase
-                .from('requirements')
-                .select('version_number')
-                .eq('req_id', cleanReqId)
-                .single();
-            nextVersion = (current?.version_number || 1) + 1;
-        }
-
-        // 3. Payload for Main 'requirements' Table
-        const payload = {
-            name,
-            estimated_hours: hours,
-            assigned_to: assigneeId,
-            blended_rate: rate, 
-            total_budget: currentTotalBudget,
-            version_number: nextVersion,
-            updated_at: new Date().toISOString()
-        };
-
-        let result;
-        if (isUpdate) {
-            result = await supabase.from('requirements').update(payload).eq('req_id', cleanReqId).select().single();
-        } else {
-            const newRecord = { 
-                ...payload, 
-                project_id: localStorage.getItem('selected_project_id'), 
-                tenant_id: window.sessionData?.tenantId 
-            };
-            result = await supabase.from('requirements').insert([newRecord]).select().single();
-        }
-
-        if (result.error) throw result.error;
-
-        // 4. INSERT TO DEDICATED HISTORY TABLE
-        const historyId = isUpdate ? cleanReqId : result.data.req_id;
-        const { error: historyError } = await supabase.from('requirement_history').insert([{
-            requirement_id: historyId,
-            version_number: nextVersion,
-            total_budget: currentTotalBudget,
-            assigned_to_name: assigneeName,
-            changed_by_name: window.sessionData?.full_name || 'System',
-            change_summary: isUpdate ? `Updated baseline to v${nextVersion}` : 'Initial baseline created'
-        }]);
-
-        if (historyError) console.error("History Log Error:", historyError);
-
-        // 5. Cleanup & UI Sync
-        window.closeReqSlider();
-        if (typeof window.loadRequirements === 'function') await window.loadRequirements();
-
-    } catch (err) {
-        console.error("Save Error:", err.message);
-    }
-};
-
-// This function expects an array of rows from the 'requirement_history' table
-function renderHistoryList(historyRows) {
-    const container = document.getElementById('req-history-list');
-    if (!container) return;
-
-    if (!historyRows || historyRows.length === 0) {
-        container.innerHTML = `
-            <div class="mt-8 pt-6 border-t border-gray-100">
-                <h4 class="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Baseline Audit Trail</h4>
-                <p class="text-[10px] text-gray-400 italic">No previous versions found.</p>
-            </div>`;
-        return;
-    }
-
-    // Sort by version descending (Newest first)
-    const sorted = [...historyRows].sort((a, b) => b.version_number - a.version_number);
-
-    container.innerHTML = `
-        <div class="mt-8 pt-6 border-t border-gray-100">
-            <h4 class="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4">Baseline Audit Trail</h4>
-            <div class="space-y-4">
-                ${sorted.map(entry => `
-                    <div class="flex gap-3 text-xs">
-                        <div class="w-1 bg-indigo-500 rounded-full"></div>
-                        <div class="flex-1">
-                            <div class="flex justify-between items-start">
-                                <p class="font-bold text-gray-800">Version ${entry.version_number}</p>
-                                <p class="text-[10px] text-indigo-600 font-mono font-bold">$${entry.total_budget?.toLocaleString()}</p>
-                            </div>
-                            <p class="text-gray-500 text-[11px]">By ${entry.changed_by_name} on ${new Date(entry.created_at).toLocaleDateString()}</p>
-                            <p class="text-[10px] text-gray-400 italic mt-0.5">${entry.change_summary || ''}</p>
-                        </div>
-                    </div>
-                `).join('')}
-            </div>
-        </div>
-    `;
-}
-<<<<<<< Updated upstream
-// Ensure the Close function is also defined for the UI 'X' button
-//window.closeReqSlider = () => {
-//    const panel = document.getElementById('req-editor-panel');
-//    if (panel) panel.classList.remove('active');
-//};
-
-// Add a close helper since your HTML calls window.closeReqSlider()
-//window.closeReqSlider = () => {
-//    document.getElementById('req-editor-panel').classList.remove('active');
-//};
-
-// --- HELPER: KEBAB MENU (Updated to call openReqSlider) ---
-function getKabobMenu(item, type) {
-    // STANDARDIZED: Using sessionData to match our enterprise role-checking pattern
-    const isAdmin = window.sessionData?.role === 'admin';
-    
-    // Safety check: handle the different ID names between tables
-    const itemId = type === 'req' ? item.req_id : item.step_id;
-    const sliderFunc = type === 'req' ? 'openReqSlider' : 'openTaskSlider';
-
-    return `
-        <div id="kebab-${type}-${itemId}" class="hidden absolute right-0 mt-1 w-40 bg-white border shadow-lg rounded-md z-[110] py-1">
-            <button onclick="event.stopPropagation(); window.${sliderFunc}('${itemId}')" 
-                class="w-full text-left px-4 py-2 text-xs hover:bg-blue-50">
-                ${isAdmin ? 'Edit Details' : 'View Details'}
-            </button>
-            ${isAdmin ? `
-                <button onclick="event.stopPropagation(); window.delete${type === 'req' ? 'Req' : 'Task'}('${itemId}')" 
-                    class="w-full text-left px-4 py-2 text-xs text-red-600 hover:bg-red-50">
-                    Delete
-                </button>` : ''}
-        </div>
-    `;
-}
-
-// --- HELPER: TOGGLE KEBAB ---
-window.toggleKebab = (id) => {
-    document.querySelectorAll('[id^="kebab-"]').forEach(el => el.classList.add('hidden'));
-    const menu = document.getElementById(`kebab-${id}`);
-    if (menu) menu.classList.remove('hidden');
-};
-        
-        // Note Loading
-        async function loadTaskNotes(taskId) {
-            const { data: notes } = await supabase.from('task_notes').select(`*, user_profiles(full_name)`).eq('task_id', taskId).order('created_at', {ascending:true});
-            const container = document.getElementById('notes-container');
-            if(notes && container) {
-                container.innerHTML = notes.map(n => `<div class="p-2 bg-gray-50 rounded border mb-1"><p class="text-[10px] font-bold text-indigo-600">${n.user_profiles?.full_name}</p><p class="text-xs">${n.content}</p></div>`).join('');
-            }
-        }
-        
-        window.appendNote = async () => {
-             // (Logic placeholder - implemented in full earlier)
-             alert("Note appended!");
-        }
-        
-        async function appendNoteToActivity(taskId, content) {
-    if (!taskId || !content) return;
-    await supabase.from('task_notes').insert([{ 
-        task_id: taskId, 
-        user_id: window.sessionData?.user_id, 
-        content: content 
-    }]);
-}
-        
-        // --- END OF SCRIPT ---
-    </script>
+    window.closeReqSlider = () => document.getElementById('req-editor-panel').classList.remove('active');
+    window.closeTaskSlider = () => document.getElementById('task-editor-panel').classList.remove('active');
+    // ... Additional slider logic logic here ...
+</script>
 </body>
 </html>
-=======
-
-window.loadRequirements = async () => {
-    // 0. Context Guard: Using global project/tenant state
-    const projectId = localStorage.getItem('selected_project_id');
-    const tenantId = window.sessionData?.tenantId;
-
-    if (!projectId || !tenantId) {
-        console.warn("Load Requirements: Missing Project or Tenant context.");
-        return;
-    }
-
-    // 1. Fetch Requirements
-    // Joined with assignee details for the sub-text display
-    const { data: reqs, error } = await supabase.from('requirements')
-        .select(`*, assignee:assigned_to(full_name, email)`)
-        .eq('project_id', projectId)
-        .eq('tenant_id', tenantId)
-        .order('sequence_order', { ascending: true });
-
-    if (error) {
-        console.error("Error loading requirements:", error.message);
-        return;
-    }
-
-    const list = document.getElementById('req-list');
-    if (reqs && list) {
-        // Update the counter in the UI header
-        const countEl = document.getElementById('req-count');
-        if (countEl) countEl.innerText = `${reqs.length} ITEMS`;
-
-        list.innerHTML = reqs.map(req => {
-            // MATH FALLBACK: Prefer total_budget (rolled up) or calculate baseline on the fly
-            const displayTotal = req.total_budget || (parseFloat(req.estimated_hours) * (parseFloat(req.blended_rate) || 0));
-            
-            // Kebab Menu Logic: Re-uses Function 10/11
-            const menuHtml = (typeof getKabobMenu === 'function') ? getKabobMenu(req, 'req') : '';
-            
-            // Selection Logic: Check if this row is the currently active one
-            const isActive = window.selectedReqId === req.req_id ? 'border-indigo-600 bg-indigo-50/30' : 'border-transparent';
-            
-            return `
-                <li class="req-row p-4 hover:bg-gray-50 flex justify-between items-center cursor-pointer border-l-4 ${isActive} transition-all" 
-                    data-id="${req.req_id}" 
-                    onclick="window.selectRequirement('${req.req_id}')">
-                    
-                    <div class="flex items-center gap-3">
-                        <input type="checkbox" class="req-checkbox w-4 h-4 rounded border-gray-300" onclick="event.stopPropagation()">
-                        
-                        <span class="cursor-move text-gray-300 font-bold p-1 hover:text-indigo-400">::</span>
-                        
-                        <div>
-                            <p class="text-sm font-bold text-gray-800">${req.name || req.title}</p>
-                            <p class="text-[10px] text-gray-400 font-bold uppercase tracking-tight">
-                                ${req.assignee?.full_name || 'Unassigned'} | ${req.estimated_hours || 0}h | v${req.version_number || 1}
-                            </p>
-                        </div>
-                    </div>
-
-                    <div class="flex items-center gap-4">
-                        <div class="text-right">
-                            <p class="text-sm font-mono font-bold text-indigo-600">
-                                $${Number(displayTotal).toLocaleString(undefined, {minimumFractionDigits: 0})}
-                            </p>
-                        </div>
-                        
-                        <div class="relative kebab-container">
-                            <button onclick="event.stopPropagation(); window.toggleKebab('req-${req.req_id}')" class="p-1 text-gray-400 hover:text-indigo-600">
-                                <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                                </svg>
-                            </button>
-                            ${menuHtml}
-                        </div>
-                    </div>
-                </li>`;
-        }).join('');
-    }
-
-    // 2. Re-bind Sortable after the list is rendered in the DOM
-    if (typeof window.initSortable === 'function') {
-        setTimeout(window.initSortable, 50);
-    }
-};
-
->>>>>>> Stashed changes

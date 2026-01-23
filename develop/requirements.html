@@ -162,7 +162,109 @@
 });
 
     // --- REQUIREMENT ENGINE ---
-    window.selectRequirement = async (id) => {
+    window.openReqSlider = async (id = null) => {
+    const panel = document.getElementById('req-editor-panel');
+    const titleEl = document.getElementById('req-editor-title');
+    const btnEl = document.getElementById('req-save-btn');
+    const versionEl = document.getElementById('req-version-display');
+    const statusBadge = document.getElementById('req-status-badge');
+    const historyContainer = document.getElementById('req-history-list');
+
+    // 0. Permission Check: Admin, PM, and TL can edit. Team Member cannot.
+    const canEdit = ['admin', 'project_manager', 'team_leader'].includes(window.sessionData?.role);
+
+    // 1. Reset Form Fields
+    const titleInput = document.getElementById('req-title-input');
+    const hoursInput = document.getElementById('req-hours-input');
+    const rateInput = document.getElementById('req-applied-rate');
+    const assignSelect = document.getElementById('req-assign-select');
+
+    if (titleInput) titleInput.value = '';
+    if (hoursInput) hoursInput.value = 0;
+    if (rateInput) rateInput.value = '';
+    if (assignSelect) assignSelect.selectedIndex = 0;
+    if (versionEl) versionEl.innerText = '0';
+    if (historyContainer) historyContainer.innerHTML = '';
+
+    // --- APPLY RBAC LOCKS ---
+    if (titleInput) titleInput.readOnly = !canEdit;
+    if (assignSelect) assignSelect.disabled = !canEdit;
+    if (hoursInput) hoursInput.readOnly = !canEdit;
+    if (rateInput) rateInput.readOnly = !canEdit;
+    
+    if (btnEl) {
+        btnEl.style.display = canEdit ? 'block' : 'none';
+    }
+
+    if (!id) {
+        // --- MODE: CREATE NEW ---
+        window.selectedReqId = null; 
+        titleEl.innerText = "Add New Requirement";
+        btnEl.innerText = "Create Requirement";
+        btnEl.onclick = () => window.addRequirement(); 
+        
+        if(statusBadge) {
+            statusBadge.innerText = 'Draft';
+            statusBadge.className = "text-[9px] px-2 py-0.5 rounded-full font-bold uppercase bg-gray-100 text-gray-600";
+        }
+    } else {
+        // --- MODE: EDIT EXISTING ---
+        const cleanId = String(id).trim().replace(/['"]/g, '');
+        window.selectedReqId = cleanId; 
+        titleEl.innerText = "Requirement Details";
+        
+        // Fetch using the CORRECT column name: req_id
+        const { data: req, error } = await supabase
+            .from('requirements')
+            .select('*')
+            .eq('req_id', cleanId)
+            .single();
+        
+        if (error) {
+            console.error("Error fetching requirement:", error.message);
+            return;
+        }
+        
+        if (req) {
+            // --- NOMENCLATURE FIX ---
+            // Per your instruction: Requirements use "title"
+            if (titleInput) titleInput.value = req.title || req.name || '';
+            
+            if (assignSelect) assignSelect.value = req.assigned_to || '';
+            if (hoursInput) hoursInput.value = req.estimated_hours || 0;
+            if (rateInput) rateInput.value = req.custom_rate || '';
+            if (versionEl) versionEl.innerText = req.version_number || '1';
+            
+            // --- UPDATED HISTORY LOGIC ---
+            // Fetching from the standalone requirement_history table
+            const { data: history } = await supabase
+                .from('requirement_history')
+                .select('*')
+                .eq('requirement_id', cleanId)
+                .order('created_at', { ascending: false });
+
+            if (historyContainer && history) {
+                if (typeof window.renderHistoryList === 'function') {
+                    window.renderHistoryList(history);
+                }
+            }
+            
+            if(statusBadge) {
+                statusBadge.innerText = req.status || 'Active';
+                statusBadge.className = req.status === 'Complete' 
+                    ? "text-[9px] px-2 py-0.5 rounded-full font-bold uppercase bg-green-100 text-green-700"
+                    : "text-[9px] px-2 py-0.5 rounded-full font-bold uppercase bg-blue-100 text-blue-700";
+            }
+
+            btnEl.innerText = "Update Baseline Budget";
+            btnEl.onclick = () => window.addRequirement(cleanId); 
+        }
+    }
+    
+    if (panel) panel.classList.add('active');
+};	
+	
+	window.selectRequirement = async (id) => {
         const cleanId = String(id).trim().replace(/['"]/g, ''); // UUID Sanitization
         window.selectedReqId = cleanId;
 
@@ -227,13 +329,28 @@
         const { data: step, error } = await supabase.from('steps').select('*').eq('step_id', id).single();
         
         if (step) {
-            // FIX: Using fallbacks for 'name' vs 'title' to prevent empty inputs
-            document.getElementById('step-title-input').value = step.name || step.title || '';
-            document.getElementById('step-assign-select').value = step.assigned_to || '';
-            document.getElementById('step-hours-input').value = step.estimated_hours || 0;
+            // --- NOMENCLATURE FIX ---
+            // Per your instruction: Steps/Tasks use "name" as the primary column
+            const titleInput = document.getElementById('step-title-input');
+            if (titleInput) {
+                titleInput.value = step.name || step.title || '';
+            }
+
+            const assignSelect = document.getElementById('step-assign-select');
+            if (assignSelect) {
+                assignSelect.value = step.assigned_to || '';
+            }
+
+            const hoursInput = document.getElementById('step-hours-input');
+            if (hoursInput) {
+                hoursInput.value = step.estimated_hours || 0;
+            }
             
             // FIX: Ensure cost displays correctly (total_cost is standard in your schema)
-            document.getElementById('step-cost-input').value = (step.total_cost || step.cost || 0).toFixed(2);
+            const costInput = document.getElementById('step-cost-input');
+            if (costInput) {
+                costInput.value = (step.cost || step.total_cost || 0).toFixed(2);
+            }
             
             btnEl.onclick = () => window.updateStep(id);
             if (typeof loadTaskNotes === 'function') loadTaskNotes(id);
@@ -277,44 +394,80 @@
 };
 
     window.rollupToRequirement = async (reqId) => {
-        const cleanReqId = String(reqId).trim().replace(/['"]/g, '');
+    // 1. Sanitize the ID
+    const cleanReqId = String(reqId).trim().replace(/['"]/g, '');
+    
+    // 2. Fetch all active tasks/steps for this requirement
+    // Note: We use the 'steps' table as the source of truth for the rollup
+    const { data: tasks, error } = await supabase.from('steps')
+        .select('estimated_hours, cost, assigned_to')
+        .eq('requirement_id', cleanReqId)
+        .eq('is_active', true);
+
+    if (error) {
+        console.error("Rollup Error fetching tasks:", error.message);
+        return;
+    }
+
+    let totalCost = 0;
+    let totalHours = 0;
+
+    // 3. Calculation Loop
+    tasks.forEach(task => {
+        const hrs = parseFloat(task.estimated_hours) || 0;
+        let cost = parseFloat(task.cost) || 0;
+
+        // Fallback Calculation logic: 
+        // If no hard cost is set, calculate based on assignee rate or project default
+        if (cost === 0 && hrs > 0) {
+            const teamMembers = window.teamMembers || [];
+            const user = teamMembers.find(m => m.user_id === task.assigned_to);
+            
+            // Priority: User Rate > Project Blended Rate > 0
+            const rate = (user && parseFloat(user.hourly_cost) > 0) 
+                ? parseFloat(user.hourly_cost) 
+                : (parseFloat(window.projectBlendedRate) || 0);
+                
+            cost = hrs * rate;
+        }
         
-        const { data: tasks, error } = await supabase.from('steps')
-            .select('estimated_hours, cost, assigned_to')
-            .eq('requirement_id', cleanReqId)
-            .eq('is_active', true);
+        totalCost += cost;
+        totalHours += hrs;
+    });
 
-        if (error) return console.error("Rollup Error:", error);
-
-        let totalCost = 0;
-        let totalHours = 0;
-
-        tasks.forEach(task => {
-            const hrs = parseFloat(task.estimated_hours) || 0;
-            let cost = parseFloat(task.cost) || 0;
-
-            // Fallback Calculation logic
-            if (cost === 0 && hrs > 0) {
-                const user = window.teamMembers.find(m => m.user_id === task.assigned_to);
-                const rate = (user && parseFloat(user.hourly_cost) > 0) ? user.hourly_cost : window.projectBlendedRate;
-                cost = hrs * rate;
-            }
-            totalCost += cost;
-            totalHours += hrs;
-        });
-
-        await supabase.from('requirements').update({
+    // 4. Update the Requirements Table
+    // This updates the "Budget" that the health score depends on
+    const { error: updateError } = await supabase
+        .from('requirements')
+        .update({
             estimated_hours: totalHours,
             total_budget: totalCost,
             updated_at: new Date().toISOString()
-        }).eq('req_id', cleanReqId);
+        })
+        .eq('req_id', cleanReqId);
 
-        loadRequirements(); // Sync UI
-        document.getElementById('selected-req-budget-display').innerText = `$${totalCost.toLocaleString()}`;
-    };
+    if (updateError) {
+        console.error("Rollup Error updating requirement:", updateError.message);
+        return;
+    }
+
+    // 5. Sync UI
+    // Call the global version of loadRequirements to refresh the left-hand list
+    if (typeof window.loadRequirements === 'function') {
+        window.loadRequirements();
+    }
+
+    // Update the Budget display in the header if it exists
+    const budgetDisplay = document.getElementById('selected-req-budget-display');
+    if (budgetDisplay) {
+        budgetDisplay.innerText = `$${totalCost.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+    }
+
+    console.log(`Rollup Complete for ${cleanReqId}: $${totalCost} / ${totalHours}h`);
+};
 
     // UI ENGINE
-async function loadRequirements() {
+window.loadRequirements = async () => {
     // 1. Context Retrieval & Validation
     const projectId = localStorage.getItem('selected_project_id');
     const tenantId = window.sessionData?.tenantId;
@@ -351,14 +504,14 @@ async function loadRequirements() {
         return;
     }
 
-    // 5. Render (FIXED FOR "UNTITLED" ISSUE)
+    // 5. Render
     list.innerHTML = safeReqs.map(req => {
-        // --- THE FIX ---
-        // We check for .name (current), .title (legacy), then fallback
-        const requirementName = req.name || req.title || 'Untitled Requirement';
+        // --- NOMENCLATURE FIX ---
+        // Per your instruction: Requirements use "title"
+        const displayTitle = req.title || req.name || 'Untitled Requirement';
         
         const displayTotal = req.total_budget || 0;
-        const menuHtml = (typeof getKabobMenu === 'function') ? getKabobMenu(req, 'req') : '';
+        const menuHtml = (typeof window.getKabobMenu === 'function') ? window.getKabobMenu(req, 'req') : '';
         const isActive = window.selectedReqId === req.req_id ? 'border-indigo-600 bg-indigo-50/30' : 'border-transparent';
 
         return `
@@ -370,7 +523,7 @@ async function loadRequirements() {
                     <span class="cursor-move text-gray-300 font-bold p-1">::</span>
                     
                     <div>
-                        <p class="text-sm font-bold text-gray-800">${requirementName}</p>
+                        <p class="text-sm font-bold text-gray-800">${displayTitle}</p>
                         <p class="text-[10px] text-gray-400 font-bold uppercase">
                             ${req.assignee?.full_name || 'Unassigned'} | ${req.estimated_hours || 0}h
                         </p>
@@ -481,8 +634,9 @@ window.toggleKebab = (id) => {
     // 3. Render Loop
     const safeSteps = steps || [];
     list.innerHTML = safeSteps.map(s => {
-        // --- DATA MAPPING: SWAPPED TO 'TITLE' ---
-        const taskName = s.title || s.name || 'Untitled Task';
+        // --- NOMENCLATURE FIX ---
+        // Per your instruction: Steps/Tasks use "name"
+        const taskName = s.name || s.title || 'Untitled Task';
         const taskCost = s.cost || s.total_cost || 0;
         const taskHours = s.estimated_hours || 0;
         

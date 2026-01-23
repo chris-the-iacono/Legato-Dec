@@ -222,21 +222,86 @@
 
     // --- UI ENGINE ---
     async function loadRequirements() {
-        const { data: reqs } = await supabase.from('requirements').select(`*, assignee:assigned_to(full_name)`).eq('project_id', projectId).order('sequence_order');
-        const list = document.getElementById('req-list');
-        document.getElementById('req-count').innerText = `${reqs?.length || 0} ITEMS`;
-        
-        list.innerHTML = reqs.map(req => `
-            <li class="req-row p-4 hover:bg-gray-50 flex justify-between items-center cursor-pointer border-l-4 border-transparent transition-all" 
-                data-id="${req.req_id}" onclick="window.selectRequirement('${req.req_id}')">
-                <div>
-                    <p class="text-sm font-bold text-gray-800">${req.name}</p>
-                    <p class="text-[10px] text-gray-400 font-bold uppercase">${req.assignee?.full_name || 'Unassigned'} | ${req.estimated_hours}h</p>
-                </div>
-                <p class="text-sm font-mono font-bold text-indigo-600">$${(req.total_budget || 0).toLocaleString()}</p>
-            </li>
-        `).join('');
+    // 1. Context Retrieval & Validation
+    const projectId = localStorage.getItem('selected_project_id');
+    const tenantId = window.sessionData?.tenantId;
+
+    // Prevention of 400 error
+    if (!projectId || projectId === "null" || !tenantId) {
+        console.warn("loadRequirements: Missing required IDs. Aborting fetch.");
+        return;
     }
+
+    // 2. Data Fetching
+    const { data: reqs, error } = await supabase
+        .from('requirements')
+        .select(`*, assignee:assigned_to(full_name)`)
+        .eq('project_id', projectId)
+        .eq('tenant_id', tenantId) // Security check
+        .order('sequence_order');
+
+    if (error) {
+        console.error("Supabase Error in loadRequirements:", error.message);
+        return;
+    }
+
+    // 3. DOM Elements
+    const list = document.getElementById('req-list');
+    const countEl = document.getElementById('req-count');
+    if (!list) return;
+
+    // 4. Null-Safe Mapping (Fixes Line 229 TypeError)
+    const safeReqs = reqs || [];
+    if (countEl) countEl.innerText = `${safeReqs.length} ITEMS`;
+
+    if (safeReqs.length === 0) {
+        list.innerHTML = `<div class="p-10 text-center text-gray-400 italic">No requirements found.</div>`;
+        return;
+    }
+
+    // 5. Render
+    list.innerHTML = safeReqs.map(req => {
+        // Fallback calculations for display
+        const displayTotal = req.total_budget || 0;
+        const menuHtml = (typeof getKabobMenu === 'function') ? getKabobMenu(req, 'req') : '';
+        const isActive = window.selectedReqId === req.req_id ? 'border-indigo-600 bg-indigo-50/30' : 'border-transparent';
+
+        return `
+            <li class="req-row p-4 hover:bg-gray-50 flex justify-between items-center cursor-pointer border-l-4 ${isActive} transition-all" 
+                data-id="${req.req_id}" onclick="window.selectRequirement('${req.req_id}')">
+                
+                <div class="flex items-center gap-3">
+                    <input type="checkbox" class="w-4 h-4 rounded border-gray-300" onclick="event.stopPropagation()">
+                    <span class="cursor-move text-gray-300 font-bold p-1">::</span>
+                    
+                    <div>
+                        <p class="text-sm font-bold text-gray-800">${req.name || 'Untitled'}</p>
+                        <p class="text-[10px] text-gray-400 font-bold uppercase">
+                            ${req.assignee?.full_name || 'Unassigned'} | ${req.estimated_hours || 0}h
+                        </p>
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-4">
+                    <p class="text-sm font-mono font-bold text-indigo-600">$${Number(displayTotal).toLocaleString()}</p>
+                    <div class="relative kebab-container">
+                        <button onclick="event.stopPropagation(); window.toggleKebab('req-${req.req_id}')" class="p-1 text-gray-400 hover:text-indigo-600">
+                            <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                        </button>
+                        ${menuHtml}
+                    </div>
+                </div>
+            </li>
+        `;
+    }).join('');
+
+    // 6. Sortable Initialization
+    if (typeof window.initSortable === 'function') {
+        setTimeout(window.initSortable, 50);
+    }
+}
 
     async function refreshSteps() {
         const { data: steps } = await supabase.from('steps').select('*').eq('requirement_id', window.selectedReqId).eq('is_active', true).order('sequence_order');

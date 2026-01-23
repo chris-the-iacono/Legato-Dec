@@ -3,37 +3,89 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Requirements & Tasks | Project Budget Manager</title>
+    <title>Requirements | Project Manager</title>
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
+    
     <style>
-        .app-container { height: calc(100vh - 140px); display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
-        .list-viewport { overflow-y: auto; flex-grow: 1; position: relative; }
-        .active-req { background-color: #f5f3ff !important; border-left: 4px solid #6366f1 !important; }
-        .active-task { background-color: #eff6ff !important; border-left: 4px solid #3b82f6 !important; }
-        .side-slider { position: fixed; top: 0; width: 450px; height: 100vh; background: white; box-shadow: 0 0 40px rgba(0,0,0,0.15); transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1); z-index: 1000; display: flex; flex-direction: column; }
-        #req-editor-panel { right: 0; transform: translateX(100%); }
-        #req-editor-panel.active { transform: translateX(0); }
-        #task-editor-panel { left: 0; transform: translateX(-100%); }
-        #task-editor-panel.active { transform: translateX(0); }
-        .cursor-move { cursor: move; }
-        /* Disable Canvas as per instructions */
-        canvas { display: none !important; }
-    </style>
+    /* Layout & Viewport */
+    .app-container { 
+        height: calc(100vh - 140px); 
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1.5rem;
+    }
+    .list-viewport { overflow-y: auto; flex-grow: 1; position: relative; }
+    
+    /* Active State Highlights */
+    .active-req { background-color: #f5f3ff !important; border-left: 4px solid #6366f1 !important; }
+    .active-task { background-color: #eff6ff !important; border-left: 4px solid #3b82f6 !important; }
+
+    /* Status Badges */
+    .status-pending { background-color: #f3f4f6; color: #374151; padding: 2px 8px; border-radius: 9999px; border: 1px solid #e5e7eb; }
+    .status-inprogress { background-color: #eff6ff; color: #2563eb; padding: 2px 8px; border-radius: 9999px; border: 1px solid #dbeafe; }
+    .status-complete { background-color: #f0fdf4; color: #16a34a; padding: 2px 8px; border-radius: 9999px; border: 1px solid #dcfce7; }
+
+    /* Slider Animations */
+    .side-slider {
+        position: fixed;
+        top: 0;
+        width: 450px;
+        height: 100vh;
+        background: white;
+        box-shadow: 0 0 40px rgba(0,0,0,0.15);
+        transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        z-index: 1000;
+        display: flex;
+        flex-direction: column;
+    }
+
+    #req-editor-panel { right: 0; transform: translateX(100%); }
+    #req-editor-panel.active { transform: translateX(0); }
+
+    #task-editor-panel { left: 0; transform: translateX(-100%); }
+    #task-editor-panel.active { transform: translateX(0); }
+
+    /* Kebab Menu Animation */
+    [id^="kebab-req-"], [id^="kebab-task-"] { animation: slideIn 0.15s ease-out; }
+    @keyframes slideIn { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
+
+    /* RBAC: Hide Drag Handles */
+    body.hide-drag-handles .cursor-move {
+        display: none !important;
+        pointer-events: none;
+    }
+</style>
 </head>
 <body class="bg-gray-100 min-h-screen overflow-hidden">
     <div id="main-header"></div>
+    
     <main class="max-w-7xl mx-auto p-4 lg:p-6">
         <div class="app-container">
             <section class="bg-white rounded-xl shadow-sm border border-gray-200 flex flex-col overflow-hidden">
                 <div class="px-4 py-4 border-b bg-gray-50/80 flex justify-between items-center">
                     <div>
-                        <h3 class="font-bold text-gray-800">1. Requirements (Project Budgets)</h3>
-                        <p id="req-count" class="text-[9px] text-gray-400 font-bold uppercase tracking-wider">0 ITEMS</p>
+                        <h3 class="font-bold text-gray-800">1. Requirements</h3>
+                        <p class="text-[9px] text-gray-400 font-bold uppercase tracking-wider">Project Backlog</p>
                     </div>
-                    <button onclick="window.openReqSlider()" class="bg-indigo-600 text-white p-1.5 rounded-lg hover:bg-indigo-700 shadow-md">
-                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-                    </button>
+                    <div class="flex items-center gap-2">
+                        <span id="req-count" class="text-[10px] bg-gray-200 text-gray-600 px-2 py-1 rounded-full font-bold">0 ITEMS</span>
+                        <button onclick="window.openReqSlider()" class="bg-indigo-600 text-white p-1.5 rounded-lg hover:bg-indigo-700 transition shadow-md">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
+                        </button>
+                    </div>
+                </div>
+                <div id="bulk-actions" class="hidden bg-indigo-50 p-2 border-b flex justify-between items-center transition-all">
+                    <span id="selected-count" class="text-xs font-bold text-indigo-700 ml-2">0 selected</span>
+                    <div class="flex gap-2">
+                        <select id="bulk-status-select" class="text-xs border-gray-300 rounded p-1">
+                            <option value="">Change to...</option>
+                            <option value="Pending">Pending</option>
+                            <option value="In Progress">In Progress</option>
+                            <option value="Complete">Complete</option>
+                        </select>
+                        <button onclick="window.applyBulkStatus()" class="bg-indigo-600 text-white px-3 py-1 rounded text-xs font-bold hover:bg-indigo-700">Apply</button>
+                    </div>
                 </div>
                 <ul id="req-list" class="list-viewport divide-y divide-gray-100"></ul>
             </section>
@@ -42,50 +94,144 @@
                 <div class="px-4 py-4 border-b bg-blue-50/80 flex justify-between items-center">
                     <div>
                         <h3 id="selected-req-title-display" class="font-bold text-gray-800">2. Task Breakdown</h3>
-                        <p id="selected-req-budget-display" class="text-[10px] text-blue-600 font-black">$0.00</p>
+                        <p id="selected-req-meta" class="text-[9px] text-blue-500 font-bold uppercase tracking-wider">Select a requirement to view tasks</p>
                     </div>
-                    <button id="add-task-btn" onclick="window.openTaskSlider()" disabled class="bg-blue-600 text-white p-1.5 rounded-lg opacity-50 cursor-not-allowed">
-                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-                    </button>
+                    <div class="flex items-center gap-2">
+                        <span id="task-count" class="text-[10px] bg-blue-100 text-blue-600 px-2 py-1 rounded-full font-bold">0 TASKS</span>
+                        <button id="add-task-btn" onclick="window.openTaskSlider()" class="bg-blue-600 text-white p-1.5 rounded-lg hover:bg-blue-700 transition shadow-md opacity-50 cursor-not-allowed" disabled>
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
+                        </button>
+                    </div>
                 </div>
                 <ul id="step-list" class="list-viewport divide-y divide-gray-100"></ul>
             </section>
         </div>
     </main>
 
-    <div id="req-editor-panel" class="side-slider">
-        <div class="p-4 border-b bg-indigo-50 flex justify-between items-center">
-            <h2 id="req-editor-title" class="font-bold">Requirement Details</h2>
-            <button onclick="window.closeReqSlider()">&times;</button>
-        </div>
-        <div class="p-6 space-y-4">
-            <input type="text" id="req-title-input" placeholder="Title" class="w-full p-2 border rounded">
-            <select id="req-assign-select" class="w-full p-2 border rounded"></select>
-            <input type="number" id="req-hours-input" placeholder="Hours" class="w-full p-2 border rounded">
-            <input type="number" id="req-applied-rate" placeholder="Rate" class="w-full p-2 border rounded">
-            <button id="req-save-btn" class="w-full bg-indigo-600 text-white py-2 rounded">Save Requirement</button>
-            <div id="req-history-list" class="mt-4 text-xs space-y-2"></div>
-        </div>
-    </div>
-
-    <div id="task-editor-panel" class="side-slider">
-        <div class="p-4 border-b bg-blue-50 flex justify-between items-center">
-            <h2 id="task-editor-title" class="font-bold">Task Details</h2>
-            <button onclick="window.closeTaskSlider()">&times;</button>
-        </div>
-        <div class="p-6 space-y-4">
-            <input type="text" id="step-title-input" class="w-full p-2 border rounded">
-            <select id="step-assign-select" class="w-full p-2 border rounded"></select>
-            <div class="grid grid-cols-2 gap-2">
-                <input type="number" id="step-hours-input" class="p-2 border rounded">
-                <input type="text" id="step-cost-input" readonly class="p-2 border rounded bg-gray-50">
+    <section id="req-editor-panel" class="side-slider">
+    <div class="flex justify-between items-center p-4 border-b bg-indigo-50">
+        <div>
+            <h2 id="req-editor-title" class="font-bold text-lg text-indigo-900">Requirement Details</h2>
+            <div class="flex gap-2 items-center">
+                <p class="text-[10px] text-indigo-400 font-bold uppercase">Budget Version: <span id="req-version-display">0</span></p>
+                <span id="req-status-badge" class="text-[9px] px-2 py-0.5 rounded-full font-bold uppercase bg-green-100 text-green-700">Active</span>
             </div>
-            <button id="task-save-btn" class="w-full bg-blue-600 text-white py-2 rounded">Save Task</button>
-            <button id="delete-task-btn" class="w-full text-red-600 text-xs hidden">Delete Task</button>
-            <div id="log-time-section" class="pt-4 border-t"></div>
-            <div id="notes-container" class="space-y-2"></div>
+        </div>
+        <button onclick="window.closeReqSlider()" class="text-gray-400 hover:text-indigo-600 transition-colors">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+        </button>
+    </div>
+    
+    <!-- Added h-full and flex-col to ensure history stays at bottom or scrolls properly -->
+    <div class="p-6 space-y-6 overflow-y-auto h-[calc(100vh-80px)]">
+        <div class="space-y-4">
+            <div>
+                <label class="text-[11px] font-bold text-gray-500 uppercase ml-1">Title</label>
+                <input type="text" id="req-title-input" data-admin-only placeholder="e.g. Database Migration" class="w-full border-gray-200 rounded-lg text-sm p-3 border outline-none focus:ring-2 focus:ring-indigo-500 disabled:bg-gray-50 disabled:text-gray-400">
+            </div>
+            
+            <div class="grid grid-cols-2 gap-4">
+                <div class="flex flex-col">
+                    <label class="text-[11px] font-bold text-gray-500 uppercase mb-1 ml-1">Accountable</label>
+                    <select id="req-assign-select" data-admin-only onchange="window.handleUserSelection('req')" class="bg-white border-gray-200 rounded-lg text-sm p-3 border disabled:bg-gray-50"></select>
+                </div>
+                <div class="flex flex-col">
+                    <label class="text-[11px] font-bold text-gray-500 uppercase mb-1 ml-1">Applied Rate</label>
+                    <input type="number" id="req-applied-rate" readonly class="bg-gray-100 border-gray-200 rounded-lg text-sm p-3 font-mono text-gray-500 border">
+                </div>
+            </div>
+
+            <div>
+                <label class="text-[11px] font-bold text-gray-500 uppercase mb-1 ml-1">Estimated Budget (Hours)</label>
+                <input type="number" id="req-hours-input" data-admin-only placeholder="0" class="w-full border-gray-200 rounded-lg text-sm p-3 border disabled:bg-gray-50">
+            </div>
+
+            <div class="pt-4" id="req-admin-actions">
+                <button id="req-save-btn" onclick="window.addRequirement()" class="w-full bg-indigo-600 text-white py-3 rounded-lg text-sm font-bold hover:bg-indigo-700 shadow-lg transition-all">
+                    Update Baseline Budget
+                </button>
+                <p class="text-[10px] text-gray-400 text-center mt-2 italic">Note: Saving will create a new timestamped baseline version.</p>
+            </div>
+        </div>
+
+        <!-- NEW: Dedicated History Section -->
+        <div id="req-history-section" class="mt-10 pt-8 border-t border-gray-100">
+            <h3 class="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4">Baseline History & Audit Trail</h3>
+            <div id="req-history-list" class="space-y-4">
+                <!-- History items will be injected here by renderHistoryList() -->
+                <p class="text-xs text-gray-400 italic text-center py-4">No history records found.</p>
+            </div>
         </div>
     </div>
+</section>
+
+    <section id="task-editor-panel" class="side-slider">
+    <div class="flex justify-between items-center p-4 border-b bg-blue-50">
+        <div>
+            <h2 id="task-editor-title" class="font-bold text-lg text-blue-900">Task Details</h2>
+            <p class="text-[10px] text-blue-400 font-bold uppercase">Task Reality & Tracking</p>
+        </div>
+        <button onclick="window.closeTaskSlider()" class="text-gray-400 hover:text-blue-600 transition-colors">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+        </button>
+    </div>
+    
+    <div class="flex-grow overflow-y-auto p-6 space-y-8">
+        <div class="space-y-4 pb-6 border-b border-gray-100">
+            <h3 class="text-[11px] font-black text-gray-400 uppercase tracking-widest">Baseline Estimate</h3>
+            <div>
+                <label class="text-[10px] font-bold text-gray-400 uppercase ml-1">Task Title</label>
+                <input type="text" id="step-title-input" data-admin-only class="w-full border-gray-200 rounded-lg text-sm p-3 border">
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+                <div class="flex flex-col">
+                    <label class="text-[10px] font-bold text-gray-400 uppercase mb-1 ml-1">Responsible</label>
+                    <select id="step-assign-select" data-admin-only onchange="window.handleUserSelection('step')" class="border-gray-200 rounded-lg text-sm p-3 bg-gray-50 border"></select>
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                    <div class="flex flex-col">
+                        <label class="text-[10px] font-bold text-gray-400 uppercase mb-1 ml-1">Est. Hrs</label>
+                        <input type="number" id="step-hours-input" data-admin-only class="border-gray-200 rounded-lg text-sm p-3 border">
+                    </div>
+                    <div class="flex flex-col">
+                        <label class="text-[10px] font-bold text-gray-400 uppercase mb-1 ml-1">Est. Cost</label>
+                        <input type="number" id="step-cost-input" readonly class="bg-gray-50 border-gray-200 rounded-lg text-sm p-3 font-mono border">
+                    </div>
+                </div>
+            </div>
+            
+            <div class="space-y-3 pt-2">
+                <button id="task-save-btn" data-admin-only onclick="window.submitStep()" class="w-full bg-blue-600 text-white py-3 rounded-lg text-xs font-bold hover:bg-blue-700 transition-all shadow-md">
+                    Save Baseline Changes
+                </button>
+                
+                <button id="delete-task-btn" data-admin-only class="w-full bg-white text-red-600 border border-red-100 py-2 rounded-lg text-[10px] font-bold hover:bg-red-50 transition-all uppercase tracking-wider">
+                    Remove Task from Baseline
+                </button>
+            </div>
+        </div>
+
+        <div id="log-time-section" class="bg-green-50/50 p-4 rounded-xl border border-green-100 space-y-4">
+            <h3 class="text-[11px] font-black text-green-600 uppercase tracking-widest">Log Actual Work</h3>
+            <div class="grid grid-cols-2 gap-3">
+                <input type="number" id="log-hours" step="0.25" placeholder="Hours" class="p-2 border rounded-lg text-sm">
+                <input type="date" id="log-date" class="p-2 border rounded-lg text-sm text-gray-500">
+            </div>
+            <button onclick="window.saveTimeLog()" class="w-full bg-green-600 text-white py-2 rounded-lg text-xs font-bold hover:bg-green-700">Save Time Log</button>
+        </div>
+
+        <div class="space-y-4">
+            <h3 class="text-[11px] font-black text-gray-400 uppercase tracking-widest">Activity & Notes</h3>
+            <div id="notes-container" class="space-y-3 max-h-48 overflow-y-auto pr-2"></div>
+            <div class="flex gap-2">
+                <input type="text" id="new-note-input" placeholder="Append a note..." class="flex-grow p-2 border rounded-lg text-sm">
+                <button type="button" onclick="window.appendNote()" class="bg-gray-800 text-white px-4 py-2 rounded-lg text-xs font-bold hover:bg-black">Add</button>
+            </div>
+        </div>
+    </div>
+</section>
 	<script type="module">
     import { supabase } from './js/config.js';
 

@@ -220,13 +220,12 @@
         document.getElementById('selected-req-budget-display').innerText = `$${totalCost.toLocaleString()}`;
     };
 
-    // --- UI ENGINE ---
-    async function loadRequirements() {
+    // UI ENGINE
+async function loadRequirements() {
     // 1. Context Retrieval & Validation
     const projectId = localStorage.getItem('selected_project_id');
     const tenantId = window.sessionData?.tenantId;
 
-    // Prevention of 400 error
     if (!projectId || projectId === "null" || !tenantId) {
         console.warn("loadRequirements: Missing required IDs. Aborting fetch.");
         return;
@@ -237,7 +236,7 @@
         .from('requirements')
         .select(`*, assignee:assigned_to(full_name)`)
         .eq('project_id', projectId)
-        .eq('tenant_id', tenantId) // Security check
+        .eq('tenant_id', tenantId)
         .order('sequence_order');
 
     if (error) {
@@ -250,7 +249,7 @@
     const countEl = document.getElementById('req-count');
     if (!list) return;
 
-    // 4. Null-Safe Mapping (Fixes Line 229 TypeError)
+    // 4. Null-Safe Data Check
     const safeReqs = reqs || [];
     if (countEl) countEl.innerText = `${safeReqs.length} ITEMS`;
 
@@ -259,9 +258,12 @@
         return;
     }
 
-    // 5. Render
+    // 5. Render (FIXED FOR "UNTITLED" ISSUE)
     list.innerHTML = safeReqs.map(req => {
-        // Fallback calculations for display
+        // --- THE FIX ---
+        // We check for .name (current), .title (legacy), then fallback
+        const requirementName = req.name || req.title || 'Untitled Requirement';
+        
         const displayTotal = req.total_budget || 0;
         const menuHtml = (typeof getKabobMenu === 'function') ? getKabobMenu(req, 'req') : '';
         const isActive = window.selectedReqId === req.req_id ? 'border-indigo-600 bg-indigo-50/30' : 'border-transparent';
@@ -275,7 +277,7 @@
                     <span class="cursor-move text-gray-300 font-bold p-1">::</span>
                     
                     <div>
-                        <p class="text-sm font-bold text-gray-800">${req.name || 'Untitled'}</p>
+                        <p class="text-sm font-bold text-gray-800">${requirementName}</p>
                         <p class="text-[10px] text-gray-400 font-bold uppercase">
                             ${req.assignee?.full_name || 'Unassigned'} | ${req.estimated_hours || 0}h
                         </p>

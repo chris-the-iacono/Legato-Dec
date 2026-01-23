@@ -305,6 +305,42 @@ async function loadRequirements() {
     }
 }
 
+// --- HELPER: TOGGLE KEBAB ---
+// Attached to window to fix the "Not a function" error from inline onclicks
+window.toggleKebab = (id) => {
+    const menuId = `kebab-${id}`;
+    const targetMenu = document.getElementById(menuId);
+    
+    if (!targetMenu) {
+        console.error(`Kebab menu not found: ${menuId}`);
+        return;
+    }
+
+    // Check if the menu we clicked is already open
+    const isAlreadyOpen = !targetMenu.classList.contains('hidden');
+
+    // 1. Close ALL open kebab menus first (to prevent overlapping)
+    document.querySelectorAll('[id^="kebab-"]').forEach(el => el.classList.add('hidden'));
+
+    // 2. If it wasn't open, open it now. If it was open, leave it hidden (toggled)
+    if (!isAlreadyOpen) {
+        targetMenu.classList.remove('hidden');
+    }
+
+    // 3. Global click listener to close kebab if user clicks anywhere else
+    const closeMenus = (e) => {
+        if (!e.target.closest('.kebab-container')) {
+            targetMenu.classList.add('hidden');
+            document.removeEventListener('click', closeMenus);
+        }
+    };
+    
+    // Use a tiny timeout so the current click doesn't immediately trigger the closeMenus logic
+    setTimeout(() => {
+        document.addEventListener('click', closeMenus);
+    }, 10);
+};
+
     async function refreshSteps() {
         const { data: steps } = await supabase.from('steps').select('*').eq('requirement_id', window.selectedReqId).eq('is_active', true).order('sequence_order');
         const list = document.getElementById('step-list');

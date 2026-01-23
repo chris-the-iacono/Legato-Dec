@@ -398,6 +398,29 @@ async function loadRequirements() {
     }
 }
 
+window.getKabobMenu = (item, type) => {
+    // Standardize the ID based on the object property (req_id or step_id)
+    const id = item.req_id || item.step_id || item.id;
+    const menuId = `kebab-${type}-${id}`;
+
+    return `
+        <div id="${menuId}" class="hidden absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-xl border border-gray-100 z-[1000] overflow-hidden">
+            <div class="py-1">
+                <button onclick="event.stopPropagation(); window.open${type === 'req' ? 'Req' : 'Task'}Slider('${id}')" 
+                    class="flex items-center w-full px-4 py-3 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 transition-colors">
+                    <svg class="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    Edit Details
+                </button>
+                <button onclick="event.stopPropagation(); window.delete${type === 'req' ? 'Requirement' : 'Step'}('${id}')" 
+                    class="flex items-center w-full px-4 py-3 text-sm text-red-600 hover:bg-red-50 transition-colors">
+                    <svg class="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-4v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    Delete ${type === 'req' ? 'Requirement' : 'Task'}
+                </button>
+            </div>
+        </div>
+    `;
+};
+
 // --- HELPER: TOGGLE KEBAB ---
 // Attached to window to fix the "Not a function" error from inline onclicks
 window.toggleKebab = (id) => {
@@ -434,16 +457,70 @@ window.toggleKebab = (id) => {
     }, 10);
 };
 
-    async function refreshSteps() {
-        const { data: steps } = await supabase.from('steps').select('*').eq('requirement_id', window.selectedReqId).eq('is_active', true).order('sequence_order');
-        const list = document.getElementById('step-list');
-        list.innerHTML = steps.map(s => `
-            <li class="p-4 flex justify-between items-center hover:bg-blue-50 cursor-pointer" onclick="window.openTaskSlider('${s.step_id}')">
-                <span class="text-sm font-medium">${s.title}</span>
-                <span class="text-xs font-mono">$${(s.cost || 0).toLocaleString()}</span>
-            </li>
-        `).join('');
+    window.refreshSteps = async () => {
+    // 1. Safety Guard: Don't fetch if no requirement is selected
+    const reqId = window.selectedReqId;
+    if (!reqId) return;
+
+    // 2. Data Fetching
+    const { data: steps, error } = await supabase
+        .from('steps')
+        .select('*')
+        .eq('requirement_id', reqId)
+        .eq('is_active', true)
+        .order('sequence_order');
+
+    if (error) {
+        console.error("Error refreshing steps:", error.message);
+        return;
     }
+
+    const list = document.getElementById('step-list');
+    if (!list) return;
+
+    // 3. Render Loop
+    const safeSteps = steps || [];
+    list.innerHTML = safeSteps.map(s => {
+        // --- DATA MAPPING: SWAPPED TO 'TITLE' ---
+        const taskName = s.title || s.name || 'Untitled Task';
+        const taskCost = s.cost || s.total_cost || 0;
+        const taskHours = s.estimated_hours || 0;
+        
+        // Generate the kebab HTML (Function #17)
+        const menuHtml = (typeof window.getKabobMenu === 'function') 
+            ? window.getKabobMenu(s, 'task') 
+            : '';
+
+        return `
+            <li class="p-4 flex justify-between items-center hover:bg-indigo-50/50 border-b border-gray-50 cursor-pointer group transition-colors" 
+                onclick="window.openTaskSlider('${s.step_id}')">
+                
+                <div class="flex flex-col">
+                    <span class="text-sm font-bold text-gray-800">${taskName}</span>
+                    <span class="text-[10px] text-gray-400 font-bold uppercase tracking-tight">
+                        Est: ${taskHours}h | Assigned: ${s.assigned_to ? 'Yes' : 'No'}
+                    </span>
+                </div>
+
+                <div class="flex items-center gap-4">
+                    <span class="text-xs font-mono font-bold text-indigo-600">
+                        $${Number(taskCost).toLocaleString()}
+                    </span>
+                    
+                    <div class="relative kebab-container">
+                        <button onclick="event.stopPropagation(); window.toggleKebab('task-${s.step_id}')" 
+                            class="p-2 text-gray-400 hover:text-indigo-600 rounded-full hover:bg-white transition-all">
+                            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                        </button>
+                        ${menuHtml}
+                    </div>
+                </div>
+            </li>
+        `;
+    }).join('');
+};
 
     function populateDropdowns() {
     // 1. Verify Data Source

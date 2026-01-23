@@ -98,22 +98,68 @@
 
     // --- INITIALIZATION ---
     document.addEventListener('DOMContentLoaded', async () => {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return window.location.href = 'login.html';
+    // 1. Auth Guard: Ensure user is logged in
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (!user || authError) {
+        console.warn("No active session found, redirecting to login.");
+        return window.location.href = 'login.html';
+    }
 
-        const { data: proj } = await supabase.from('projects').select('*').eq('id', projectId).single();
-        window.projectBlendedRate = proj?.blended_rate || 0;
+    // 2. Fetch User Profile to establish Role and Tenant context
+    const { data: members, error: profileError } = await supabase.from('user_profiles').select('*');
+    if (profileError) {
+        console.error("Critical Error: Could not fetch user profiles.");
+        return;
+    }
 
-        const { data: members } = await supabase.from('user_profiles').select('*');
-        window.teamMembers = members || [];
-        
-        const myProfile = members.find(m => m.user_id === user.id);
-        window.sessionData = { ...user, role: myProfile?.role, tenantId: myProfile?.tenant_id, full_name: myProfile?.full_name };
-        tenantId = myProfile?.tenant_id;
+    window.teamMembers = members || [];
+    const myProfile = members.find(m => m.user_id === user.id);
+    
+    // Set global session data (RBAC and Multi-tenancy)
+    window.sessionData = { 
+        ...user, 
+        role: myProfile?.role, 
+        tenantId: myProfile?.tenant_id, 
+        full_name: myProfile?.full_name,
+        userId: user.id // Standardized for activity logging
+    };
 
+    // 3. Context Guard: Project Verification
+    // [Fix]: Define projectId before using it in the Supabase query
+    const projectId = localStorage.getItem('selected_project_id');
+    const tenantId = myProfile?.tenant_id;
+
+    if (!projectId) {
+        console.warn("No project selected. Redirecting to selection page.");
+        window.location.href = 'project-selection.html';
+        return;
+    }
+
+    // 4. Fetch Project Settings (Blended Rate)
+    const { data: proj, error: projError } = await supabase
+        .from('projects')
+        .select('*')
+        .eq('id', projectId)
+        .single();
+
+    if (projError) {
+        console.error("Error fetching project settings:", projError.message);
+    }
+    
+    window.projectBlendedRate = proj?.blended_rate || 0;
+
+    // 5. Initialize UI
+    // These functions now have the global context they need to run safely
+    if (typeof populateDropdowns === 'function') {
         populateDropdowns();
-        loadRequirements();
-    });
+    }
+    
+    if (typeof loadRequirements === 'function') {
+        await loadRequirements();
+    }
+    
+    console.log("Initialization Complete: Requirement view loaded.");
+});
 
     // --- REQUIREMENT ENGINE ---
     window.selectRequirement = async (id) => {
@@ -204,10 +250,40 @@
     }
 
     function populateDropdowns() {
-        const options = '<option value="">Select Resource</option>' + window.teamMembers.map(m => `<option value="${m.user_id}">${m.full_name}</option>`).join('');
-        document.getElementById('req-assign-select').innerHTML = options;
-        document.getElementById('step-assign-select').innerHTML = options;
+    // 1. Verify Data Source
+    if (!window.teamMembers || !Array.isArray(window.teamMembers)) {
+        console.warn("populateDropdowns: No team members found to populate lists.");
+        return;
     }
+
+    // 2. Generate Options HTML
+    // Start with a blank default option
+    const optionsHtml = `
+        <option value="">Select Resource</option>
+        ${window.teamMembers.map(m => `
+            <option value="${m.user_id}">${m.full_name || m.email || 'Unknown User'}</option>
+        `).join('')}
+    `;
+
+    // 3. Targeted Injection with Safety Checks
+    const reqSelect = document.getElementById('req-assign-select');
+    const stepSelect = document.getElementById('step-assign-select');
+
+    if (reqSelect) {
+        reqSelect.innerHTML = optionsHtml;
+    } else {
+        console.error("Missing DOM element: req-assign-select");
+    }
+
+    if (stepSelect) {
+        stepSelect.innerHTML = optionsHtml;
+    } else {
+        // Logging as info because the step slider might be in a different template/partial
+        console.info("Optional DOM element not found: step-assign-select");
+    }
+    
+    console.log(`Dropdowns populated with ${window.teamMembers.length} resources.`);
+}
 
     window.closeReqSlider = () => document.getElementById('req-editor-panel').classList.remove('active');
     window.closeTaskSlider = () => document.getElementById('task-editor-panel').classList.remove('active');

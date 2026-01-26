@@ -247,10 +247,6 @@ let projectId = new URLSearchParams(window.location.search).get('id');
         window.teamMembers = [];
 
         // 1. AUTH & INITIALIZATION
-
-// New function updated 1/26 @ 2:15 PM - to close kebab menus automatically
-
-// 1. AUTH & INITIALIZATION
 document.addEventListener('DOMContentLoaded', async () => {
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     
@@ -281,8 +277,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     const myProfile = window.teamMembers.find(p => p.user_id === user.id);
     if (myProfile) {
+        // Standardizing the global session object
         window.sessionData = {
-            user_id: user.id,
+            user_id: user.id, // Using user_id for consistency with profile table
             role: myProfile.role,
             full_name: myProfile.full_name,
             tenantId: myProfile.tenant_id
@@ -292,7 +289,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     populateDropdowns();
     
-    // Header Rendering
+    // Header Rendering (Using your specific session structure)
     try {
         if (typeof renderProjectHeader === 'function') {
             const sessionForHeader = { 
@@ -310,20 +307,84 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     console.log("App initialized for:", window.sessionData?.full_name);
 
-    // --- ADDED KEBAB LISTENER (1/26) ---
-    // Closes all kebab menus when clicking outside of them
+    // --- ADDED KEBAB AUTO-CLOSE LISTENER ---
     document.addEventListener('click', (event) => {
+        // If the click is NOT inside a kebab-container, hide all menus
         if (!event.target.closest('.kebab-container')) {
             document.querySelectorAll('[id^="kebab-"]').forEach(menu => {
                 menu.classList.add('hidden');
             });
         }
     });
-    // ------------------------------------
 });
 
-// END OF New function updated 1/26 @ 2:15 PM
-        
+        // 2. CORE FUNCTIONS (ATTACHED TO WINDOW)
+		// NEW FUNCTION FOR STEP REFRESH 1/13
+        window.selectRequirement = async (id) => {
+    const cleanId = String(id).trim().replace(/['"]/g, '');
+    
+    // Validation
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(cleanId)) {
+        console.error("Invalid UUID:", cleanId);
+        return;
+    }
+
+    console.log("Attempting fetch for UUID:", cleanId);
+    window.selectedReqId = cleanId;
+
+    // USE SELECT '*' TO ELIMINATE COLUMN NAME ERRORS
+    const { data: reqData, error } = await supabase
+        .from('requirements')
+        .select('*') 
+        .eq('req_id', cleanId)
+        .single();
+
+    if (error) {
+        console.error("Supabase Metadata Error:", error.message, error.details, error.hint);
+        return; 
+    }
+
+    // --- UI UPDATES: Metadata Display ---
+    const headerEl = document.getElementById('selected-req-title-display');
+    const versionEl = document.getElementById('req-version-display'); 
+    const budgetEl = document.getElementById('selected-req-budget-display'); 
+
+    if (reqData) {
+        if (headerEl) headerEl.innerText = `Tasks for: ${reqData.name}`;
+        if (versionEl) versionEl.innerText = reqData.version_number || '1';
+        if (budgetEl) {
+            const amount = reqData.total_budget || 0;
+            budgetEl.innerText = `$${amount.toLocaleString()}`;
+        }
+    }
+
+    // --- NEW: BUTTON UNLOCK LOGIC ---
+    const addTaskBtn = document.getElementById('add-task-btn');
+    if (addTaskBtn) {
+        // RBAC: Check if current user is allowed to add tasks
+        const userRole = window.sessionData?.role;
+        const canAddTask = ['admin', 'project_manager', 'team_leader'].includes(userRole);
+
+        if (canAddTask) {
+            addTaskBtn.disabled = false;
+            addTaskBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+            addTaskBtn.classList.add('opacity-100', 'cursor-pointer');
+        } else {
+            // Keep locked for team_members even if requirement is selected
+            addTaskBtn.disabled = true;
+            addTaskBtn.classList.add('opacity-50', 'cursor-not-allowed');
+        }
+    }
+
+    // Refresh steps
+    if (typeof refreshSteps === 'function') await refreshSteps();
+
+    // Highlighting logic
+    document.querySelectorAll('.req-row').forEach(row => {
+        row.classList.toggle('active-req', String(row.getAttribute('data-id')).includes(cleanId));
+    });
+};
   window.refreshSteps = async () => {
     const reqId = window.selectedReqId;
     if (!reqId) return;
@@ -894,6 +955,7 @@ window.addRequirement = async () => {
             result = await supabase.from('requirements').insert([newRecord]).select().single();
         }
 
+
         if (result.error) throw result.error;
 
         // --- WRITE TO DEDICATED HISTORY TABLE ---
@@ -1147,29 +1209,10 @@ function getKabobMenu(item, type) {
 
 // --- HELPER: TOGGLE KEBAB ---
 window.toggleKebab = (id) => {
-    const menuId = `kebab-${id}`;
-    const menu = document.getElementById(menuId);
-    
-    if (!menu) return;
-
-    // 1. Is it currently hidden?
-    const isHidden = menu.classList.contains('hidden');
-
-    // 2. Close ALL other open kebab menus
     document.querySelectorAll('[id^="kebab-"]').forEach(el => el.classList.add('hidden'));
-
-    // 3. If it was hidden, show it now. If it was open, it stays hidden (Toggle effect).
-    if (isHidden) {
-        menu.classList.remove('hidden');
-    }
+    const menu = document.getElementById(`kebab-${id}`);
+    if (menu) menu.classList.remove('hidden');
 };
-
-
-//window.toggleKebab = (id) => {
-//    document.querySelectorAll('[id^="kebab-"]').forEach(el => el.classList.add('hidden'));
-//    const menu = document.getElementById(`kebab-${id}`);
-//    if (menu) menu.classList.remove('hidden');
-//};
         
         // Note Loading
         async function loadTaskNotes(taskId) {
@@ -1192,7 +1235,9 @@ window.toggleKebab = (id) => {
         user_id: window.sessionData?.user_id, 
         content: content 
     }]);
-}              
+}
+        
+        // --- END OF SCRIPT ---
     </script>
 </body>
 </html>

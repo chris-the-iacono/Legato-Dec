@@ -247,143 +247,83 @@ let projectId = new URLSearchParams(window.location.search).get('id');
         window.teamMembers = [];
 
         // 1. AUTH & INITIALIZATION
-        document.addEventListener('DOMContentLoaded', async () => {
-            const { data: { user }, error: authError } = await supabase.auth.getUser();
-            
-            if (authError || !user) {
-                console.error("No active session found.");
-                window.location.href = 'login.html';
-                return;
-            }
 
-            // Get Project ID
-            const urlParams = new URLSearchParams(window.location.search);
-            projectId = urlParams.get('id') || localStorage.getItem('selected_project_id');
-            
-            if (!projectId || projectId === "undefined") {
-                console.error("No Project ID found.");
-                window.location.href = 'index.html';
-                return;
-            }
+// New function updated 1/26 @ 2:15 PM - to close kebab menus automatically
 
-// Listen for any click on the entire document Added 1/26 2:00
-document.addEventListener('click', (event) => {
-    // If the click is NOT inside a kebab-container, hide all menus
-    if (!event.target.closest('.kebab-container')) {
-        document.querySelectorAll('[id^="kebab-"]').forEach(menu => {
-            menu.classList.add('hidden');
-        });
-    }  // end of the hide all menus listener.
-
-            // Fetch Project Data
-            const { data: proj } = await supabase.from('projects').select('blended_rate, name').eq('id', projectId).single();
-            window.projectBlendedRate = proj?.blended_rate || 0;
-            const projectName = proj?.name || localStorage.getItem('selected_project_name');
-
-            // Fetch Profiles
-            const { data: profiles } = await supabase.from('user_profiles').select('user_id, email, full_name, hourly_cost, tenant_id, role'); 
-            window.teamMembers = profiles || [];
-            
-            const myProfile = window.teamMembers.find(p => p.user_id === user.id);
-if (myProfile) {
-    // Standardizing the global session object
-    window.sessionData = {
-        user_id: user.id, // Using user_id for consistency with profile table
-        role: myProfile.role,
-        full_name: myProfile.full_name,
-        tenantId: myProfile.tenant_id
-    };
-    tenantId = myProfile.tenant_id;
-}
-            
-            populateDropdowns();
-            
-            // Header Rendering (Using your specific session structure)
-            try {
-                if (typeof renderProjectHeader === 'function') {
-                    const sessionForHeader = { 
-                        user: { ...user, user_metadata: user.user_metadata || {} }, 
-                        modules: { module_requirements: true, module_risks: true, module_issues: true, module_changes: true } 
-                    };
-                    renderProjectHeader(sessionForHeader, 'requirements', projectName);
-                }
-            } catch (headerError) {
-                console.error("Header Error:", headerError.message);
-            }
-            
-            loadRequirements();
-            if (typeof initSortable === 'function') initSortable();
-
-            console.log("App initialized for:", window.sessionData?.full_name);
-        });
-
-        // 2. CORE FUNCTIONS (ATTACHED TO WINDOW)
-		// NEW FUNCTION FOR STEP REFRESH 1/13
-        window.selectRequirement = async (id) => {
-    const cleanId = String(id).trim().replace(/['"]/g, '');
+// 1. AUTH & INITIALIZATION
+document.addEventListener('DOMContentLoaded', async () => {
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
     
-    // Validation
-    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    if (!uuidRegex.test(cleanId)) {
-        console.error("Invalid UUID:", cleanId);
+    if (authError || !user) {
+        console.error("No active session found.");
+        window.location.href = 'login.html';
         return;
     }
 
-    console.log("Attempting fetch for UUID:", cleanId);
-    window.selectedReqId = cleanId;
-
-    // USE SELECT '*' TO ELIMINATE COLUMN NAME ERRORS
-    const { data: reqData, error } = await supabase
-        .from('requirements')
-        .select('*') 
-        .eq('req_id', cleanId)
-        .single();
-
-    if (error) {
-        console.error("Supabase Metadata Error:", error.message, error.details, error.hint);
-        return; 
+    // Get Project ID
+    const urlParams = new URLSearchParams(window.location.search);
+    projectId = urlParams.get('id') || localStorage.getItem('selected_project_id');
+    
+    if (!projectId || projectId === "undefined") {
+        console.error("No Project ID found.");
+        window.location.href = 'index.html';
+        return;
     }
 
-    // --- UI UPDATES: Metadata Display ---
-    const headerEl = document.getElementById('selected-req-title-display');
-    const versionEl = document.getElementById('req-version-display'); 
-    const budgetEl = document.getElementById('selected-req-budget-display'); 
+    // Fetch Project Data
+    const { data: proj } = await supabase.from('projects').select('blended_rate, name').eq('id', projectId).single();
+    window.projectBlendedRate = proj?.blended_rate || 0;
+    const projectName = proj?.name || localStorage.getItem('selected_project_name');
 
-    if (reqData) {
-        if (headerEl) headerEl.innerText = `Tasks for: ${reqData.name}`;
-        if (versionEl) versionEl.innerText = reqData.version_number || '1';
-        if (budgetEl) {
-            const amount = reqData.total_budget || 0;
-            budgetEl.innerText = `$${amount.toLocaleString()}`;
+    // Fetch Profiles
+    const { data: profiles } = await supabase.from('user_profiles').select('user_id, email, full_name, hourly_cost, tenant_id, role'); 
+    window.teamMembers = profiles || [];
+    
+    const myProfile = window.teamMembers.find(p => p.user_id === user.id);
+    if (myProfile) {
+        window.sessionData = {
+            user_id: user.id,
+            role: myProfile.role,
+            full_name: myProfile.full_name,
+            tenantId: myProfile.tenant_id
+        };
+        tenantId = myProfile.tenant_id;
+    }
+    
+    populateDropdowns();
+    
+    // Header Rendering
+    try {
+        if (typeof renderProjectHeader === 'function') {
+            const sessionForHeader = { 
+                user: { ...user, user_metadata: user.user_metadata || {} }, 
+                modules: { module_requirements: true, module_risks: true, module_issues: true, module_changes: true } 
+            };
+            renderProjectHeader(sessionForHeader, 'requirements', projectName);
         }
+    } catch (headerError) {
+        console.error("Header Error:", headerError.message);
     }
+    
+    loadRequirements();
+    if (typeof initSortable === 'function') initSortable();
 
-    // --- NEW: BUTTON UNLOCK LOGIC ---
-    const addTaskBtn = document.getElementById('add-task-btn');
-    if (addTaskBtn) {
-        // RBAC: Check if current user is allowed to add tasks
-        const userRole = window.sessionData?.role;
-        const canAddTask = ['admin', 'project_manager', 'team_leader'].includes(userRole);
+    console.log("App initialized for:", window.sessionData?.full_name);
 
-        if (canAddTask) {
-            addTaskBtn.disabled = false;
-            addTaskBtn.classList.remove('opacity-50', 'cursor-not-allowed');
-            addTaskBtn.classList.add('opacity-100', 'cursor-pointer');
-        } else {
-            // Keep locked for team_members even if requirement is selected
-            addTaskBtn.disabled = true;
-            addTaskBtn.classList.add('opacity-50', 'cursor-not-allowed');
+    // --- ADDED KEBAB LISTENER (1/26) ---
+    // Closes all kebab menus when clicking outside of them
+    document.addEventListener('click', (event) => {
+        if (!event.target.closest('.kebab-container')) {
+            document.querySelectorAll('[id^="kebab-"]').forEach(menu => {
+                menu.classList.add('hidden');
+            });
         }
-    }
-
-    // Refresh steps
-    if (typeof refreshSteps === 'function') await refreshSteps();
-
-    // Highlighting logic
-    document.querySelectorAll('.req-row').forEach(row => {
-        row.classList.toggle('active-req', String(row.getAttribute('data-id')).includes(cleanId));
     });
-};
+    // ------------------------------------
+});
+
+// END OF New function updated 1/26 @ 2:15 PM
+        
   window.refreshSteps = async () => {
     const reqId = window.selectedReqId;
     if (!reqId) return;

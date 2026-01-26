@@ -573,8 +573,9 @@ window.rollupToRequirement = async (reqId = window.selectedReqId, steps = null) 
     if (!tasks) {
         // Fetch using requirement_id (foreign key)
         // Optimization: Added is_active filter to ensure only valid tasks roll up
+        // Added actuals to support Health Score calculation
         const { data, error: fetchError } = await supabase.from('steps')
-            .select('estimated_hours, cost, assigned_to')
+            .select('estimated_hours, cost, assigned_to, actual_cost, actual_hours') 
             .eq('requirement_id', cleanReqId)
             .eq('is_active', true); 
         
@@ -587,11 +588,13 @@ window.rollupToRequirement = async (reqId = window.selectedReqId, steps = null) 
 
     let calculatedTotalCost = 0;
     let totalHours = 0;
+    let totalActualCost = 0; 
     const members = window.teamMembers || [];
 
     tasks.forEach(s => {
         const hours = parseFloat(s.estimated_hours) || 0;
         let taskCost = parseFloat(s.cost) || 0;
+        const actCost = parseFloat(s.actual_cost) || 0;
 
         // Fallback Calculation logic preserved: 
         // If task cost is 0, calculate based on user hourly cost or project blended rate
@@ -604,19 +607,28 @@ window.rollupToRequirement = async (reqId = window.selectedReqId, steps = null) 
         }
         calculatedTotalCost += taskCost;
         totalHours += hours;
+        totalActualCost += actCost;
     });
 
-    // 2. Sync to Database using verified column name 'total_budget'
+    // --- HEALTH SCORE CALCULATION ---
+    // Health is 100 if under budget. Drops if actuals exceed the estimated budget.
+    let healthScore = 100;
+    if (calculatedTotalCost > 0 && totalActualCost > calculatedTotalCost) {
+        healthScore = Math.max(0, Math.round((calculatedTotalCost / totalActualCost) * 100));
+    }
+
+    // 2. Sync to Database using verified column names
     const { error } = await supabase.from('requirements')
         .update({ 
             estimated_hours: totalHours, 
-            total_budget: calculatedTotalCost, 
+            total_budget: calculatedTotalCost,
+            health_score: healthScore,
             updated_at: new Date().toISOString()
         })
-        .eq('req_id', cleanReqId); // Use sanitized cleanReqId
+        .eq('req_id', cleanReqId);
 
     if (!error) {
-        console.log(`Rollup Sync Success: ${totalHours}h | $${calculatedTotalCost}`);
+        console.log(`Rollup Sync Success: ${totalHours}h | Budget: $${calculatedTotalCost} | Health: ${healthScore}%`);
         
         // 3. UI Sync: Refresh Requirements list tiles
         if (typeof window.loadRequirements === 'function') {
@@ -626,7 +638,11 @@ window.rollupToRequirement = async (reqId = window.selectedReqId, steps = null) 
         // 4. UI Sync: Update the Header display in the Task viewport
         const totalBudgetDisplay = document.getElementById('selected-req-budget-display');
         if (totalBudgetDisplay) {
-            totalBudgetDisplay.innerText = `$${calculatedTotalCost.toLocaleString()}`;
+            // Using precise 2-decimal formatting from your backup
+            totalBudgetDisplay.innerText = `$${calculatedTotalCost.toLocaleString(undefined, {
+                minimumFractionDigits: 2, 
+                maximumFractionDigits: 2
+            })}`;
         }
     } else {
         console.error("Rollup Update Error:", error.message);

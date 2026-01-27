@@ -351,7 +351,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const budgetEl = document.getElementById('selected-req-budget-display'); 
 
     if (reqData) {
-        if (headerEl) headerEl.innerText = `Tasks for: ${reqData.name}`;
+        if (headerEl) headerEl.innerText = `Tasks for: ${reqData.title}`;
         if (versionEl) versionEl.innerText = reqData.version_number || '1';
         if (budgetEl) {
             const amount = reqData.total_budget || 0;

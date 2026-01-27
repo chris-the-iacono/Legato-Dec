@@ -55,12 +55,50 @@
         display: none !important;
         pointer-events: none;
     }
+
+    /* Settings Dropdown Positioning */
+    #settings-dropdown {
+        top: 100%;
+        right: 0;
+        margin-top: 0.5rem;
+        min-width: 180px;
+        z-index: 1100;
+    }
 </style>
 </head>
 <body class="bg-gray-100 min-h-screen overflow-hidden">
     <div id="main-header"></div>
     
     <main class="max-w-7xl mx-auto p-4 lg:p-6">
+        <div class="flex justify-between items-center mb-6 px-2">
+            <div>
+                <h1 id="dashboard-project-name" class="text-2xl font-black text-gray-900 tracking-tight">Project Dashboard</h1>
+                <p id="dashboard-req-title" class="text-sm text-gray-500 font-medium">Manage requirements and task baseline estimates</p>
+            </div>
+            
+            <div class="flex items-center gap-3 relative">
+                <div class="relative kebab-container">
+                    <button onclick="document.getElementById('settings-dropdown').classList.toggle('hidden')" class="p-2 text-gray-400 hover:text-indigo-600 hover:bg-white rounded-full transition-all shadow-sm border border-transparent hover:border-gray-200">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                    </button>
+                    <div id="settings-dropdown" class="hidden absolute right-0 bg-white border border-gray-200 rounded-xl shadow-xl py-2 overflow-hidden">
+                        <button class="w-full text-left px-4 py-2.5 text-xs font-bold text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 border-b border-gray-50 transition-colors">PROJECT SETTINGS</button>
+                        <button class="w-full text-left px-4 py-2.5 text-xs font-bold text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 border-b border-gray-50 transition-colors">ESTIMATE CONFIG</button>
+                        <button class="w-full text-left px-4 py-2.5 text-xs font-bold text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 border-b border-gray-50 transition-colors">ARCHIVE PROJECT</button>
+                        <button class="w-full text-left px-4 py-2.5 text-xs font-bold text-red-600 hover:bg-red-50 transition-colors">DELETE PERMANENTLY</button>
+                    </div>
+                </div>
+                
+                <button onclick="window.location.href='team.html'" class="flex items-center gap-2 bg-white border border-gray-200 px-4 py-2 rounded-xl shadow-sm hover:shadow-md hover:border-indigo-300 transition-all group">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-400 group-hover:text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
+                    <span class="text-sm font-bold text-gray-700">Team Management</span>
+                </button>
+            </div>
+        </div>
+
         <div class="app-container">
             <section class="bg-white rounded-xl shadow-sm border border-gray-200 flex flex-col overflow-hidden">
                 <div class="px-4 py-4 border-b bg-gray-50/80 flex justify-between items-center">
@@ -109,129 +147,132 @@
     </main>
 
     <section id="req-editor-panel" class="side-slider">
-    <div class="flex justify-between items-center p-4 border-b bg-indigo-50">
-        <div>
-            <h2 id="req-editor-title" class="font-bold text-lg text-indigo-900">Requirement Details</h2>
-            <div class="flex gap-2 items-center">
-                <p class="text-[10px] text-indigo-400 font-bold uppercase">Budget Version: <span id="req-version-display">0</span></p>
-                <span id="req-status-badge" class="text-[9px] px-2 py-0.5 rounded-full font-bold uppercase bg-green-100 text-green-700">Active</span>
-            </div>
-        </div>
-        <button onclick="window.closeReqSlider()" class="text-gray-400 hover:text-indigo-600 transition-colors">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-        </button>
-    </div>
-    
-    <!-- Added h-full and flex-col to ensure history stays at bottom or scrolls properly -->
-    <div class="p-6 space-y-6 overflow-y-auto h-[calc(100vh-80px)]">
-        <div class="space-y-4">
+        <div class="flex justify-between items-center p-4 border-b bg-indigo-50">
             <div>
-                <label class="text-[11px] font-bold text-gray-500 uppercase ml-1">Title</label>
-                <input type="text" id="req-title-input" data-admin-only placeholder="e.g. Database Migration" class="w-full border-gray-200 rounded-lg text-sm p-3 border outline-none focus:ring-2 focus:ring-indigo-500 disabled:bg-gray-50 disabled:text-gray-400">
-            </div>
-            
-            <div class="grid grid-cols-2 gap-4">
-                <div class="flex flex-col">
-                    <label class="text-[11px] font-bold text-gray-500 uppercase mb-1 ml-1">Accountable</label>
-                    <select id="req-assign-select" data-admin-only onchange="window.handleUserSelection('req')" class="bg-white border-gray-200 rounded-lg text-sm p-3 border disabled:bg-gray-50"></select>
-                </div>
-                <div class="flex flex-col">
-                    <label class="text-[11px] font-bold text-gray-500 uppercase mb-1 ml-1">Applied Rate</label>
-                    <input type="number" id="req-applied-rate" readonly class="bg-gray-100 border-gray-200 rounded-lg text-sm p-3 font-mono text-gray-500 border">
+                <h2 id="req-editor-title" class="font-bold text-lg text-indigo-900">Requirement Details</h2>
+                <div class="flex gap-2 items-center">
+                    <p class="text-[10px] text-indigo-400 font-bold uppercase">Budget Version: <span id="req-version-display">0</span></p>
+                    <span id="req-status-badge" class="text-[9px] px-2 py-0.5 rounded-full font-bold uppercase bg-green-100 text-green-700">Active</span>
                 </div>
             </div>
+            <button onclick="window.closeReqSlider()" class="text-gray-400 hover:text-indigo-600 transition-colors">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+            </button>
+        </div>
+        
+        <div class="p-6 space-y-6 overflow-y-auto h-[calc(100vh-80px)]">
+            <div class="space-y-4">
+                <div>
+                    <label class="text-[11px] font-bold text-gray-500 uppercase ml-1">Title</label>
+                    <input type="text" id="req-title-input" data-admin-only placeholder="e.g. Database Migration" class="w-full border-gray-200 rounded-lg text-sm p-3 border outline-none focus:ring-2 focus:ring-indigo-500 disabled:bg-gray-50 disabled:text-gray-400">
+                </div>
+                
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="flex flex-col">
+                        <label class="text-[11px] font-bold text-gray-500 uppercase mb-1 ml-1">Accountable</label>
+                        <select id="req-assign-select" data-admin-only onchange="window.handleUserSelection('req')" class="bg-white border-gray-200 rounded-lg text-sm p-3 border disabled:bg-gray-50"></select>
+                    </div>
+                    <div class="flex flex-col">
+                        <label class="text-[11px] font-bold text-gray-500 uppercase mb-1 ml-1">Applied Rate</label>
+                        <input type="number" id="req-applied-rate" readonly class="bg-gray-100 border-gray-200 rounded-lg text-sm p-3 font-mono text-gray-500 border">
+                    </div>
+                </div>
 
-            <div>
-                <label class="text-[11px] font-bold text-gray-500 uppercase mb-1 ml-1">Estimated Budget (Hours)</label>
-                <input type="number" id="req-hours-input" data-admin-only placeholder="0" class="w-full border-gray-200 rounded-lg text-sm p-3 border disabled:bg-gray-50">
+                <div>
+                    <label class="text-[11px] font-bold text-gray-500 uppercase mb-1 ml-1">Estimated Budget (Hours)</label>
+                    <input type="number" id="req-hours-input" data-admin-only placeholder="0" class="w-full border-gray-200 rounded-lg text-sm p-3 border disabled:bg-gray-50">
+                </div>
+
+                <div class="pt-4" id="req-admin-actions">
+                    <button id="req-save-btn" onclick="window.addRequirement()" class="w-full bg-indigo-600 text-white py-3 rounded-lg text-sm font-bold hover:bg-indigo-700 shadow-lg transition-all">
+                        Update Baseline Budget
+                    </button>
+                    <p class="text-[10px] text-gray-400 text-center mt-2 italic">Note: Saving will create a new timestamped baseline version.</p>
+                </div>
             </div>
 
-            <div class="pt-4" id="req-admin-actions">
-                <button id="req-save-btn" onclick="window.addRequirement()" class="w-full bg-indigo-600 text-white py-3 rounded-lg text-sm font-bold hover:bg-indigo-700 shadow-lg transition-all">
-                    Update Baseline Budget
-                </button>
-                <p class="text-[10px] text-gray-400 text-center mt-2 italic">Note: Saving will create a new timestamped baseline version.</p>
+            <div id="req-history-section" class="mt-10 pt-8 border-t border-gray-100">
+                <h3 class="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4">Baseline History & Audit Trail</h3>
+                <div id="req-history-list" class="space-y-4">
+                    <p class="text-xs text-gray-400 italic text-center py-4">No history records found.</p>
+                </div>
             </div>
         </div>
-
-        <!-- NEW: Dedicated History Section -->
-        <div id="req-history-section" class="mt-10 pt-8 border-t border-gray-100">
-            <h3 class="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4">Baseline History & Audit Trail</h3>
-            <div id="req-history-list" class="space-y-4">
-                <!-- History items will be injected here by renderHistoryList() -->
-                <p class="text-xs text-gray-400 italic text-center py-4">No history records found.</p>
-            </div>
-        </div>
-    </div>
-</section>
+    </section>
 
     <section id="task-editor-panel" class="side-slider">
-    <div class="flex justify-between items-center p-4 border-b bg-blue-50">
-        <div>
-            <h2 id="task-editor-title" class="font-bold text-lg text-blue-900">Task Details</h2>
-            <p class="text-[10px] text-blue-400 font-bold uppercase">Task Reality & Tracking</p>
-        </div>
-        <button onclick="window.closeTaskSlider()" class="text-gray-400 hover:text-blue-600 transition-colors">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
-        </button>
-    </div>
-    
-    <div class="flex-grow overflow-y-auto p-6 space-y-8">
-        <div class="space-y-4 pb-6 border-b border-gray-100">
-            <h3 class="text-[11px] font-black text-gray-400 uppercase tracking-widest">Baseline Estimate</h3>
+        <div class="flex justify-between items-center p-4 border-b bg-blue-50">
             <div>
-                <label class="text-[10px] font-bold text-gray-400 uppercase ml-1">Task Title</label>
-                <input type="text" id="step-title-input" data-admin-only class="w-full border-gray-200 rounded-lg text-sm p-3 border">
-            </div>
-            <div class="grid grid-cols-2 gap-4">
-                <div class="flex flex-col">
-                    <label class="text-[10px] font-bold text-gray-400 uppercase mb-1 ml-1">Responsible</label>
-                    <select id="step-assign-select" data-admin-only onchange="window.handleUserSelection('step')" class="border-gray-200 rounded-lg text-sm p-3 bg-gray-50 border"></select>
-                </div>
-                <div class="grid grid-cols-2 gap-2">
-                    <div class="flex flex-col">
-                        <label class="text-[10px] font-bold text-gray-400 uppercase mb-1 ml-1">Est. Hrs</label>
-                        <input type="number" id="step-hours-input" data-admin-only class="border-gray-200 rounded-lg text-sm p-3 border">
-                    </div>
-                    <div class="flex flex-col">
-                        <label class="text-[10px] font-bold text-gray-400 uppercase mb-1 ml-1">Est. Cost</label>
-                        <input type="number" id="step-cost-input" readonly class="bg-gray-50 border-gray-200 rounded-lg text-sm p-3 font-mono border">
-                    </div>
+                <h2 id="task-editor-title" class="font-bold text-lg text-blue-900">Task Details</h2>
+                <div class="flex gap-2 items-center">
+                    <p class="text-[10px] text-blue-400 font-bold uppercase tracking-tight">Version: <span id="step-version-display">0</span></p>
+                    <span id="step-baseline-tag" class="text-[9px] bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded font-black uppercase">v0 Baseline</span>
                 </div>
             </div>
-            
-            <div class="space-y-3 pt-2">
-                <button id="task-save-btn" data-admin-only onclick="window.submitStep()" class="w-full bg-blue-600 text-white py-3 rounded-lg text-xs font-bold hover:bg-blue-700 transition-all shadow-md">
-                    Save Baseline Changes
-                </button>
+            <button onclick="window.closeTaskSlider()" class="text-gray-400 hover:text-blue-600 transition-colors">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+            </button>
+        </div>
+        
+        <div class="flex-grow overflow-y-auto p-6 space-y-8">
+            <div class="space-y-4 pb-6 border-b border-gray-100">
+                <h3 class="text-[11px] font-black text-gray-400 uppercase tracking-widest">Active Estimate</h3>
+                <div>
+                    <label class="text-[10px] font-bold text-gray-400 uppercase ml-1">Task Title</label>
+                    <input type="text" id="step-title-input" data-admin-only class="w-full border-gray-200 rounded-lg text-sm p-3 border">
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="flex flex-col">
+                        <label class="text-[10px] font-bold text-gray-400 uppercase mb-1 ml-1">Responsible</label>
+                        <select id="step-assign-select" data-admin-only onchange="window.handleUserSelection('step')" class="border-gray-200 rounded-lg text-sm p-3 bg-gray-50 border"></select>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div class="flex flex-col">
+                            <label class="text-[10px] font-bold text-gray-400 uppercase mb-1 ml-1">Est. Hrs</label>
+                            <input type="number" id="step-hours-input" data-admin-only class="border-gray-200 rounded-lg text-sm p-3 border">
+                        </div>
+                        <div class="flex flex-col">
+                            <label class="text-[10px] font-bold text-gray-400 uppercase mb-1 ml-1">Est. Cost</label>
+                            <input type="number" id="step-cost-input" readonly class="bg-gray-50 border-gray-200 rounded-lg text-sm p-3 font-mono border">
+                        </div>
+                    </div>
+                </div>
                 
-                <button id="delete-task-btn" data-admin-only class="w-full bg-white text-red-600 border border-red-100 py-2 rounded-lg text-[10px] font-bold hover:bg-red-50 transition-all uppercase tracking-wider">
-                    Remove Task from Baseline
-                </button>
+                <div class="space-y-3 pt-2">
+                    <button id="task-save-btn" data-admin-only onclick="window.submitStep()" class="w-full bg-blue-600 text-white py-3 rounded-lg text-xs font-bold hover:bg-blue-700 transition-all shadow-md">
+                        Save & Increment Version
+                    </button>
+                    
+                    <button id="delete-task-btn" data-admin-only class="w-full bg-white text-red-600 border border-red-100 py-2 rounded-lg text-[10px] font-bold hover:bg-red-50 transition-all uppercase tracking-wider">
+                        Remove Task from Baseline
+                    </button>
+                </div>
             </div>
-        </div>
 
-        <div id="log-time-section" class="bg-green-50/50 p-4 rounded-xl border border-green-100 space-y-4">
-            <h3 class="text-[11px] font-black text-green-600 uppercase tracking-widest">Log Actual Work</h3>
-            <div class="grid grid-cols-2 gap-3">
-                <input type="number" id="log-hours" step="0.25" placeholder="Hours" class="p-2 border rounded-lg text-sm">
-                <input type="date" id="log-date" class="p-2 border rounded-lg text-sm text-gray-500">
+            <div id="log-time-section" class="bg-green-50/50 p-4 rounded-xl border border-green-100 space-y-4">
+                <div class="flex justify-between items-center">
+                    <h3 class="text-[11px] font-black text-green-600 uppercase tracking-widest">Log Actual Work</h3>
+                    <p class="text-[10px] text-green-500 font-bold">Total Logged: <span id="step-actual-hours-display">0</span>h</p>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <input type="number" id="log-hours" step="0.25" placeholder="Hours" class="p-2 border rounded-lg text-sm">
+                    <input type="date" id="log-date" class="p-2 border rounded-lg text-sm text-gray-500">
+                </div>
+                <button onclick="window.saveTimeLog()" class="w-full bg-green-600 text-white py-2 rounded-lg text-xs font-bold hover:bg-green-700">Save Time Log</button>
             </div>
-            <button onclick="window.saveTimeLog()" class="w-full bg-green-600 text-white py-2 rounded-lg text-xs font-bold hover:bg-green-700">Save Time Log</button>
-        </div>
 
-        <div class="space-y-4">
-            <h3 class="text-[11px] font-black text-gray-400 uppercase tracking-widest">Activity & Notes</h3>
-            <div id="notes-container" class="space-y-3 max-h-48 overflow-y-auto pr-2"></div>
-            <div class="flex gap-2">
-                <input type="text" id="new-note-input" placeholder="Append a note..." class="flex-grow p-2 border rounded-lg text-sm">
-                <button type="button" onclick="window.appendNote()" class="bg-gray-800 text-white px-4 py-2 rounded-lg text-xs font-bold hover:bg-black">Add</button>
+            <div class="space-y-4">
+                <h3 class="text-[11px] font-black text-gray-400 uppercase tracking-widest">Activity & Notes</h3>
+                <div id="notes-container" class="space-y-3 max-h-48 overflow-y-auto pr-2"></div>
+                <div class="flex gap-2">
+                    <input type="text" id="new-note-input" placeholder="Append a note..." class="flex-grow p-2 border rounded-lg text-sm">
+                    <button type="button" onclick="window.appendNote()" class="bg-gray-800 text-white px-4 py-2 rounded-lg text-xs font-bold hover:bg-black">Add</button>
+                </div>
             </div>
         </div>
-    </div>
-</section>
+    </section>
 
     <script type="module"> 
         import { supabase, MODULES } from './js/config.js';

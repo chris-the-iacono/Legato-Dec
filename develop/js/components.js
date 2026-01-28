@@ -2,7 +2,7 @@
 import { handleSignOut } from './auth.js';
 
 /**
- * Renders the Tabbed UI Header with Admin and Navigation features.
+ * Renders the Tabbed UI Header with Admin, Navigation features, and Settings Gear.
  */
 export function renderProjectHeader(session, activeTab, projectName = "Select Project") {
     const headerElement = document.getElementById('main-header');
@@ -22,8 +22,8 @@ export function renderProjectHeader(session, activeTab, projectName = "Select Pr
     }
 
     // 3. ADMIN CHECK
-    // Checks if user is an admin to show the Team Management button
     const isAdmin = session.role === 'admin' || session.role === 'owner';
+    const isDashboard = activeTab === 'dashboard';
 
     // 4. DEFINE TABS (Filtered by purchased modules)
     const allTabs = [
@@ -37,59 +37,87 @@ export function renderProjectHeader(session, activeTab, projectName = "Select Pr
 
     // 5. RENDER THE HTML
     headerElement.innerHTML = `
-        <header class="bg-white border-b border-gray-200 sticky top-0 z-50 shadow-sm">
-            <div class="max-w-7xl mx-auto px-4 flex justify-between items-center h-12 border-b border-gray-100">
+        <header class="bg-white border-b border-gray-200 sticky top-0 z-[1001] shadow-sm">
+            <div class="max-w-7xl mx-auto px-4 flex justify-between items-center h-14 border-b border-gray-100">
                 <div class="flex items-center space-x-4">
-                    <button onclick="window.history.back()" class="p-1.5 hover:bg-gray-100 rounded-full transition text-gray-500 mr-2" title="Go Back">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                        </svg>
-                    </button>
+                    ${!isDashboard ? `
+                        <button onclick="window.location.href='index.html'" class="p-1.5 hover:bg-gray-100 rounded-full transition text-gray-400 mr-1" title="Back to Selection">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                            </svg>
+                        </button>
+                    ` : ''}
 
-                    <span class="text-xs font-black text-indigo-600 uppercase tracking-widest flex items-center">
-                        ${session.tenantName || 'Workspace'} ${envBadge}
-                    </span>
-                    <span class="text-gray-300">|</span>
-                    <span class="text-sm font-semibold text-gray-800">${projectName}</span>
+                    <div class="flex flex-col">
+                        <span class="text-[10px] font-black text-indigo-600 uppercase tracking-widest flex items-center leading-none">
+                            ${session.tenantName || 'Workspace'} ${envBadge}
+                        </span>
+                        <h1 class="text-sm font-bold text-gray-900 mt-1">${projectName}</h1>
+                    </div>
                 </div>
 
-                <div class="flex items-center space-x-4">
+                <div class="flex items-center space-x-3">
+                    <div class="relative" id="header-settings-wrapper" onmouseleave="document.getElementById('settings-dropdown').classList.add('hidden')">
+                        <button onclick="document.getElementById('settings-dropdown').classList.toggle('hidden')" 
+                                class="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors border border-gray-100 bg-gray-50/50"
+                                title="Project Settings">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                            </svg>
+                        </button>
+
+                        <div id="settings-dropdown" class="hidden absolute right-0 mt-2 w-56 bg-white border border-gray-200 rounded-xl shadow-2xl z-[2000] py-2 overflow-hidden">
+                            <div class="px-4 py-2 border-b border-gray-50 mb-1">
+                                <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest">Configuration</p>
+                            </div>
+                            <button class="w-full text-left px-4 py-2 text-xs font-bold text-gray-700 hover:bg-indigo-50 transition-colors">Edit Details</button>
+                            <button class="w-full text-left px-4 py-2 text-xs font-bold text-gray-700 hover:bg-indigo-50 transition-colors">Configure Rates</button>
+                            <button class="w-full text-left px-4 py-2 text-xs font-bold text-gray-700 hover:bg-indigo-50 transition-colors">Audit History</button>
+                            <div class="border-t border-gray-100 mt-1 pt-1">
+                                <button class="w-full text-left px-4 py-2 text-xs font-bold text-red-600 hover:bg-red-50 transition-colors">Archive Project</button>
+                            </div>
+                        </div>
+                    </div>
+
                     ${isAdmin ? `
-                        <a href="admin.html" class="text-[10px] font-bold bg-indigo-50 text-indigo-700 px-2.5 py-1 rounded-md border border-indigo-100 hover:bg-indigo-100 transition uppercase tracking-tight">
+                        <a href="admin.html" class="hidden md:inline-flex text-[11px] font-bold bg-indigo-600 text-white px-3 py-1.5 rounded-lg hover:bg-indigo-700 transition shadow-sm uppercase tracking-tight">
                             Team Management
                         </a>
                     ` : ''}
                     
-                    <span class="text-xs text-gray-500 font-medium hidden sm:inline">
-                        ${session.fullName}
-                    </span>
+                    <div class="h-6 w-px bg-gray-200 mx-1"></div>
                     
-                    <button id="global-signout" class="text-xs font-bold text-red-600 hover:text-red-800 transition">
+                    <button id="global-signout" class="text-xs font-bold text-gray-400 hover:text-red-600 transition">
                         Sign Out
                     </button>
                 </div>
             </div>
 
-            <div class="max-w-7xl mx-auto px-4">
-                <nav class="-mb-px flex space-x-8 overflow-x-auto">
-                    ${visibleTabs.map(tab => `
-                        <a href="${tab.link}" 
-                           class="whitespace-nowrap py-4 px-1 border-b-2 font-bold text-sm transition-all duration-200
-                           ${activeTab === tab.id 
-                               ? 'border-indigo-500 text-indigo-600' 
-                               : 'border-transparent text-gray-400 hover:text-gray-600 hover:border-gray-300'}">
-                            ${tab.name}
-                        </a>
-                    `).join('')}
-                </nav>
-            </div>
+            ${!isDashboard ? `
+                <div class="max-w-7xl mx-auto px-4">
+                    <nav class="-mb-px flex space-x-8 overflow-x-auto no-scrollbar">
+                        ${visibleTabs.map(tab => `
+                            <a href="${tab.link}" 
+                               class="whitespace-nowrap py-3 px-1 border-b-2 font-bold text-xs transition-all duration-200 tracking-tight
+                               ${activeTab === tab.id 
+                                   ? 'border-indigo-500 text-indigo-600' 
+                                   : 'border-transparent text-gray-400 hover:text-gray-600 hover:border-gray-300'}">
+                                ${tab.name}
+                            </a>
+                        `).join('')}
+                    </nav>
+                </div>
+            ` : ''}
         </header>
     `;
 
     // 6. ATTACH EVENTS
-    document.getElementById('global-signout').addEventListener('click', (e) => {
-        e.preventDefault();
-        handleSignOut(); 
-        // Note: auth.js handleSignOut should handle the window.location.href = 'index.html'
-    });
+    const signOutBtn = document.getElementById('global-signout');
+    if (signOutBtn) {
+        signOutBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            handleSignOut(); 
+        });
+    }
 }

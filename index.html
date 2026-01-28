@@ -67,115 +67,173 @@
         </div>
     </div>
 
-    <script type="module">
-        import { supabase } from './js/config.js';
-        import { checkAccess } from './js/auth.js';
-        import { renderProjectHeader } from './js/components.js';
+<script type="module">
+    import { supabase } from './js/config.js';
+    import { checkAccess } from './js/auth.js';
+    import { renderProjectHeader } from './js/components.js';
 
-        let sessionData = null;
+    let sessionData = null;
 
-        document.addEventListener('DOMContentLoaded', async () => {
-            try {
-                sessionData = await checkAccess();
-                if (!sessionData) return;
-                window.sessionData = sessionData;
+    document.addEventListener('DOMContentLoaded', async () => {
+        try {
+            sessionData = await checkAccess();
+            if (!sessionData) return;
+            window.sessionData = sessionData;
 
-                // Render Header in 'dashboard' mode (Hides tabs, shows gear)
-                renderProjectHeader(sessionData, 'dashboard', 'Project Selection');
+            // Render Header in 'dashboard' mode (Hides tabs, shows gear)
+            renderProjectHeader(sessionData, 'dashboard', 'Project Selection');
 
-                await loadProjects();
-            } catch (err) {
-                console.error("Init Error:", err);
-            }
-        });
+            await loadProjects();
+        } catch (err) {
+            console.error("Init Error:", err);
+        }
+    });
 
-        async function loadProjects() {
-            try {
-                const { data, error } = await supabase
-                    .from('projects')
-                    .select('*')
-                    .eq('tenant_id', sessionData.tenantId)
-                    .order('created_at', { ascending: false });
+    async function loadProjects() {
+        try {
+            // DEEP SELECT: Fetches requirements and tasks so we can calculate costs
+            const { data, error } = await supabase
+                .from('projects')
+                .select(`
+                    *,
+                    requirements (
+                        total_budget,
+                        created_at,
+                        steps (
+                            cost,
+                            status,
+                            is_active
+                        )
+                    )
+                `)
+                .eq('tenant_id', sessionData.tenantId)
+                .order('created_at', { ascending: false });
 
-                if (error) throw error;
-                renderProjectCards(data || []);
-            } catch (err) {
-                console.error("Load Error:", err);
-                document.getElementById('project-list').innerHTML = `<p class="text-red-500">Failed to load projects.</p>`;
-            }
+            if (error) throw error;
+            renderProjectCards(data || []);
+        } catch (err) {
+            console.error("Load Error:", err);
+            document.getElementById('project-list').innerHTML = `<p class="text-red-500 text-center col-span-full">Failed to load projects.</p>`;
+        }
+    }
+
+    function renderProjectCards(projects) {
+        const container = document.getElementById('project-list');
+        
+        if (!projects.length) {
+            container.innerHTML = `<div class="col-span-full py-20 text-center border-2 border-dashed border-gray-200 rounded-2xl">
+                <p class="text-gray-400">No projects found. Create your first one above!</p>
+            </div>`;
+            return;
         }
 
-        function renderProjectCards(projects) {
-            const container = document.getElementById('project-list');
-            if (!projects.length) {
-                container.innerHTML = `<div class="col-span-full py-20 text-center border-2 border-dashed border-gray-200 rounded-2xl">
-                    <p class="text-gray-400">No projects found. Create your first one above!</p>
-                </div>`;
-                return;
-            }
+        container.innerHTML = projects.map(project => {
+            // 1. Calculate Start Date from the earliest requirement
+            const dates = project.requirements?.map(r => new Date(r.created_at)) || [];
+            const startDate = dates.length ? new Date(Math.min(...dates)).toLocaleDateString() : 'Not Started';
 
-            container.innerHTML = projects.map(p => `
-                <div onclick="openProject('${p.id}', '${p.name}')" 
-                     class="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm hover:shadow-xl hover:border-indigo-300 transition-all cursor-pointer group relative overflow-hidden">
-                    <div class="absolute top-0 left-0 w-1 h-full bg-indigo-500 opacity-0 group-hover:opacity-100 transition-all"></div>
-                    <div class="flex justify-between items-start mb-4">
-                        <span class="text-[10px] font-black text-indigo-600 uppercase tracking-widest">${p.name}</span>
-                        <span class="px-2 py-1 bg-gray-100 text-[10px] font-bold rounded text-gray-500 uppercase">${p.status || 'Active'}</span>
+            // 2. Calculate Estimated Cost (Total Project Budget)
+            const estCost = project.requirements?.reduce((sum, r) => sum + (r.total_budget || 0), 0) || 0;
+// Calculate Actual Cost using the text status from the UI
+			const actualCost = project.requirements?.reduce((acc, req) => {
+    // We look for 'Complete' because that is what your <select> and CSS use
+    		const doneSum = req.steps?.filter(s => s.is_active && s.status === 'Complete')
+                             .reduce((sum, s) => sum + (s.cost || 0), 0);
+    		return acc + (doneSum || 0);
+		}, 0) || 0;
+            // 3. Calculate Actual Cost (Sum of 'Complete' tasks)
+//            const actualCost = project.requirements?.reduce((acc, req) => {
+//                const doneSum = req.steps?.filter(s => s.is_active && (s.status === 'Complete' || s.status === 'Done'))
+//                                         .reduce((sum, s) => sum + (s.cost || 0), 0);
+//                return acc + (doneSum || 0);
+//            }, 0) || 0;
+	        // 4. Calculate Burn Percentage and Balance
+            const burnPercent = estCost > 0 ? Math.round((actualCost / estCost) * 100) : 0;
+            const balance = estCost - actualCost;
+
+            return `
+                <div onclick="openProject('${project.id}', '${project.name}')" 
+                     class="bg-white rounded-2xl border border-gray-200 shadow-sm hover:shadow-xl hover:border-indigo-300 transition-all cursor-pointer group flex flex-col overflow-hidden">
+                    
+                    <div class="p-6">
+                        <div class="flex justify-between items-start mb-4">
+                            <span class="text-[10px] font-black text-indigo-600 uppercase tracking-widest">${project.name}</span>
+                            <span class="text-[10px] font-bold text-gray-400">Started: ${startDate}</span>
+                        </div>
+                        
+                        <h3 class="text-lg font-black text-gray-900 mb-1 group-hover:text-indigo-600 transition-colors">${project.title}</h3>
+                        
+                        <div class="mt-6 space-y-4">
+                            <div>
+                                <div class="flex justify-between text-[10px] font-black uppercase tracking-tight mb-1">
+                                    <span class="text-gray-500">Budget Consumed</span>
+                                    <span class="${burnPercent > 90 ? 'text-red-600' : 'text-indigo-600'}">${burnPercent}%</span>
+                                </div>
+                                <div class="w-full bg-gray-100 h-1.5 rounded-full overflow-hidden">
+                                    <div class="h-full ${burnPercent > 90 ? 'bg-red-500' : 'bg-indigo-500'} transition-all duration-500" 
+                                         style="width: ${Math.min(burnPercent, 100)}%"></div>
+                                </div>
+                            </div>
+
+                            <div class="grid grid-cols-2 gap-4 pt-2">
+                                <div>
+                                    <p class="text-[9px] font-bold text-gray-400 uppercase">Budget</p>
+                                    <p class="text-sm font-black text-gray-900">$${estCost.toLocaleString()}</p>
+                                </div>
+                                <div>
+                                    <p class="text-[9px] font-bold text-gray-400 uppercase">Balance</p>
+                                    <p class="text-sm font-black ${balance < 0 ? 'text-red-600' : 'text-green-600'}">$${balance.toLocaleString()}</p>
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                    <h3 class="text-lg font-bold text-gray-900 mb-1 group-hover:text-indigo-600 transition-colors">${p.title}</h3>
-                    <div class="flex items-center gap-4 mt-4 pt-4 border-t border-gray-50 text-gray-400">
-                        <div class="flex flex-col">
-                            <span class="text-[9px] uppercase font-bold tracking-tighter">Priority</span>
-                            <span class="text-xs font-bold text-gray-700">${p.priority_value || 50}</span>
+
+                    <div class="mt-auto bg-gray-50 px-6 py-3 flex justify-between items-center border-t border-gray-100">
+                        <div class="flex items-center gap-1">
+                             <div class="w-2 h-2 rounded-full ${project.status === 'Active' ? 'bg-green-500' : 'bg-gray-400'}"></div>
+                             <span class="text-[10px] font-bold text-gray-500 uppercase">${project.status || 'Active'}</span>
                         </div>
-                        <div class="flex flex-col">
-                            <span class="text-[9px] uppercase font-bold tracking-tighter">Rate</span>
-                            <span class="text-xs font-bold text-gray-700">$${p.blended_rate || 0}/hr</span>
-                        </div>
+                        <span class="text-[10px] font-bold text-indigo-500 group-hover:translate-x-1 transition-transform">View Details &rarr;</span>
                     </div>
                 </div>
-            `).join('');
+            `;
+        }).join('');
+    }
+
+    window.toggleProjectModal = () => {
+        const modal = document.getElementById('project-modal');
+        if (modal) modal.classList.toggle('hidden');
+    };
+
+    window.openProject = (id, name) => {
+        localStorage.setItem('selected_project_id', id);
+        localStorage.setItem('selected_project_name', name);
+        window.location.href = 'requirements.html';
+    };
+
+    window.saveNewProject = async () => {
+        try {
+            const name = document.getElementById('new-project-name').value.trim();
+            const title = document.getElementById('new-project-title').value.trim();
+            const rate = parseFloat(document.getElementById('new-project-rate').value) || 0;
+            const priority = parseInt(document.getElementById('new-project-priority').value) || 50;
+
+            if (!name || !title) return alert("Please fill in Name and Title.");
+
+            const { error } = await supabase.from('projects').insert([{
+                name, title, tenant_id: sessionData.tenantId, 
+                blended_rate: rate, status: 'Active', priority_value: priority 
+            }]);
+
+            if (error) throw error;
+            window.toggleProjectModal();
+            await loadProjects();
+        } catch (err) {
+            alert("Save failed: " + err.message);
         }
+    };
 
-        window.toggleProjectModal = () => {
-            const modal = document.getElementById('project-modal');
-            if (modal) modal.classList.toggle('hidden');
-        };
-
-        window.openProject = (id, name) => {
-            localStorage.setItem('selected_project_id', id);
-            localStorage.setItem('selected_project_name', name);
-            window.location.href = 'requirements.html';
-        };
-
-        window.saveNewProject = async () => {
-            try {
-                const name = document.getElementById('new-project-name').value.trim();
-                const title = document.getElementById('new-project-title').value.trim();
-                const rate = parseFloat(document.getElementById('new-project-rate').value) || 0;
-                const priority = parseInt(document.getElementById('new-project-priority').value) || 50;
-
-                if (!name || !title) return alert("Please fill in Name and Title.");
-
-                const { error } = await supabase.from('projects').insert([{
-                    name, 
-                    title, 
-                    tenant_id: sessionData.tenantId, 
-                    blended_rate: rate, 
-                    status: 'Active', 
-                    priority_value: priority 
-                }]);
-
-                if (error) throw error;
-                window.toggleProjectModal();
-                await loadProjects();
-            } catch (err) {
-                alert("Save failed: " + err.message);
-            }
-        };
-
-        // Attach function to window for the render card logic
-        window.loadProjects = loadProjects;
-    </script>
+    window.loadProjects = loadProjects;
+</script>    
 </body>
 </html>

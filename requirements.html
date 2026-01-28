@@ -21,6 +21,12 @@
     .active-req { background-color: #f5f3ff !important; border-left: 4px solid #6366f1 !important; }
     .active-task { background-color: #eff6ff !important; border-left: 4px solid #3b82f6 !important; }
 
+    /* Drag and Drop Styling */
+    .sortable-ghost { opacity: 0.4; background: #e0e7ff; border: 2px dashed #6366f1; }
+    .sortable-chosen { background: #f8fafc; }
+    .drag-handle { cursor: grab; }
+    .drag-handle:active { cursor: grabbing; }
+
     /* Status Badges */
     .status-pending { background-color: #f3f4f6; color: #374151; padding: 2px 8px; border-radius: 9999px; border: 1px solid #e5e7eb; }
     .status-inprogress { background-color: #eff6ff; color: #2563eb; padding: 2px 8px; border-radius: 9999px; border: 1px solid #dbeafe; }
@@ -46,14 +52,16 @@
     #task-editor-panel { left: 0; transform: translateX(-100%); }
     #task-editor-panel.active { transform: translateX(0); }
 
-    /* Kebab Menu Animation */
-    [id^="kebab-req-"], [id^="kebab-task-"] { animation: slideIn 0.15s ease-out; }
-    @keyframes slideIn { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
-
-    /* RBAC: Hide Drag Handles */
-    body.hide-drag-handles .cursor-move {
-        display: none !important;
-        pointer-events: none;
+    /* Kebab Menu Logic & Animation */
+    .kebab-container { position: relative; }
+    [id^="kebab-req-"], [id^="kebab-task-"] { 
+        animation: slideIn 0.15s ease-out; 
+        z-index: 50;
+    }
+    
+    @keyframes slideIn { 
+        from { opacity: 0; transform: translateY(-8px); } 
+        to { opacity: 1; transform: translateY(0); } 
     }
 
     /* Settings Dropdown Positioning */
@@ -61,9 +69,22 @@
         top: 100%;
         right: 0;
         margin-top: 0.5rem;
-        min-width: 180px;
+        min-width: 200px;
         z-index: 1100;
     }
+
+    /* RBAC: Hide Drag Handles */
+    body.hide-drag-handles .cursor-move,
+    body.hide-drag-handles .drag-handle {
+        display: none !important;
+        pointer-events: none;
+    }
+    
+    /* Custom Scrollbar for Viewports */
+    .list-viewport::-webkit-scrollbar { width: 6px; }
+    .list-viewport::-webkit-scrollbar-track { background: transparent; }
+    .list-viewport::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
+    .list-viewport::-webkit-scrollbar-thumb:hover { background: #cbd5e1; }
 </style>
 </head>
 <body class="bg-gray-100 min-h-screen overflow-hidden">

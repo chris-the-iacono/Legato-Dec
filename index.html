@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Project Dashboard</title>
+    <title>Project Selection | Project Manager</title>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-gray-50">
@@ -11,41 +11,57 @@
     <div id="main-header"></div>
 
     <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div class="mb-8 flex justify-between items-center">
+            <h2 class="text-xl font-black text-gray-800 uppercase tracking-tight">Your Projects</h2>
+            <button onclick="toggleProjectModal()" class="bg-indigo-600 text-white px-4 py-2 rounded-lg font-bold text-sm hover:bg-indigo-700 transition shadow-sm flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                </svg>
+                Create Project
+            </button>
+        </div>
+
         <div id="project-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div class="col-span-full py-20 text-center">
+                <p class="text-gray-400 font-medium">Loading your workspace projects...</p>
             </div>
+        </div>
     </main>
 
-    <div id="project-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden flex items-center justify-center z-50">
-        <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
-            <h2 class="text-xl font-bold mb-4">Create New Project</h2>
+    <div id="project-modal" class="fixed inset-0 bg-gray-900/60 backdrop-blur-sm hidden flex items-center justify-center z-[2000]">
+        <div class="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md border border-gray-100">
+            <h2 class="text-2xl font-black text-gray-900 mb-2">New Project</h2>
+            <p class="text-sm text-gray-500 mb-6">Set the initial baseline for your new workspace.</p>
+            
             <div class="space-y-4">
                 <div>
-                    <label class="block text-sm font-medium text-gray-700">Project Name</label>
-                    <input type="text" id="new-project-name" placeholder="e.g. Q4 Audit"
-                           class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2">
+                    <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1 ml-1">Project Code / Name</label>
+                    <input type="text" id="new-project-name" placeholder="e.g. Q4-AUDIT"
+                           class="w-full border border-gray-200 rounded-xl p-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500 transition-all">
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-gray-700">Project Title (Description)</label>
+                    <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1 ml-1">Project Description</label>
                     <input type="text" id="new-project-title" placeholder="e.g. Annual Financial Review"
-                           class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2">
+                           class="w-full border border-gray-200 rounded-xl p-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500 transition-all">
                 </div>
                 <div class="grid grid-cols-2 gap-4">
                     <div>
-                        <label class="block text-sm font-medium text-gray-700">Applied Rate ($/hr)</label>
-                        <input type="number" id="new-project-rate" 
-                               class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2">
+                        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1 ml-1">Blended Rate ($)</label>
+                        <input type="number" id="new-project-rate" placeholder="150"
+                               class="w-full border border-gray-200 rounded-xl p-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500 transition-all">
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-gray-700">Priority (1-100)</label>
+                        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1 ml-1">Priority (1-100)</label>
                         <input type="number" id="new-project-priority" min="1" max="100" value="50"
-                               class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2">
+                               class="w-full border border-gray-200 rounded-xl p-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500 transition-all">
                     </div>
                 </div>
             </div>
-            <div class="mt-6 flex justify-end space-x-3">
-                <button onclick="toggleProjectModal()" class="text-gray-600 hover:text-gray-800">Cancel</button>
-                <button onclick="saveNewProject()" class="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700">
-                    Save Project
+
+            <div class="mt-8 flex gap-3">
+                <button onclick="toggleProjectModal()" class="flex-1 px-4 py-3 text-sm font-bold text-gray-500 hover:bg-gray-50 rounded-xl transition">Cancel</button>
+                <button onclick="saveNewProject()" class="flex-1 bg-indigo-600 text-white px-4 py-3 rounded-xl font-bold text-sm hover:bg-indigo-700 shadow-lg transition-all">
+                    Create Project
                 </button>
             </div>
         </div>
@@ -62,15 +78,10 @@
             try {
                 sessionData = await checkAccess();
                 if (!sessionData) return;
-
                 window.sessionData = sessionData;
 
-                // Render the unified header with the Gear
-                const headerElement = document.getElementById('main-header');
-                if (headerElement) {
-                    // We pass 'dashboard' to tell the component to show the "+ New Project" button
-                    renderProjectHeader(sessionData, 'dashboard', 'Project Selection');
-                }
+                // Render Header in 'dashboard' mode (Hides tabs, shows gear)
+                renderProjectHeader(sessionData, 'dashboard', 'Project Selection');
 
                 await loadProjects();
             } catch (err) {
@@ -78,8 +89,53 @@
             }
         });
 
-        // ... rest of your loadProjects, renderProjectCards, and save logic ...
-        // (Keep those functions as they were, they are working well)
+        async function loadProjects() {
+            try {
+                const { data, error } = await supabase
+                    .from('projects')
+                    .select('*')
+                    .eq('tenant_id', sessionData.tenantId)
+                    .order('created_at', { ascending: false });
+
+                if (error) throw error;
+                renderProjectCards(data || []);
+            } catch (err) {
+                console.error("Load Error:", err);
+                document.getElementById('project-list').innerHTML = `<p class="text-red-500">Failed to load projects.</p>`;
+            }
+        }
+
+        function renderProjectCards(projects) {
+            const container = document.getElementById('project-list');
+            if (!projects.length) {
+                container.innerHTML = `<div class="col-span-full py-20 text-center border-2 border-dashed border-gray-200 rounded-2xl">
+                    <p class="text-gray-400">No projects found. Create your first one above!</p>
+                </div>`;
+                return;
+            }
+
+            container.innerHTML = projects.map(p => `
+                <div onclick="openProject('${p.id}', '${p.name}')" 
+                     class="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm hover:shadow-xl hover:border-indigo-300 transition-all cursor-pointer group relative overflow-hidden">
+                    <div class="absolute top-0 left-0 w-1 h-full bg-indigo-500 opacity-0 group-hover:opacity-100 transition-all"></div>
+                    <div class="flex justify-between items-start mb-4">
+                        <span class="text-[10px] font-black text-indigo-600 uppercase tracking-widest">${p.name}</span>
+                        <span class="px-2 py-1 bg-gray-100 text-[10px] font-bold rounded text-gray-500 uppercase">${p.status || 'Active'}</span>
+                    </div>
+                    <h3 class="text-lg font-bold text-gray-900 mb-1 group-hover:text-indigo-600 transition-colors">${p.title}</h3>
+                    <div class="flex items-center gap-4 mt-4 pt-4 border-t border-gray-50 text-gray-400">
+                        <div class="flex flex-col">
+                            <span class="text-[9px] uppercase font-bold tracking-tighter">Priority</span>
+                            <span class="text-xs font-bold text-gray-700">${p.priority_value || 50}</span>
+                        </div>
+                        <div class="flex flex-col">
+                            <span class="text-[9px] uppercase font-bold tracking-tighter">Rate</span>
+                            <span class="text-xs font-bold text-gray-700">$${p.blended_rate || 0}/hr</span>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
 
         window.toggleProjectModal = () => {
             const modal = document.getElementById('project-modal');
@@ -102,8 +158,12 @@
                 if (!name || !title) return alert("Please fill in Name and Title.");
 
                 const { error } = await supabase.from('projects').insert([{
-                    name, title, tenant_id: sessionData.tenantId, 
-                    blended_rate: rate, status: 'Active', priority_value: priority 
+                    name, 
+                    title, 
+                    tenant_id: sessionData.tenantId, 
+                    blended_rate: rate, 
+                    status: 'Active', 
+                    priority_value: priority 
                 }]);
 
                 if (error) throw error;
@@ -113,6 +173,9 @@
                 alert("Save failed: " + err.message);
             }
         };
+
+        // Attach function to window for the render card logic
+        window.loadProjects = loadProjects;
     </script>
 </body>
 </html>

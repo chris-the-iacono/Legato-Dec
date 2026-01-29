@@ -16,3 +16,4 @@ export const MODULES = {
     ISSUES: 'module_issues',
     CHANGES: 'module_changes'
 };
+window.supabase = supabase;

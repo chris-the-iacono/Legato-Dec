@@ -27,7 +27,7 @@ export async function rollupToRequirement(requirementId) {
         const { error: updateError } = await supabase
             .from('requirements')
             .update({ total_budget: newTotal })
-            .eq('id', requirementId);
+            .eq('req_id', requirementId); //changed 'id' to 'req_id'
 
         if (updateError) throw updateError;
 

@@ -27,7 +27,7 @@ export async function rollupToRequirement(requirementId) {
         const { error: updateError } = await supabase
             .from('requirements')
             .update({ total_budget: newTotal })
-            .eq('req_id', requirementId); //changed 'id' to 'req_id'
+            .eq('req_id', requirementId); // Using req_id as per your recent correction
 
         if (updateError) throw updateError;
 
@@ -61,7 +61,7 @@ export async function syncHierarchyStatus(requirementId, projectId) {
             await supabase
                 .from('requirements')
                 .update({ status: 'Complete' })
-                .eq('id', requirementId);
+                .eq('req_id', requirementId);
             
             console.log(`Requirement ${requirementId} automatically set to Complete.`);
         }
@@ -94,32 +94,45 @@ export async function syncHierarchyStatus(requirementId, projectId) {
 /**
  * 3. REAL-TIME LISTENER (The "Brain")
  * Listens for changes to the steps table and automatically triggers the engine.
- * This removes the need to manually call these functions in your UI files.
  */
 export const initializeProjectEngine = () => {
-    console.log("Project Engine Listener initialized...");
+    console.log("?? Project Engine: Initializing Connection...");
 
-    supabase
-        .channel('public:steps')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'steps' }, async (payload) => {
-            console.log('Change detected in Steps table:', payload);
-            
-            const requirementId = payload.new?.requirement_id || payload.old?.requirement_id;
-            const projectId = localStorage.getItem('selected_project_id');
-
-            if (requirementId) {
-                // Run the budget math
-                await rollupToRequirement(requirementId);
-                // Run the status automation
-                await syncHierarchyStatus(requirementId, projectId);
+    const channel = supabase
+        .channel('project-automation-channel')
+        .on(
+            'postgres_changes', 
+            { event: '*', schema: 'public', table: 'steps' }, 
+            async (payload) => {
+                // THIS IS THE LOG WE ARE LOOKING FOR
+                console.log('? ENGINE TRIGGERED: Change detected in Steps!', payload);
                 
-                // Refresh the UI if a refresh function exists on the global window
-                if (window.loadRequirements) {
-                    window.loadRequirements();
+                const requirementId = payload.new?.requirement_id || payload.old?.requirement_id;
+                const projectId = localStorage.getItem('selected_project_id');
+
+                if (requirementId) {
+                    // 1. Run the budget math (Rollup)
+                    await rollupToRequirement(requirementId);
+                    
+                    // 2. Run the status automation (Cascade Completion)
+                    await syncHierarchyStatus(requirementId, projectId);
+                    
+                    // 3. Refresh the UI if the bridge is connected
+                    if (typeof window.loadRequirements === 'function') {
+                        console.log("?? Refreshing UI via global hook...");
+                        window.loadRequirements();
+                    }
                 }
             }
-        })
-        .subscribe();
+        )
+        .subscribe((status) => {
+            // THIS WILL TELL US IF THE CONNECTION IS BLOCKED
+            console.log("?? Realtime Status:", status);
+            
+            if (status === 'CHANNEL_ERROR') {
+                console.error("? Realtime Connection Failed. Check Supabase 'Replication' settings.");
+            }
+        });
 };
 
 // Start the listener automatically when this module is loaded

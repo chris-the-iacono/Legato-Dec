@@ -1101,7 +1101,7 @@ async function loadRequirements() {
 
     if (typeof window.initSortable === 'function') window.initSortable();
 }
-
+window.loadRequirements = loadRequirements;
 window.openReqSlider = async (id = null) => {
     const panel = document.getElementById('req-editor-panel');
     const titleEl = document.getElementById('req-editor-title');

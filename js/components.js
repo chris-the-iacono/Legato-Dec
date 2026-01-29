@@ -1,5 +1,8 @@
 // js/components.js
 import { handleSignOut } from './auth.js';
+// NEW: Import the project engine logic
+import { rollupToRequirement, syncHierarchyStatus } from './project-engine.js';
+import { supabase } from './config.js';
 
 /**
  * Renders the Tabbed UI Header with Admin, Navigation features, and Settings Gear.
@@ -8,6 +11,9 @@ export function renderProjectHeader(session, activeTab, projectName = "Select Pr
     const headerElement = document.getElementById('main-header');
     
     if (!headerElement) return;
+
+    // Store session globally for modal access
+    window.currentSession = session;
 
     // 1. DYNAMIC TAB TITLE
     document.title = `${projectName} | ${activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}`;
@@ -71,11 +77,11 @@ export function renderProjectHeader(session, activeTab, projectName = "Select Pr
                             <div class="px-4 py-2 border-b border-gray-50 mb-1">
                                 <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest">Configuration</p>
                             </div>
-                            <button class="w-full text-left px-4 py-2 text-xs font-bold text-gray-700 hover:bg-indigo-50 transition-colors">Edit Details</button>
+                            <button onclick="window.openProjectDetails()" class="w-full text-left px-4 py-2 text-xs font-bold text-gray-700 hover:bg-indigo-50 transition-colors">Edit Details</button>
                             <button class="w-full text-left px-4 py-2 text-xs font-bold text-gray-700 hover:bg-indigo-50 transition-colors">Configure Rates</button>
                             <button class="w-full text-left px-4 py-2 text-xs font-bold text-gray-700 hover:bg-indigo-50 transition-colors">Audit History</button>
                             <div class="border-t border-gray-100 mt-1 pt-1">
-                                <button class="w-full text-left px-4 py-2 text-xs font-bold text-red-600 hover:bg-red-50 transition-colors">Archive Project</button>
+                                <button onclick="window.archiveProject()" class="w-full text-left px-4 py-2 text-xs font-bold text-red-600 hover:bg-red-50 transition-colors">Archive Project</button>
                             </div>
                         </div>
                     </div>
@@ -121,3 +127,100 @@ export function renderProjectHeader(session, activeTab, projectName = "Select Pr
         });
     }
 }
+
+/**
+ * DYNAMIC MODAL ENGINE
+ * Injects the Edit Details modal into the DOM only when requested.
+ */
+window.openProjectDetails = async () => {
+    const projectId = localStorage.getItem('selected_project_id');
+    if (!projectId) return alert("No project selected.");
+
+    // Fetch current project data
+    const { data: project, error } = await supabase
+        .from('projects')
+        .select('*')
+        .eq('id', projectId)
+        .single();
+
+    if (error) return console.error("Fetch Error:", error);
+
+    // Create Modal Backdrop
+    const modalOverlay = document.createElement('div');
+    modalOverlay.id = 'dynamic-project-modal';
+    modalOverlay.className = 'fixed inset-0 bg-gray-900/60 backdrop-blur-sm z-[3000] flex items-center justify-center p-4';
+    
+    // RBAC Check
+    const allowedRoles = ['admin', 'owner', 'project_manager'];
+    const canEdit = allowedRoles.includes(window.currentSession?.role?.toLowerCase());
+
+    modalOverlay.innerHTML = `
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200">
+            <div class="p-6 border-b border-gray-100 flex justify-between items-center">
+                <h2 class="text-lg font-black text-gray-900 uppercase tracking-tight">Project Details</h2>
+                <button onclick="document.getElementById('dynamic-project-modal').remove()" class="text-gray-400 hover:text-gray-600">&times;</button>
+            </div>
+            <div class="p-6 space-y-4">
+                <div>
+                    <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Project Title</label>
+                    <input id="edit-project-title" type="text" value="${project.title}" ${!canEdit ? 'disabled' : ''} 
+                           class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none disabled:bg-gray-50">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Status</label>
+                    <select id="edit-project-status" ${!canEdit ? 'disabled' : ''} 
+                            class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none disabled:bg-gray-50">
+                        <option value="Active" ${project.status === 'Active' ? 'selected' : ''}>Active</option>
+                        <option value="On Hold" ${project.status === 'On Hold' ? 'selected' : ''}>On Hold</option>
+                        <option value="Cancelled" ${project.status === 'Cancelled' ? 'selected' : ''}>Cancelled</option>
+                        <option value="Complete" ${project.status === 'Complete' ? 'selected' : ''}>Complete</option>
+                    </select>
+                </div>
+                <div class="pt-4 flex gap-3">
+                    <button onclick="document.getElementById('dynamic-project-modal').remove()" 
+                            class="flex-1 px-4 py-2 border border-gray-200 rounded-lg text-xs font-bold text-gray-600 hover:bg-gray-50 transition-colors">Cancel</button>
+                    ${canEdit ? `
+                        <button onclick="window.saveProjectDetails('${project.id}')" 
+                                class="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg text-xs font-bold hover:bg-indigo-700 transition-shadow shadow-md">Save Changes</button>
+                    ` : ''}
+                </div>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(modalOverlay);
+};
+
+window.saveProjectDetails = async (id) => {
+    const title = document.getElementById('edit-project-title').value;
+    const status = document.getElementById('edit-project-status').value;
+
+    const { error } = await supabase
+        .from('projects')
+        .update({ title, status })
+        .eq('id', id);
+
+    if (error) {
+        alert("Update failed: " + error.message);
+    } else {
+        document.getElementById('dynamic-project-modal').remove();
+        // Reload to update the header title and badges
+        location.reload();
+    }
+};
+
+window.archiveProject = async () => {
+    const projectId = localStorage.getItem('selected_project_id');
+    if (!confirm("Are you sure you want to archive this project? It will be hidden from the main dashboard.")) return;
+
+    const { error } = await supabase
+        .from('projects')
+        .update({ status: 'Archived' })
+        .eq('id', projectId);
+
+    if (error) alert(error.message);
+    else window.location.href = 'index.html';
+};
+
+// Export the engine functions so they are globally available via this module
+export { rollupToRequirement, syncHierarchyStatus };

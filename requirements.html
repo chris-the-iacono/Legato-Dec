@@ -1,7 +1,5 @@
 <!DOCTYPE html>
 <html lang="en">
-<!DOCTYPE html>
-<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -43,7 +41,7 @@
         background: white;
         box-shadow: 0 0 40px rgba(0,0,0,0.15);
         transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-        z-index: 1100; /* Increased to stay above sticky header */
+        z-index: 1100;
         display: flex;
         flex-direction: column;
     }
@@ -78,7 +76,6 @@
     .list-viewport::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
     .list-viewport::-webkit-scrollbar-thumb:hover { background: #cbd5e1; }
 
-    /* Ensure no scrollbar on the body since we have inner viewports */
     body { overflow: hidden; }
 </style>
 </head>
@@ -215,17 +212,11 @@
                 <div class="grid grid-cols-2 gap-4">
                     <div class="flex flex-col">
                         <label class="text-[10px] font-bold text-gray-400 uppercase mb-1 ml-1">Responsible</label>
-                        <select id="step-assign-select" data-admin-only onchange="window.handleUserSelection('step')" class="border-gray-200 rounded-lg text-sm p-3 bg-gray-50 border"></select>
+                        <select id="step-assign-select" data-admin-only class="border-gray-200 rounded-lg text-sm p-3 bg-gray-50 border"></select>
                     </div>
-                    <div class="grid grid-cols-2 gap-2">
-                        <div class="flex flex-col">
-                            <label class="text-[10px] font-bold text-gray-400 uppercase mb-1 ml-1">Est. Hrs</label>
-                            <input type="number" id="step-hours-input" data-admin-only class="border-gray-200 rounded-lg text-sm p-3 border">
-                        </div>
-                        <div class="flex flex-col">
-                            <label class="text-[10px] font-bold text-gray-400 uppercase mb-1 ml-1">Est. Cost</label>
-                            <input type="number" id="step-cost-input" readonly class="bg-gray-50 border-gray-200 rounded-lg text-sm p-3 font-mono border">
-                        </div>
+                    <div class="flex flex-col">
+                        <label class="text-[10px] font-bold text-gray-400 uppercase mb-1 ml-1">Est. Hrs</label>
+                        <input type="number" id="step-hours-input" data-admin-only class="border-gray-200 rounded-lg text-sm p-3 border">
                     </div>
                 </div>
                 
@@ -263,6 +254,7 @@
         </div>
     </section>
 </body>
+</html>
 	<script type="module">
     import { rollupToRequirement } from './js/project-engine.js';
     // Attach it to the window so your existing logic can call it

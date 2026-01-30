@@ -9,32 +9,76 @@ import { supabase } from './config.js';
  * 1. rollupToRequirement
  * Sums the cost of all active steps for a requirement and updates the total_budget.
  */
-export async function rollupToRequirement(requirementId) {
+/**
+ * Unified Rollup Engine
+ * Preserves: Health Score, Member Rate Fallbacks, and Manual Step Injection
+ */
+export async function rollupToRequirement(requirementId, manualSteps = null) {
     try {
-        // Fetch all active steps for this requirement
-        const { data: steps, error: fetchError } = await supabase
-            .from('steps')
-            .select('cost')
-            .eq('requirement_id', requirementId)
-            .eq('is_active', true);
+        let tasks = manualSteps;
 
-        if (fetchError) throw fetchError;
+        // 1. Fetch steps if not provided manually
+        if (!tasks) {
+            const { data, error: fetchError } = await supabase
+                .from('steps')
+                .select('estimated_hours, cost, assigned_to, actual_cost, is_active')
+                .eq('requirement_id', requirementId)
+                .eq('is_active', true);
 
-        // Sum the costs
-        const newTotal = steps.reduce((sum, step) => sum + (parseFloat(step.cost) || 0), 0);
+            if (fetchError) throw fetchError;
+            tasks = data || [];
+        }
 
-        // Update the requirement's budget
+        let totalBudget = 0;
+        let totalHours = 0;
+        let totalActualCost = 0;
+        
+        // Access global members for fallback rates
+        const members = window.teamMembers || [];
+        const blendedRate = window.projectBlendedRate || 0;
+
+        // 2. Comprehensive Calculation Loop
+        tasks.forEach(s => {
+            const hours = parseFloat(s.estimated_hours) || 0;
+            let taskCost = parseFloat(s.cost) || 0;
+            const actCost = parseFloat(s.actual_cost) || 0;
+
+            // --- RE-INTEGRATED: Fallback Rate Logic ---
+            if (taskCost === 0 && hours > 0) {
+                const user = members.find(m => m.user_id === s.assigned_to);
+                const effectiveRate = (user && parseFloat(user.hourly_cost) > 0) 
+                    ? parseFloat(user.hourly_cost) 
+                    : blendedRate;
+                taskCost = hours * effectiveRate;
+            }
+
+            totalBudget += taskCost;
+            totalHours += hours;
+            totalActualCost += actCost;
+        });
+
+        // --- RE-INTEGRATED: Health Score Logic ---
+        let healthScore = 100;
+        if (totalBudget > 0 && totalActualCost > totalBudget) {
+            healthScore = Math.max(0, Math.round((totalBudget / totalActualCost) * 100));
+        }
+
+        // 3. Database Update
         const { error: updateError } = await supabase
             .from('requirements')
-            .update({ total_budget: newTotal })
-            .eq('req_id', requirementId); // Using req_id as per your recent correction
+            .update({ 
+                total_budget: totalBudget,
+                estimated_hours: totalHours,
+                health_score: healthScore,
+                updated_at: new Date().toISOString()
+            })
+            .eq('req_id', requirementId);
 
         if (updateError) throw updateError;
 
-        console.log(`Rollup Complete: Req ${requirementId} new total: $${newTotal}`);
-        return newTotal;
+        return { totalBudget, totalHours, healthScore };
     } catch (err) {
-        console.error("Rollup Error:", err.message);
+        console.error("? Engine Rollup Error:", err.message);
         return null;
     }
 }

@@ -263,7 +263,11 @@
         </div>
     </section>
 </body>
-
+	<script type="module">
+    import { rollupToRequirement } from './js/project-engine.js';
+    // Attach it to the window so your existing logic can call it
+    window.engineRollup = rollupToRequirement;
+	</script>
     <script type="module"> 
         import { supabase, MODULES } from './js/config.js';
         import { checkAccess } from './js/auth.js';
@@ -594,90 +598,34 @@ window.saveOrder = async (table, container) => {
         console.error("Save Order Critical Error:", err);
     }
 };
-
-        // --- ROLLUP ENGINE (VERIFIED SCHEMA NAMES) ---
+	/* Changed 1/30/26 - Moved the complete rollup engine logic into project-engine.js 
+	and replaced window.rollupToRequirement function in requirements.html with a bridge */
 window.rollupToRequirement = async (reqId = window.selectedReqId, steps = null) => {
-    // 1. Sanitize the UUID to prevent 400 errors
     if (!reqId) return;
     const cleanReqId = String(reqId).trim().replace(/['"]/g, '');
-    
-    let tasks = steps;
-    if (!tasks) {
-        // Fetch using requirement_id (foreign key)
-        // Optimization: Added is_active filter to ensure only valid tasks roll up
-        // Added actuals to support Health Score calculation
-        const { data, error: fetchError } = await supabase.from('steps')
-            .select('estimated_hours, cost, assigned_to, actual_cost, actual_hours') 
-            .eq('requirement_id', cleanReqId)
-            .eq('is_active', true); 
-        
-        if (fetchError) {
-            console.error("Error fetching steps for rollup:", fetchError);
-            return;
-        }
-        tasks = data || [];
+
+    // 1. Call the Centralized Engine via the window bridge
+    if (typeof window.engineRollup !== 'function') {
+        console.error("Project Engine not yet loaded.");
+        return;
     }
 
-    let calculatedTotalCost = 0;
-    let totalHours = 0;
-    let totalActualCost = 0; 
-    const members = window.teamMembers || [];
+    const result = await window.engineRollup(cleanReqId, steps);
 
-    tasks.forEach(s => {
-        const hours = parseFloat(s.estimated_hours) || 0;
-        let taskCost = parseFloat(s.cost) || 0;
-        const actCost = parseFloat(s.actual_cost) || 0;
-
-        // Fallback Calculation logic preserved: 
-        // If task cost is 0, calculate based on user hourly cost or project blended rate
-        if (taskCost === 0 && hours > 0) {
-            const user = members.find(m => m.user_id === s.assigned_to);
-            const effectiveRate = (user && parseFloat(user.hourly_cost) > 0) 
-                ? parseFloat(user.hourly_cost) 
-                : (window.projectBlendedRate || 0);
-            taskCost = hours * effectiveRate;
-        }
-        calculatedTotalCost += taskCost;
-        totalHours += hours;
-        totalActualCost += actCost;
-    });
-
-    // --- HEALTH SCORE CALCULATION ---
-    // Health is 100 if under budget. Drops if actuals exceed the estimated budget.
-    let healthScore = 100;
-    if (calculatedTotalCost > 0 && totalActualCost > calculatedTotalCost) {
-        healthScore = Math.max(0, Math.round((calculatedTotalCost / totalActualCost) * 100));
-    }
-
-    // 2. Sync to Database using verified column names
-    const { error } = await supabase.from('requirements')
-        .update({ 
-            estimated_hours: totalHours, 
-            total_budget: calculatedTotalCost,
-            health_score: healthScore,
-            updated_at: new Date().toISOString()
-        })
-        .eq('req_id', cleanReqId);
-
-    if (!error) {
-        console.log(`Rollup Sync Success: ${totalHours}h | Budget: $${calculatedTotalCost} | Health: ${healthScore}%`);
-        
-        // 3. UI Sync: Refresh Requirements list tiles
+    if (result) {
+        // 2. UI Refresh: Requirements List
         if (typeof window.loadRequirements === 'function') {
             await window.loadRequirements();
         }
 
-        // 4. UI Sync: Update the Header display in the Task viewport
-        const totalBudgetDisplay = document.getElementById('selected-req-budget-display');
-        if (totalBudgetDisplay) {
-            // Using precise 2-decimal formatting from your backup
-            totalBudgetDisplay.innerText = `$${calculatedTotalCost.toLocaleString(undefined, {
+        // 3. UI Refresh: Header Display
+        const budgetDisplay = document.getElementById('selected-req-budget-display');
+        if (budgetDisplay) {
+            budgetDisplay.innerText = `$${result.totalBudget.toLocaleString(undefined, {
                 minimumFractionDigits: 2, 
                 maximumFractionDigits: 2
             })}`;
         }
-    } else {
-        console.error("Rollup Update Error:", error.message);
     }
 };
 
@@ -1069,7 +1017,17 @@ async function loadRequirements() {
     if (reqs && list) {
         document.getElementById('req-count').innerText = `${reqs.length} ITEMS`;
         list.innerHTML = reqs.map(req => {
-            const displayTotal = req.total_cost || (parseFloat(req.estimated_hours) * (parseFloat(req.custom_rate) || 0));
+            // --- Financial Comparison Logic ---
+            // 'total_budget' is the live rollup from the engine
+            // 'total_cost' is the baseline/approved budget snapshot
+            const currentSpend = parseFloat(req.total_budget) || 0;
+            const approvedBudget = parseFloat(req.total_cost) || (parseFloat(req.estimated_hours) * (parseFloat(req.custom_rate) || 0));
+            const variance = approvedBudget - currentSpend;
+            
+            // Logic for budget health styling
+            const budgetColor = variance < 0 ? 'text-red-600' : 'text-indigo-600';
+            const versionStr = req.version_number ? `v${req.version_number}` : 'v1';
+
             const menuHtml = (typeof getKabobMenu === 'function') ? getKabobMenu(req, 'req') : '';
             
             return `
@@ -1087,7 +1045,12 @@ async function loadRequirements() {
                         </div>
                     </div>
                     <div class="flex items-center gap-4">
-                        <p class="text-sm font-mono font-bold text-indigo-600">$${Number(displayTotal).toLocaleString()}</p>
+                        <div class="flex flex-col items-end gap-0.5">
+                            <p class="text-sm font-mono font-bold ${budgetColor}">$${Number(currentSpend).toLocaleString()}</p>
+                            <p class="text-[9px] text-gray-400 font-bold uppercase tracking-wider">
+                                Budget: $${Number(approvedBudget).toLocaleString()} (${versionStr})
+                            </p>
+                        </div>
                         <div class="relative kebab-container">
                             <button onclick="event.stopPropagation(); window.toggleKebab('req-${req.req_id}')" class="p-1 text-gray-400 hover:text-indigo-600">
                                 <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>

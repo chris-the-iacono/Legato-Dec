@@ -859,7 +859,43 @@ if (error) return alert("Save failed: " + error.message);
 
     console.log(`Task ${cleanStepId} updated and budget rolled up.`);
 };
+		//-----Added 1/30 @ 2:00
+		
+window.handleUserSelection = (context) => {
+    // 1. Identify which dropdown and which cost field we are targeting
+    const selectId = context === 'step' ? 'step-assign-select' : 'req-assign-select';
+    const costInputId = context === 'step' ? 'step-cost' : 'req-custom-rate'; // Adjust these IDs to match your HTML
+    const hoursInputId = context === 'step' ? 'step-hours' : 'req-hours';
 
+    const selectEl = document.getElementById(selectId);
+    const costEl = document.getElementById(costInputId);
+    const hoursEl = document.getElementById(hoursInputId);
+
+    if (!selectEl || !costEl) return;
+
+    const selectedUserId = selectEl.value;
+    const members = window.teamMembers || [];
+    const blendedRate = window.projectBlendedRate || 0;
+
+    // 2. Find the selected user's data
+    const user = members.find(m => m.user_id === selectedUserId);
+    
+    // 3. Determine the rate (User Rate or Project Fallback)
+    const effectiveRate = (user && parseFloat(user.hourly_cost) > 0) 
+        ? parseFloat(user.hourly_cost) 
+        : blendedRate;
+
+    // 4. Update the UI Field
+    // If you have hours already entered, let's calculate the cost immediately
+    if (hoursEl && parseFloat(hoursEl.value) > 0) {
+        costEl.value = (parseFloat(hoursEl.value) * effectiveRate).toFixed(2);
+        console.log(`Auto-calculated cost for ${user?.full_name || 'Unassigned'}: $${costEl.value}`);
+    } else {
+        // If no hours yet, maybe just store the rate in a data-attribute or log it
+        console.log(`Rate selected: $${effectiveRate}/hr`);
+    }
+};
+		
         // --- SUPPORTING FUNCTIONS ---
         window.closeTaskSlider = () => document.getElementById('task-editor-panel').classList.remove('active');
         window.closeReqSlider = () => document.getElementById('req-editor-panel').classList.remove('active');

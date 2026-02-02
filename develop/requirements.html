@@ -640,7 +640,7 @@ const isAdmin = window.sessionData?.role === 'admin';
     document.getElementById('step-title-input').value = '';
     document.getElementById('step-assign-select').value = '';
     document.getElementById('step-hours-input').value = 0;
-    document.getElementById('step-cost-input').value = "0.00";
+    // document.getElementById('step-cost-input').value = "0.00"; Removed display of EST. COST field from task slider, so this can't be applied any longer 
     document.getElementById('notes-container').innerHTML = '<p class="text-xs text-gray-400 italic">No activity yet.</p>';
     
     // Clear any existing Actuals Summary display
@@ -658,7 +658,7 @@ const isAdmin = window.sessionData?.role === 'admin';
             document.getElementById('step-title-input').value = step.title;
             document.getElementById('step-assign-select').value = step.assigned_to;
             document.getElementById('step-hours-input').value = step.estimated_hours;
-            document.getElementById('step-cost-input').value = step.cost;
+            //document.getElementById('step-cost-input').value = step.cost; this field has been removed from the step/task slider.
             
             btnEl.onclick = () => window.updateStep(id);
             if (typeof loadTaskNotes === 'function') loadTaskNotes(id);

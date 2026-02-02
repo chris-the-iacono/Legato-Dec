@@ -361,7 +361,20 @@ document.addEventListener('DOMContentLoaded', async () => {
     console.log("Attempting fetch for UUID:", cleanId);
     window.selectedReqId = cleanId;
 
-    // USE SELECT '*' TO ELIMINATE COLUMN NAME ERRORS
+    // --- NEW: UI Highlighting Logic ---
+    // Remove highlight from everyone first
+    document.querySelectorAll('.req-row').forEach(row => {
+        row.classList.remove('active-req');
+        // Optional: ensure the border-transparent is restored if classList doesn't override
+    });
+
+    // Add highlight to the selected row
+    const activeRow = document.querySelector(`.req-row[data-id="${cleanId}"]`);
+    if (activeRow) {
+        activeRow.classList.add('active-req');
+    }
+
+    // Fetch Requirement Data
     const { data: reqData, error } = await supabase
         .from('requirements')
         .select('*') 
@@ -369,7 +382,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         .single();
 
     if (error) {
-        console.error("Supabase Metadata Error:", error.message, error.details, error.hint);
+        console.error("Supabase Metadata Error:", error.message);
         return; 
     }
 
@@ -383,23 +396,20 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (versionEl) versionEl.innerText = reqData.version_number || '1';
         if (budgetEl) {
             const amount = reqData.total_budget || 0;
-            budgetEl.innerText = `$${amount.toLocaleString()}`;
+            budgetEl.innerText = `$${amount.toLocaleString(undefined, {minimumFractionDigits: 2})}`;
         }
     }
 
-    // --- NEW: BUTTON UNLOCK LOGIC ---
+    // --- BUTTON UNLOCK LOGIC ---
     const addTaskBtn = document.getElementById('add-task-btn');
     if (addTaskBtn) {
-        // RBAC: Check if current user is allowed to add tasks
         const userRole = window.sessionData?.role;
         const canAddTask = ['admin', 'project_manager', 'team_leader'].includes(userRole);
-
         if (canAddTask) {
             addTaskBtn.disabled = false;
             addTaskBtn.classList.remove('opacity-50', 'cursor-not-allowed');
             addTaskBtn.classList.add('opacity-100', 'cursor-pointer');
         } else {
-            // Keep locked for team_members even if requirement is selected
             addTaskBtn.disabled = true;
             addTaskBtn.classList.add('opacity-50', 'cursor-not-allowed');
         }
@@ -407,13 +417,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Refresh steps
     if (typeof refreshSteps === 'function') await refreshSteps();
-
-    // Highlighting logic
-    document.querySelectorAll('.req-row').forEach(row => {
-        row.classList.toggle('active-req', String(row.getAttribute('data-id')).includes(cleanId));
-    });
 };
-  window.refreshSteps = async () => {
+  	window.refreshSteps = async () => {
     const reqId = window.selectedReqId;
     if (!reqId) return;
 

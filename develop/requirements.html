@@ -348,71 +348,42 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         // 2. CORE FUNCTIONS (ATTACHED TO WINDOW)
 		// NEW FUNCTION FOR STEP REFRESH 1/13
-        window.selectRequirement = async (id) => {
+    window.selectRequirement = async (id) => {
     const cleanId = String(id).trim().replace(/['"]/g, '');
     
-    // Validation
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    if (!uuidRegex.test(cleanId)) {
-        console.error("Invalid UUID:", cleanId);
-        return;
-    }
+    if (!uuidRegex.test(cleanId)) return;
 
-    console.log("Attempting fetch for UUID:", cleanId);
     window.selectedReqId = cleanId;
 
-    // --- NEW: UI Highlighting Logic ---
-    // Remove highlight from everyone first
+    // UI: Instant Highlight Update
     document.querySelectorAll('.req-row').forEach(row => {
-        row.classList.remove('active-req');
-        // Optional: ensure the border-transparent is restored if classList doesn't override
+        const isTarget = row.getAttribute('data-id') === cleanId;
+        row.classList.toggle('active-req', isTarget);
     });
 
-    // Add highlight to the selected row
-    const activeRow = document.querySelector(`.req-row[data-id="${cleanId}"]`);
-    if (activeRow) {
-        activeRow.classList.add('active-req');
-    }
-
-    // Fetch Requirement Data
+    // Data Fetch
     const { data: reqData, error } = await supabase
         .from('requirements')
         .select('*') 
         .eq('req_id', cleanId)
         .single();
 
-    if (error) {
-        console.error("Supabase Metadata Error:", error.message);
-        return; 
-    }
-
-    // --- UI UPDATES: Metadata Display ---
-    const headerEl = document.getElementById('selected-req-title-display');
-    const versionEl = document.getElementById('req-version-display'); 
-    const budgetEl = document.getElementById('selected-req-budget-display'); 
-
-    if (reqData) {
+    if (!error && reqData) {
+        const headerEl = document.getElementById('selected-req-title-display');
+        const versionEl = document.getElementById('req-version-display'); 
         if (headerEl) headerEl.innerText = `Tasks for: ${reqData.title}`;
         if (versionEl) versionEl.innerText = reqData.version_number || '1';
-        if (budgetEl) {
-            const amount = reqData.total_budget || 0;
-            budgetEl.innerText = `$${amount.toLocaleString(undefined, {minimumFractionDigits: 2})}`;
-        }
     }
 
-    // --- BUTTON UNLOCK LOGIC ---
+    // Unlock Button
     const addTaskBtn = document.getElementById('add-task-btn');
     if (addTaskBtn) {
-        const userRole = window.sessionData?.role;
-        const canAddTask = ['admin', 'project_manager', 'team_leader'].includes(userRole);
-        if (canAddTask) {
-            addTaskBtn.disabled = false;
-            addTaskBtn.classList.remove('opacity-50', 'cursor-not-allowed');
-            addTaskBtn.classList.add('opacity-100', 'cursor-pointer');
-        } else {
-            addTaskBtn.disabled = true;
-            addTaskBtn.classList.add('opacity-50', 'cursor-not-allowed');
-        }
+        const canAddTask = ['admin', 'project_manager', 'team_leader'].includes(window.sessionData?.role);
+        addTaskBtn.disabled = !canAddTask;
+        addTaskBtn.classList.toggle('opacity-50', !canAddTask);
+        addTaskBtn.classList.toggle('cursor-not-allowed', !canAddTask);
+        addTaskBtn.classList.toggle('opacity-100', canAddTask);
     }
 
     // Refresh steps
@@ -1050,21 +1021,18 @@ async function loadRequirements() {
     if (reqs && list) {
         document.getElementById('req-count').innerText = `${reqs.length} ITEMS`;
         list.innerHTML = reqs.map(req => {
-            // --- Financial Comparison Logic ---
-            // 'total_budget' is the live rollup from the engine
-            // 'total_cost' is the baseline/approved budget snapshot
             const currentSpend = parseFloat(req.total_budget) || 0;
             const approvedBudget = parseFloat(req.total_cost) || (parseFloat(req.estimated_hours) * (parseFloat(req.custom_rate) || 0));
             const variance = approvedBudget - currentSpend;
-            
-            // Logic for budget health styling
             const budgetColor = variance < 0 ? 'text-red-600' : 'text-indigo-600';
             const versionStr = req.version_number ? `v${req.version_number}` : 'v1';
 
+            // 1. Check persistence
+            const isActive = (window.selectedReqId === req.req_id) ? 'active-req' : ''; 
             const menuHtml = (typeof getKabobMenu === 'function') ? getKabobMenu(req, 'req') : '';
-            
+
             return `
-                <li class="req-row p-4 hover:bg-gray-50 flex justify-between items-center cursor-pointer border-l-4 border-transparent transition-all" 
+                <li class="req-row p-4 hover:bg-gray-50 flex justify-between items-center cursor-pointer border-l-4 border-transparent transition-all ${isActive}" 
                     data-id="${req.req_id}" 
                     onclick="window.selectRequirement('${req.req_id}')">
                     <div class="flex items-center gap-3">
@@ -1079,9 +1047,9 @@ async function loadRequirements() {
                     </div>
                     <div class="flex items-center gap-4">
                         <div class="flex flex-col items-end gap-0.5">
-                            <p class="text-sm font-mono font-bold ${budgetColor}">$${Number(currentSpend).toLocaleString()}</p>
+                            <p class="text-sm font-mono font-bold ${budgetColor}">$${Number(currentSpend).toLocaleString(undefined, {minimumFractionDigits: 2})}</p>
                             <p class="text-[9px] text-gray-400 font-bold uppercase tracking-wider">
-                                Budget: $${Number(approvedBudget).toLocaleString()} (${versionStr})
+                                Budget: $${Number(approvedBudget).toLocaleString(undefined, {minimumFractionDigits: 2})} (${versionStr})
                             </p>
                         </div>
                         <div class="relative kebab-container">

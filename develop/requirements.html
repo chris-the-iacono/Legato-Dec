@@ -721,7 +721,7 @@ window.rollupToRequirement = async (reqId = window.selectedReqId, steps = null) 
     const title = document.getElementById('step-title-input')?.value.trim();
     const assignedId = document.getElementById('step-assign-select')?.value;
     const hours = parseFloat(document.getElementById('step-hours-input')?.value) || 0;
-    const changeReason = document.getElementById('step-change-reason')?.value.trim(); // NEW: Audit Trail
+    const changeReason = document.getElementById('step-change-reason')?.value.trim(); 
     
     if (!title || !assignedId || hours <= 0) {
         return alert("Fill all required fields (Title, Assignee, and Hours > 0).");
@@ -747,12 +747,22 @@ window.rollupToRequirement = async (reqId = window.selectedReqId, steps = null) 
         // --- UPDATE EXISTING STEP ---
         if (!changeReason) return alert("Please provide a reason for this estimate change.");
         
+        // Fetch current version to increment it
+        const { data: currentStep } = await supabase
+            .from('steps')
+            .select('version_number')
+            .eq('step_id', editingStepId)
+            .single();
+        
+        const nextVersion = (parseInt(currentStep?.version_number) || 1) + 1;
+        
         const { data, error: updateError } = await supabase.from('steps')
             .update({
                 title: title,
                 assigned_to: assignedId,
                 estimated_hours: hours,
                 cost: calculatedCost,
+                version_number: nextVersion, // Version Increment
                 updated_at: new Date().toISOString()
             })
             .eq('step_id', editingStepId)
@@ -762,7 +772,6 @@ window.rollupToRequirement = async (reqId = window.selectedReqId, steps = null) 
         error = updateError;
     } else {
         // --- INSERT NEW STEP ---
-        // Get Next Sequence Order
         const { data: existing } = await supabase
             .from('steps')
             .select('sequence_order')
@@ -780,7 +789,8 @@ window.rollupToRequirement = async (reqId = window.selectedReqId, steps = null) 
             estimated_hours: hours,
             cost: calculatedCost,
             sequence_order: nextOrder,
-            status: 'pending'
+            status: 'pending',
+            version_number: 1 // Original Baseline
         }]).select().single();
 
         resultStep = data;
@@ -791,14 +801,29 @@ window.rollupToRequirement = async (reqId = window.selectedReqId, steps = null) 
 
     // 4. AUDIT LOG: Unified capture for traceability
     const auditContent = editingStepId 
-        ? `Estimate Updated: $${calculatedCost.toLocaleString()} (${hours}h). Reason: ${changeReason}`
-        : `Task created. Budgeted at $${calculatedCost.toLocaleString()} (${hours}h @ $${effectiveRate}/h)`;
+        ? `Estimate Updated (v${resultStep.version_number}): $${calculatedCost.toLocaleString()} (${hours}h). Reason: ${changeReason}`
+        : `Task created (v1). Budgeted at $${calculatedCost.toLocaleString()} (${hours}h @ $${effectiveRate}/h)`;
 
     await supabase.from('task_notes').insert([{ 
         task_id: resultStep.step_id, 
         user_id: window.sessionData?.user_id, 
         content: auditContent 
     }]);
+
+    // 5. SYNC: Close UI and trigger the Hardened Engine Rollup
+    window.closeTaskSlider();
+    
+    if (window.rollupToRequirement) {
+        await window.rollupToRequirement(window.selectedReqId);
+    }
+    
+    // Refresh the UI
+    if (typeof window.refreshSteps === 'function') {
+        await window.refreshSteps();
+    } else if (typeof window.loadSteps === 'function') {
+        await window.loadSteps(window.selectedReqId);
+    }
+};
 
     // 5. SYNC: Close UI and trigger the Hardened Engine Rollup
     window.closeTaskSlider();

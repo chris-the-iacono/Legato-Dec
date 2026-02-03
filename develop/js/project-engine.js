@@ -8,10 +8,7 @@ import { supabase } from './config.js';
 /**
  * 1. rollupToRequirement
  * Sums the cost of all active steps for a requirement and updates the total_budget.
- */
-/**
- * Unified Rollup Engine
- * Preserves: Health Score, Member Rate Fallbacks, and Manual Step Injection
+ * Hardened to support unified version_number and precise decimal math.
  */
 export async function rollupToRequirement(requirementId, manualSteps = null) {
     try {
@@ -44,6 +41,7 @@ export async function rollupToRequirement(requirementId, manualSteps = null) {
             const actCost = parseFloat(s.actual_cost) || 0;
 
             // --- RE-INTEGRATED: Fallback Rate Logic ---
+            // If cost is 0 but hours exist, attempt to calculate based on assignee or blended rate
             if (taskCost === 0 && hours > 0) {
                 const user = members.find(m => m.user_id === s.assigned_to);
                 const effectiveRate = (user && parseFloat(user.hourly_cost) > 0) 
@@ -58,12 +56,15 @@ export async function rollupToRequirement(requirementId, manualSteps = null) {
         });
 
         // --- RE-INTEGRATED: Health Score Logic ---
+        // Measures performance: (Planned / Actual) * 100. Caps at 100.
         let healthScore = 100;
         if (totalBudget > 0 && totalActualCost > totalBudget) {
             healthScore = Math.max(0, Math.round((totalBudget / totalActualCost) * 100));
         }
 
-        // 3. Database Update
+        // 3. Database Update (HARDENED)
+        // Note: We update total_budget and estimated_hours. 
+        // version_number is preserved; it only increments via Change Management logic.
         const { error: updateError } = await supabase
             .from('requirements')
             .update({ 
@@ -99,6 +100,7 @@ export async function syncHierarchyStatus(requirementId, projectId) {
 
         if (stepError) throw stepError;
 
+        // Requirement is complete only if it has steps AND all steps are Complete
         const allStepsComplete = steps.length > 0 && steps.every(s => s.status === 'Complete');
 
         if (allStepsComplete) {
@@ -107,7 +109,7 @@ export async function syncHierarchyStatus(requirementId, projectId) {
                 .update({ status: 'Complete' })
                 .eq('req_id', requirementId);
             
-            console.log(`Requirement ${requirementId} automatically set to Complete.`);
+            console.log(`? Requirement ${requirementId} automatically set to Complete.`);
         }
 
         // STEP B: Check Requirements -> Project
@@ -127,11 +129,11 @@ export async function syncHierarchyStatus(requirementId, projectId) {
                     .update({ status: 'Complete' })
                     .eq('id', projectId);
                 
-                console.log(`Project ${projectId} automatically set to Complete.`);
+                console.log(`?? Project ${projectId} automatically set to Complete.`);
             }
         }
     } catch (err) {
-        console.error("Status Sync Error:", err.message);
+        console.error("? Status Sync Error:", err.message);
     }
 }
 
@@ -140,7 +142,7 @@ export async function syncHierarchyStatus(requirementId, projectId) {
  * Listens for changes to the steps table and automatically triggers the engine.
  */
 export const initializeProjectEngine = () => {
-    console.log("?? Project Engine: Initializing Connection...");
+    console.log("? Project Engine: Initializing Connection...");
 
     const channel = supabase
         .channel('project-automation-channel')
@@ -148,11 +150,11 @@ export const initializeProjectEngine = () => {
             'postgres_changes', 
             { event: '*', schema: 'public', table: 'steps' }, 
             async (payload) => {
-                // THIS IS THE LOG WE ARE LOOKING FOR
-                console.log('? ENGINE TRIGGERED: Change detected in Steps!', payload);
+                console.log('?? ENGINE TRIGGERED: Change detected in Steps!', payload);
                 
                 const requirementId = payload.new?.requirement_id || payload.old?.requirement_id;
-                const projectId = localStorage.getItem('selected_project_id');
+                // Get project ID from localStorage or fallback to a global variable
+                const projectId = localStorage.getItem('selected_project_id') || window.currentProjectId;
 
                 if (requirementId) {
                     // 1. Run the budget math (Rollup)
@@ -162,6 +164,7 @@ export const initializeProjectEngine = () => {
                     await syncHierarchyStatus(requirementId, projectId);
                     
                     // 3. Refresh the UI if the bridge is connected
+                    // Using window.loadRequirements to ensure we hit the global UI refresh hook
                     if (typeof window.loadRequirements === 'function') {
                         console.log("?? Refreshing UI via global hook...");
                         window.loadRequirements();
@@ -170,11 +173,10 @@ export const initializeProjectEngine = () => {
             }
         )
         .subscribe((status) => {
-            // THIS WILL TELL US IF THE CONNECTION IS BLOCKED
             console.log("?? Realtime Status:", status);
             
             if (status === 'CHANNEL_ERROR') {
-                console.error("? Realtime Connection Failed. Check Supabase 'Replication' settings.");
+                console.error("?? Realtime Connection Failed. Check Supabase 'Replication' settings.");
             }
         });
 };

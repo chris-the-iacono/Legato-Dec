@@ -189,6 +189,8 @@
     </section>
 
     <section id="task-editor-panel" class="side-slider">
+        <input type="hidden" id="step-id-hidden">
+
         <div class="flex justify-between items-center p-4 border-b bg-blue-50">
             <div>
                 <h2 id="task-editor-title" class="font-bold text-lg text-blue-900">Task Details</h2>
@@ -218,6 +220,11 @@
                         <label class="text-[10px] font-bold text-gray-400 uppercase mb-1 ml-1">Est. Hrs</label>
                         <input type="number" id="step-hours-input" data-admin-only class="border-gray-200 rounded-lg text-sm p-3 border">
                     </div>
+                </div>
+
+                <div id="reason-wrapper" class="pt-2" style="display: none;">
+                    <label class="text-[10px] font-bold text-amber-600 uppercase ml-1">Reason for Estimate Change</label>
+                    <textarea id="step-change-reason" placeholder="Required for baseline adjustments..." class="w-full border-amber-200 rounded-lg text-sm p-3 border bg-amber-50/30 outline-none focus:ring-2 focus:ring-amber-500 h-20 resize-none"></textarea>
                 </div>
                 
                 <div class="space-y-3 pt-2">
@@ -605,18 +612,25 @@ window.rollupToRequirement = async (reqId = window.selectedReqId, steps = null) 
     const titleEl = document.getElementById('task-editor-title');
     const btnEl = document.getElementById('task-save-btn');
     
-    // Permissions Check (Standardized)
-const isAdmin = window.sessionData?.role === 'admin';
+    // 1. Permissions Check (Standardized)
+    const isAdmin = window.sessionData?.role === 'admin';
     document.querySelectorAll('[data-admin-only]').forEach(el => {
         el.disabled = !isAdmin;
         if(!isAdmin) el.classList.add('bg-gray-100', 'cursor-not-allowed');
     });
 
-    // Reset Form
+    // 2. Reset Form & UI State
+    document.getElementById('step-id-hidden').value = id || ''; // Set hidden ID for hardening
     document.getElementById('step-title-input').value = '';
     document.getElementById('step-assign-select').value = '';
     document.getElementById('step-hours-input').value = 0;
-    // document.getElementById('step-cost-input').value = "0.00"; Removed display of EST. COST field from task slider, so this can't be applied any longer 
+    
+    // Clear and Hide Change Reason by default (only for edits)
+    const reasonEl = document.getElementById('step-change-reason');
+    const reasonWrapper = document.getElementById('reason-wrapper'); // Assuming a wrapper for UI control
+    if (reasonEl) reasonEl.value = '';
+    if (reasonWrapper) reasonWrapper.style.display = 'none';
+
     document.getElementById('notes-container').innerHTML = '<p class="text-xs text-gray-400 italic">No activity yet.</p>';
     
     // Clear any existing Actuals Summary display
@@ -624,27 +638,31 @@ const isAdmin = window.sessionData?.role === 'admin';
     if (existingSummary) existingSummary.remove();
 
     if (id) {
+        // --- EDIT MODE ---
         window.selectedStepId = id;
         titleEl.innerText = "Task Details";
         btnEl.innerText = "Update Baseline Changes";
         
-        // 1. Fetch Task Details (Verified Schema: steps)
+        // Show the reason field for edits to satisfy Governance Pillar
+        if (reasonWrapper) reasonWrapper.style.display = 'block';
+
+        // Fetch Task Details
         const { data: step } = await supabase.from('steps').select('*').eq('step_id', id).single();
         if (step) {
             document.getElementById('step-title-input').value = step.title;
             document.getElementById('step-assign-select').value = step.assigned_to;
             document.getElementById('step-hours-input').value = step.estimated_hours;
-            //document.getElementById('step-cost-input').value = step.cost; this field has been removed from the step/task slider.
             
-            btnEl.onclick = () => window.updateStep(id);
+            // Both paths now use submitStep because we hardened it to handle both modes
+            btnEl.onclick = () => window.submitStep();
             if (typeof loadTaskNotes === 'function') loadTaskNotes(id);
         }
 
-        // 2. Fetch and Display Actuals (Verified Schema: time_logs)
+        // Fetch and Display Actuals
         const { data: logs } = await supabase
             .from('time_logs')
-            .select('hours_spent, calculated_cost') // Corrected from hours_logged, billing_amount
-            .eq('task_id', id); // Corrected from step_id
+            .select('hours_spent, calculated_cost')
+            .eq('task_id', id);
 
         const totalActualHrs = logs?.reduce((sum, l) => sum + (parseFloat(l.hours_spent) || 0), 0) || 0;
         const totalActualCost = logs?.reduce((sum, l) => sum + (parseFloat(l.calculated_cost) || 0), 0) || 0;
@@ -670,30 +688,27 @@ const isAdmin = window.sessionData?.role === 'admin';
         }
 
     } else {
+        // --- NEW TASK MODE ---
         window.selectedStepId = null;
         titleEl.innerText = "Add New Task";
         btnEl.innerText = "Save Task";
         btnEl.onclick = () => window.submitStep();
     }
-  // --- DELETE BUTTON INITIALIZATION ---
-const delBtn = document.getElementById('delete-task-btn');
-if (delBtn) {
-    // 1. RBAC: Only show the delete button if user is Admin, PM, or TL
-    const userRole = window.sessionData?.role;
-    const canDelete = ['admin', 'project_manager', 'team_leader'].includes(userRole);
-    
-    // 2. Logic: Only show delete if we are EDITING an existing task (id exists)
-    if (id && canDelete) {
-        delBtn.style.display = 'block';
-        delBtn.onclick = async () => {
-            // This triggers the soft-delete and budget rollup
-            await window.deleteStep(id);
-        };
-    } else {
-        // Hide if it's a new task or the user lacks permissions
-        delBtn.style.display = 'none';
-    }
-}  
+
+    // --- DELETE BUTTON LOGIC ---
+    const delBtn = document.getElementById('delete-task-btn');
+    if (delBtn) {
+        const userRole = window.sessionData?.role;
+        const canDelete = ['admin', 'project_manager', 'team_leader'].includes(userRole);
+        
+        if (id && canDelete) {
+            delBtn.style.display = 'block';
+            delBtn.onclick = async () => await window.deleteStep(id);
+        } else {
+            delBtn.style.display = 'none';
+        }
+    }  
+
     panel.classList.add('active');
 };
 
@@ -701,9 +716,12 @@ if (delBtn) {
     // 1. Validation & Pre-checks
     if (!window.selectedReqId) return alert("Select a requirement first.");
     
+    // Check if we are editing an existing step or creating a new one
+    const editingStepId = document.getElementById('step-id-hidden')?.value; 
     const title = document.getElementById('step-title-input')?.value.trim();
     const assignedId = document.getElementById('step-assign-select')?.value;
     const hours = parseFloat(document.getElementById('step-hours-input')?.value) || 0;
+    const changeReason = document.getElementById('step-change-reason')?.value.trim(); // NEW: Audit Trail
     
     if (!title || !assignedId || hours <= 0) {
         return alert("Fill all required fields (Title, Assignee, and Hours > 0).");
@@ -717,56 +735,89 @@ if (delBtn) {
     
     const calculatedCost = hours * effectiveRate;
 
-    // 3. SEQUENCE LOGIC: Get Next Order (Maintains drag-and-drop position)
-    const { data: existing } = await supabase
-        .from('steps')
-        .select('sequence_order')
-        .eq('requirement_id', window.selectedReqId)
-        .order('sequence_order', { ascending: false })
-        .limit(1);
-    
-    const nextOrder = (existing?.[0]?.sequence_order || 0) + 10;
+    // 3. RBAC Guard
+    const userRole = window.sessionData?.role;
+    const canAddTask = ['admin', 'project_manager', 'team_leader'].includes(userRole);
+    if (!canAddTask) return alert("Access Denied: Insufficient permissions.");
 
-    // 4. RBAC & PERSISTENCE: Guard and Save to Supabase 'steps' table
-const userRole = window.sessionData?.role;
-const canAddTask = ['admin', 'project_manager', 'team_leader'].includes(userRole);
+    let resultStep;
+    let error;
 
-if (!canAddTask) {
-    alert("Access Denied: Your role does not have permission to add tasks.");
-    return; // Stop the function here
-}
+    if (editingStepId) {
+        // --- UPDATE EXISTING STEP ---
+        if (!changeReason) return alert("Please provide a reason for this estimate change.");
+        
+        const { data, error: updateError } = await supabase.from('steps')
+            .update({
+                title: title,
+                assigned_to: assignedId,
+                estimated_hours: hours,
+                cost: calculatedCost,
+                updated_at: new Date().toISOString()
+            })
+            .eq('step_id', editingStepId)
+            .select().single();
+        
+        resultStep = data;
+        error = updateError;
+    } else {
+        // --- INSERT NEW STEP ---
+        // Get Next Sequence Order
+        const { data: existing } = await supabase
+            .from('steps')
+            .select('sequence_order')
+            .eq('requirement_id', window.selectedReqId)
+            .order('sequence_order', { ascending: false })
+            .limit(1);
+        
+        const nextOrder = (existing?.[0]?.sequence_order || 0) + 10;
 
-const { data: newStep, error } = await supabase.from('steps').insert([{
-    requirement_id: window.selectedReqId,
-    tenant_id: window.sessionData?.tenantId || tenantId,
-    title: title,
-    assigned_to: assignedId,
-    estimated_hours: hours,
-    cost: calculatedCost, // Persists the calculated math
-    sequence_order: nextOrder,
-    status: 'pending'
-}]).select().single();
+        const { data, error: insertError } = await supabase.from('steps').insert([{
+            requirement_id: window.selectedReqId,
+            tenant_id: window.sessionData?.tenantId,
+            title: title,
+            assigned_to: assignedId,
+            estimated_hours: hours,
+            cost: calculatedCost,
+            sequence_order: nextOrder,
+            status: 'pending'
+        }]).select().single();
 
-if (error) return alert("Save failed: " + error.message);
+        resultStep = data;
+        error = insertError;
+    }
 
-    // 5. AUDIT LOG: Create initial note using standardized sessionData
+    if (error) return alert("Save failed: " + error.message);
+
+    // 4. AUDIT LOG: Unified capture for traceability
+    const auditContent = editingStepId 
+        ? `Estimate Updated: $${calculatedCost.toLocaleString()} (${hours}h). Reason: ${changeReason}`
+        : `Task created. Budgeted at $${calculatedCost.toLocaleString()} (${hours}h @ $${effectiveRate}/h)`;
+
     await supabase.from('task_notes').insert([{ 
-        task_id: newStep.step_id, 
+        task_id: resultStep.step_id, 
         user_id: window.sessionData?.user_id, 
-        content: `Task created. Budgeted at $${calculatedCost.toLocaleString()} (${hours}h @ $${effectiveRate}/h)` 
+        content: auditContent 
     }]);
 
-    // 6. SYNC: Close UI, trigger requirement-level rollup, and refresh list
+    // 5. SYNC: Close UI and trigger the Hardened Engine Rollup
     window.closeTaskSlider();
     
-    // Update the main Requirement total_budget column in the database
-    await window.rollupToRequirement(window.selectedReqId);
+    // The Engine Rollup updates requirements.total_budget and requirements.estimated_hours
+    if (window.rollupToRequirement) {
+        await window.rollupToRequirement(window.selectedReqId);
+    }
     
-    // Refresh the task list UI
+    // Refresh the UI
     if (typeof window.refreshSteps === 'function') {
         await window.refreshSteps();
-    } else if (typeof loadSteps === 'function') {
-        await loadSteps(window.selectedReqId);
+    } else if (typeof window.loadSteps === 'function') {
+        await window.loadSteps(window.selectedReqId);
+    }
+    
+    // Optional: Reload requirements to see the new budget totals on the left panel
+    if (typeof window.loadRequirements === 'function') {
+        window.loadRequirements();
     }
 };
 

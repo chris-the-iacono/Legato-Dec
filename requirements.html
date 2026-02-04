@@ -813,34 +813,19 @@ window.rollupToRequirement = async (reqId = window.selectedReqId, steps = null) 
     // 5. SYNC: Close UI and trigger the Hardened Engine Rollup
     window.closeTaskSlider();
     
-    if (window.rollupToRequirement) {
-        await window.rollupToRequirement(window.selectedReqId);
-    }
-    
-    // Refresh the UI
-    if (typeof window.refreshSteps === 'function') {
-        await window.refreshSteps();
-    } else if (typeof window.loadSteps === 'function') {
-        await window.loadSteps(window.selectedReqId);
-    }
-};
-
-    // 5. SYNC: Close UI and trigger the Hardened Engine Rollup
-    window.closeTaskSlider();
-    
     // The Engine Rollup updates requirements.total_budget and requirements.estimated_hours
     if (window.rollupToRequirement) {
         await window.rollupToRequirement(window.selectedReqId);
     }
     
-    // Refresh the UI
+    // Refresh the Task List (Right Panel)
     if (typeof window.refreshSteps === 'function') {
         await window.refreshSteps();
     } else if (typeof window.loadSteps === 'function') {
         await window.loadSteps(window.selectedReqId);
     }
     
-    // Optional: Reload requirements to see the new budget totals on the left panel
+    // Refresh the Requirements List (Left Panel) to reflect new budget totals
     if (typeof window.loadRequirements === 'function') {
         window.loadRequirements();
     }

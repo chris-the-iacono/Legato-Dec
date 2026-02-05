@@ -459,7 +459,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                         <div>
                             <div class="flex items-center gap-2">
                                 <p class="text-sm font-bold text-gray-800 group-hover:text-indigo-600 transition-colors">${s.title}</p>
-                                <span class="text-[9px] bg-blue-100 text-blue-600 px-1.5 rounded font-bold uppercase">v${s.version || 1}</span>
+                                <span class="text-[9px] bg-blue-100 text-blue-600 px-1.5 rounded font-bold uppercase">v${s.version_number || 1}</span>
                             </div>
                             <p class="text-[10px] text-gray-400 uppercase font-bold">
                                 Est: ${estHrs}h | 
@@ -620,20 +620,28 @@ window.rollupToRequirement = async (reqId = window.selectedReqId, steps = null) 
     });
 
     // 2. Reset Form & UI State
-    document.getElementById('step-id-hidden').value = id || ''; // Set hidden ID for hardening
+    document.getElementById('step-id-hidden').value = id || ''; 
     document.getElementById('step-title-input').value = '';
     document.getElementById('step-assign-select').value = '';
     document.getElementById('step-hours-input').value = 0;
     
-    // Clear and Hide Change Reason by default (only for edits)
+    // --- UI VERSION RESET ---
+    const versionDisplay = document.getElementById('step-version-display');
+    const baselineTag = document.getElementById('step-baseline-tag');
+    if (versionDisplay) versionDisplay.innerText = id ? "..." : "1"; 
+    if (baselineTag) {
+        baselineTag.innerText = id ? "..." : "v1 Baseline";
+        baselineTag.className = "text-[9px] bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded font-black uppercase";
+    }
+
+    // Clear and Hide Change Reason by default
     const reasonEl = document.getElementById('step-change-reason');
-    const reasonWrapper = document.getElementById('reason-wrapper'); // Assuming a wrapper for UI control
+    const reasonWrapper = document.getElementById('reason-wrapper');
     if (reasonEl) reasonEl.value = '';
     if (reasonWrapper) reasonWrapper.style.display = 'none';
 
     document.getElementById('notes-container').innerHTML = '<p class="text-xs text-gray-400 italic">No activity yet.</p>';
     
-    // Clear any existing Actuals Summary display
     const existingSummary = document.getElementById('actuals-summary-display');
     if (existingSummary) existingSummary.remove();
 
@@ -642,8 +650,6 @@ window.rollupToRequirement = async (reqId = window.selectedReqId, steps = null) 
         window.selectedStepId = id;
         titleEl.innerText = "Task Details";
         btnEl.innerText = "Update Baseline Changes";
-        
-        // Show the reason field for edits to satisfy Governance Pillar
         if (reasonWrapper) reasonWrapper.style.display = 'block';
 
         // Fetch Task Details
@@ -652,8 +658,17 @@ window.rollupToRequirement = async (reqId = window.selectedReqId, steps = null) 
             document.getElementById('step-title-input').value = step.title;
             document.getElementById('step-assign-select').value = step.assigned_to;
             document.getElementById('step-hours-input').value = step.estimated_hours;
+
+            // --- BIND VERSION DATA ---
+            const vNum = step.version_number || 1;
+            if (versionDisplay) versionDisplay.innerText = vNum;
+            if (baselineTag) {
+                baselineTag.innerText = vNum === 1 ? "v1 Baseline" : `v${vNum} Change`;
+                baselineTag.className = vNum === 1 
+                    ? "text-[9px] bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded font-black uppercase"
+                    : "text-[9px] bg-amber-100 text-amber-600 px-1.5 py-0.5 rounded font-black uppercase";
+            }
             
-            // Both paths now use submitStep because we hardened it to handle both modes
             btnEl.onclick = () => window.submitStep();
             if (typeof loadTaskNotes === 'function') loadTaskNotes(id);
         }

@@ -301,9 +301,18 @@ document.addEventListener('DOMContentLoaded', async () => {
         return;
     }
 
-    // Fetch Project Data
-    const { data: proj } = await supabase.from('projects').select('blended_rate, name').eq('id', projectId).single();
+    // --- UPDATED FETCH: Capture Status for Governance ---
+    const { data: proj } = await supabase
+        .from('projects')
+        .select('blended_rate, name, status') // Added status here
+        .eq('id', projectId)
+        .single();
+
     window.projectBlendedRate = proj?.blended_rate || 0;
+    
+    // This is the CRITICAL line for your Change Request logic:
+    window.currentProjectStatus = proj?.status || 'Planning'; 
+    
     const projectName = proj?.name || localStorage.getItem('selected_project_name');
 
     // Fetch Profiles
@@ -312,9 +321,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     const myProfile = window.teamMembers.find(p => p.user_id === user.id);
     if (myProfile) {
-        // Standardizing the global session object
         window.sessionData = {
-            user_id: user.id, // Using user_id for consistency with profile table
+            user_id: user.id,
             role: myProfile.role,
             full_name: myProfile.full_name,
             tenantId: myProfile.tenant_id
@@ -324,7 +332,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     populateDropdowns();
     
-    // Header Rendering (Using your specific session structure)
+    // Header Rendering
     try {
         if (typeof renderProjectHeader === 'function') {
             const sessionForHeader = { 
@@ -340,11 +348,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     loadRequirements();
     if (typeof initSortable === 'function') initSortable();
 
-    console.log("App initialized for:", window.sessionData?.full_name);
+    console.log("App initialized. Project Status:", window.currentProjectStatus);
 
-    // --- ADDED KEBAB AUTO-CLOSE LISTENER ---
+    // KEBAB AUTO-CLOSE LISTENER
     document.addEventListener('click', (event) => {
-        // If the click is NOT inside a kebab-container, hide all menus
         if (!event.target.closest('.kebab-container')) {
             document.querySelectorAll('[id^="kebab-"]').forEach(menu => {
                 menu.classList.add('hidden');
@@ -770,8 +777,16 @@ window.rollupToRequirement = async (reqId = window.selectedReqId, steps = null) 
         
         const nextVersion = (parseInt(currentStep?.version_number) || 1) + 1;
 
-        // GOVERNANCE GATE: Flag as CR if Project is Active and a baseline exists
-        if (window.currentProjectStatus === 'active' && currentStep.version_number >= 1) {
+        // --- IMPROVED GOVERNANCE GATE ---
+        // Dynamically checks for project status in multiple possible global locations
+        const projectStatus = (
+            window.currentProjectStatus || 
+            window.projectData?.status || 
+            'planning'
+        ).toLowerCase();
+
+        // Flag as CR if Project is Active and a baseline (v1) already exists
+        if (projectStatus === 'active' && currentStep.version_number >= 1) {
             isCR = true;
         }
         
@@ -819,11 +834,13 @@ window.rollupToRequirement = async (reqId = window.selectedReqId, steps = null) 
     if (error) return alert("Save failed: " + error.message);
 
     // 4. AUDIT LOG: Unified capture
+    // Corrected label with Emoji for UI Visibility
     const auditLabel = isCR ? "?? CHANGE REQUEST" : "Baseline Adjustment";
     const auditContent = editingStepId 
         ? `${auditLabel} (v${resultStep.version_number}): $${calculatedCost.toLocaleString()} (${hours}h). Reason: ${changeReason}`
         : `Task created (v1 Baseline). Budgeted at $${calculatedCost.toLocaleString()} (${hours}h @ $${effectiveRate}/h)`;
 
+    // Persist to task_notes via utility function
     await appendNoteToActivity(resultStep.step_id, auditContent);
 
     // 5. SYNC: Close UI, Rollup budget, and Refresh UI
@@ -843,7 +860,7 @@ window.rollupToRequirement = async (reqId = window.selectedReqId, steps = null) 
         window.loadRequirements();
     }
     
-    console.log(`Task ${resultStep.step_id} saved successfully.`);
+    console.log(`Task ${resultStep.step_id} saved successfully. Status: ${isCR ? 'CR Generated' : 'Baseline Updated'}`);
 };
 		//-----Added 1/30 @ 2:00 re-tested at 2:28
 		

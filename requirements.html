@@ -589,7 +589,6 @@ window.rollupToRequirement = async (reqId = window.selectedReqId, steps = null) 
     if (!reqId) return;
     const cleanReqId = String(reqId).trim().replace(/['"]/g, '');
 
-    // 1. Call the Centralized Engine via the window bridge
     if (typeof window.engineRollup !== 'function') {
         console.error("Project Engine not yet loaded.");
         return;
@@ -598,18 +597,24 @@ window.rollupToRequirement = async (reqId = window.selectedReqId, steps = null) 
     const result = await window.engineRollup(cleanReqId, steps);
 
     if (result) {
-        // 2. UI Refresh: Requirements List
+        // Refresh the Left Panel (Requirement List)
         if (typeof window.loadRequirements === 'function') {
             await window.loadRequirements();
         }
 
-        // 3. UI Refresh: Header Display
+        // Update the Right Panel Header (Budget & Version)
         const budgetDisplay = document.getElementById('selected-req-budget-display');
         if (budgetDisplay) {
             budgetDisplay.innerText = `$${result.totalBudget.toLocaleString(undefined, {
                 minimumFractionDigits: 2, 
                 maximumFractionDigits: 2
             })}`;
+        }
+
+        // Add version display to header if element exists
+        const versionDisplay = document.getElementById('selected-req-version-display');
+        if (versionDisplay) {
+            versionDisplay.innerText = `v${result.maxVersion}`;
         }
     }
 };

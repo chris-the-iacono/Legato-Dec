@@ -7,8 +7,8 @@ import { supabase } from './config.js';
 
 /**
  * 1. rollupToRequirement
- * Sums the cost of all active steps for a requirement and updates the total_budget.
- * Hardened to support unified version_number and precise decimal math.
+ * Sums the cost of all active steps, finds the highest version, and updates the requirement.
+ * Hardened for PMI-standard governance and precise decimal math.
  */
 export async function rollupToRequirement(requirementId, manualSteps = null) {
     try {
@@ -18,7 +18,7 @@ export async function rollupToRequirement(requirementId, manualSteps = null) {
         if (!tasks) {
             const { data, error: fetchError } = await supabase
                 .from('steps')
-                .select('estimated_hours, cost, assigned_to, actual_cost, is_active')
+                .select('estimated_hours, cost, assigned_to, actual_cost, is_active, version_number')
                 .eq('requirement_id', requirementId)
                 .eq('is_active', true);
 
@@ -29,6 +29,7 @@ export async function rollupToRequirement(requirementId, manualSteps = null) {
         let totalBudget = 0;
         let totalHours = 0;
         let totalActualCost = 0;
+        let maxVersion = 1; // Default to v1 baseline
         
         // Access global members for fallback rates
         const members = window.teamMembers || [];
@@ -39,9 +40,9 @@ export async function rollupToRequirement(requirementId, manualSteps = null) {
             const hours = parseFloat(s.estimated_hours) || 0;
             let taskCost = parseFloat(s.cost) || 0;
             const actCost = parseFloat(s.actual_cost) || 0;
+            const vNum = parseInt(s.version_number) || 1;
 
-            // --- RE-INTEGRATED: Fallback Rate Logic ---
-            // If cost is 0 but hours exist, attempt to calculate based on assignee or blended rate
+            // --- Fallback Rate Logic ---
             if (taskCost === 0 && hours > 0) {
                 const user = members.find(m => m.user_id === s.assigned_to);
                 const effectiveRate = (user && parseFloat(user.hourly_cost) > 0) 
@@ -53,31 +54,35 @@ export async function rollupToRequirement(requirementId, manualSteps = null) {
             totalBudget += taskCost;
             totalHours += hours;
             totalActualCost += actCost;
+
+            // --- TRACK HIGHEST VERSION ---
+            if (vNum > maxVersion) maxVersion = vNum;
         });
 
-        // --- RE-INTEGRATED: Health Score Logic ---
-        // Measures performance: (Planned / Actual) * 100. Caps at 100.
+        // --- Health Score Logic ---
         let healthScore = 100;
         if (totalBudget > 0 && totalActualCost > totalBudget) {
             healthScore = Math.max(0, Math.round((totalBudget / totalActualCost) * 100));
         }
 
         // 3. Database Update (HARDENED)
-        // Note: We update total_budget and estimated_hours. 
-        // version_number is preserved; it only increments via Change Management logic.
+        // Now syncs total_budget, estimated_hours, health_score, AND version_number
         const { error: updateError } = await supabase
             .from('requirements')
             .update({ 
                 total_budget: totalBudget,
                 estimated_hours: totalHours,
                 health_score: healthScore,
+                version_number: maxVersion, // Syncs parent version to highest child version
                 updated_at: new Date().toISOString()
             })
-            .eq('req_id', requirementId);
+            .eq('id', requirementId); // Using 'id' to match standard requirements table PK
 
         if (updateError) throw updateError;
 
-        return { totalBudget, totalHours, healthScore };
+        console.log(`?? Engine: Req ${requirementId} updated to v${maxVersion}. Budget: $${totalBudget}`);
+
+        return { totalBudget, totalHours, healthScore, maxVersion };
     } catch (err) {
         console.error("? Engine Rollup Error:", err.message);
         return null;
@@ -87,11 +92,9 @@ export async function rollupToRequirement(requirementId, manualSteps = null) {
 /**
  * 2. syncHierarchyStatus
  * Checks if all children are "Complete" and updates the parent status.
- * This cascades from Task -> Requirement and Requirement -> Project.
  */
 export async function syncHierarchyStatus(requirementId, projectId) {
     try {
-        // STEP A: Check Tasks -> Requirement
         const { data: steps, error: stepError } = await supabase
             .from('steps')
             .select('status')
@@ -100,19 +103,17 @@ export async function syncHierarchyStatus(requirementId, projectId) {
 
         if (stepError) throw stepError;
 
-        // Requirement is complete only if it has steps AND all steps are Complete
         const allStepsComplete = steps.length > 0 && steps.every(s => s.status === 'Complete');
 
         if (allStepsComplete) {
             await supabase
                 .from('requirements')
                 .update({ status: 'Complete' })
-                .eq('req_id', requirementId);
+                .eq('id', requirementId);
             
             console.log(`? Requirement ${requirementId} automatically set to Complete.`);
         }
 
-        // STEP B: Check Requirements -> Project
         if (projectId) {
             const { data: reqs, error: reqError } = await supabase
                 .from('requirements')
@@ -138,11 +139,11 @@ export async function syncHierarchyStatus(requirementId, projectId) {
 }
 
 /**
- * 3. REAL-TIME LISTENER (The "Brain")
- * Listens for changes to the steps table and automatically triggers the engine.
+ * 3. REAL-TIME LISTENER
+ * Bridges the gap between database changes and the logic above.
  */
 export const initializeProjectEngine = () => {
-    console.log("? Project Engine: Initializing Connection...");
+    console.log("?? Project Engine: Initializing Connection...");
 
     const channel = supabase
         .channel('project-automation-channel')
@@ -150,36 +151,26 @@ export const initializeProjectEngine = () => {
             'postgres_changes', 
             { event: '*', schema: 'public', table: 'steps' }, 
             async (payload) => {
-                console.log('?? ENGINE TRIGGERED: Change detected in Steps!', payload);
+                console.log('?? ENGINE TRIGGERED:', payload.eventType);
                 
                 const requirementId = payload.new?.requirement_id || payload.old?.requirement_id;
-                // Get project ID from localStorage or fallback to a global variable
-                const projectId = localStorage.getItem('selected_project_id') || window.currentProjectId;
+                const projectId = localStorage.getItem('selected_project_id');
 
                 if (requirementId) {
-                    // 1. Run the budget math (Rollup)
                     await rollupToRequirement(requirementId);
-                    
-                    // 2. Run the status automation (Cascade Completion)
                     await syncHierarchyStatus(requirementId, projectId);
                     
-                    // 3. Refresh the UI if the bridge is connected
-                    // Using window.loadRequirements to ensure we hit the global UI refresh hook
                     if (typeof window.loadRequirements === 'function') {
-                        console.log("?? Refreshing UI via global hook...");
                         window.loadRequirements();
                     }
                 }
             }
         )
-        .subscribe((status) => {
-            console.log("?? Realtime Status:", status);
-            
-            if (status === 'CHANNEL_ERROR') {
-                console.error("?? Realtime Connection Failed. Check Supabase 'Replication' settings.");
-            }
-        });
+        .subscribe();
 };
 
-// Start the listener automatically when this module is loaded
+// Auto-initialize
 initializeProjectEngine();
+
+// Bridge to global window for manual triggers
+window.engineRollup = rollupToRequirement;

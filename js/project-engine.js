@@ -8,7 +8,7 @@ import { supabase } from './config.js';
 /**
  * 1. rollupToRequirement
  * Sums the cost of all active steps, finds the highest version, and updates the requirement.
- * Hardened for PMI-standard governance and precise decimal math.
+ * Corrected to use 'req_id' as the primary key for the requirements table.
  */
 export async function rollupToRequirement(requirementId, manualSteps = null) {
     try {
@@ -31,7 +31,6 @@ export async function rollupToRequirement(requirementId, manualSteps = null) {
         let totalActualCost = 0;
         let maxVersion = 1; // Default to v1 baseline
         
-        // Access global members for fallback rates
         const members = window.teamMembers || [];
         const blendedRate = window.projectBlendedRate || 0;
 
@@ -42,7 +41,6 @@ export async function rollupToRequirement(requirementId, manualSteps = null) {
             const actCost = parseFloat(s.actual_cost) || 0;
             const vNum = parseInt(s.version_number) || 1;
 
-            // --- Fallback Rate Logic ---
             if (taskCost === 0 && hours > 0) {
                 const user = members.find(m => m.user_id === s.assigned_to);
                 const effectiveRate = (user && parseFloat(user.hourly_cost) > 0) 
@@ -55,28 +53,26 @@ export async function rollupToRequirement(requirementId, manualSteps = null) {
             totalHours += hours;
             totalActualCost += actCost;
 
-            // --- TRACK HIGHEST VERSION ---
             if (vNum > maxVersion) maxVersion = vNum;
         });
 
-        // --- Health Score Logic ---
         let healthScore = 100;
         if (totalBudget > 0 && totalActualCost > totalBudget) {
             healthScore = Math.max(0, Math.round((totalBudget / totalActualCost) * 100));
         }
 
-        // 3. Database Update (HARDENED)
-        // Now syncs total_budget, estimated_hours, health_score, AND version_number
+        // 3. Database Update
+        // CORRECTED: Using 'req_id' to match your specific schema PK
         const { error: updateError } = await supabase
             .from('requirements')
             .update({ 
                 total_budget: totalBudget,
                 estimated_hours: totalHours,
                 health_score: healthScore,
-                version_number: maxVersion, // Syncs parent version to highest child version
+                version_number: maxVersion,
                 updated_at: new Date().toISOString()
             })
-            .eq('id', requirementId); // Using 'id' to match standard requirements table PK
+            .eq('req_id', requirementId); 
 
         if (updateError) throw updateError;
 
@@ -106,10 +102,11 @@ export async function syncHierarchyStatus(requirementId, projectId) {
         const allStepsComplete = steps.length > 0 && steps.every(s => s.status === 'Complete');
 
         if (allStepsComplete) {
+            // CORRECTED: Using 'req_id'
             await supabase
                 .from('requirements')
                 .update({ status: 'Complete' })
-                .eq('id', requirementId);
+                .eq('req_id', requirementId);
             
             console.log(`? Requirement ${requirementId} automatically set to Complete.`);
         }
@@ -125,6 +122,7 @@ export async function syncHierarchyStatus(requirementId, projectId) {
             const allReqsComplete = reqs.length > 0 && reqs.every(r => r.status === 'Complete');
 
             if (allReqsComplete) {
+                // Projects usually use 'id'
                 await supabase
                     .from('projects')
                     .update({ status: 'Complete' })
@@ -140,7 +138,6 @@ export async function syncHierarchyStatus(requirementId, projectId) {
 
 /**
  * 3. REAL-TIME LISTENER
- * Bridges the gap between database changes and the logic above.
  */
 export const initializeProjectEngine = () => {
     console.log("?? Project Engine: Initializing Connection...");
@@ -151,8 +148,6 @@ export const initializeProjectEngine = () => {
             'postgres_changes', 
             { event: '*', schema: 'public', table: 'steps' }, 
             async (payload) => {
-                console.log('?? ENGINE TRIGGERED:', payload.eventType);
-                
                 const requirementId = payload.new?.requirement_id || payload.old?.requirement_id;
                 const projectId = localStorage.getItem('selected_project_id');
 
@@ -169,8 +164,5 @@ export const initializeProjectEngine = () => {
         .subscribe();
 };
 
-// Auto-initialize
 initializeProjectEngine();
-
-// Bridge to global window for manual triggers
 window.engineRollup = rollupToRequirement;

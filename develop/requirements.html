@@ -291,7 +291,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         return;
     }
 
-    // Get Project ID
+    // 1. Get Project ID
     const urlParams = new URLSearchParams(window.location.search);
     projectId = urlParams.get('id') || localStorage.getItem('selected_project_id');
     
@@ -301,28 +301,29 @@ document.addEventListener('DOMContentLoaded', async () => {
         return;
     }
 
-    // --- UPDATED FETCH: Capture Status for Governance ---
+    // 2. Fetch Project Data (Now capturing 'status' for Change Requests)
     const { data: proj } = await supabase
         .from('projects')
-        .select('blended_rate, name, status') // Added status here
+        .select('blended_rate, name, status') 
         .eq('id', projectId)
         .single();
 
     window.projectBlendedRate = proj?.blended_rate || 0;
     
-    // This is the CRITICAL line for your Change Request logic:
+    // Set global status for submitStep logic
     window.currentProjectStatus = proj?.status || 'Planning'; 
     
     const projectName = proj?.name || localStorage.getItem('selected_project_name');
 
-    // Fetch Profiles
+    // 3. Fetch Profiles
     const { data: profiles } = await supabase.from('user_profiles').select('user_id, email, full_name, hourly_cost, tenant_id, role'); 
     window.teamMembers = profiles || [];
     
     const myProfile = window.teamMembers.find(p => p.user_id === user.id);
     if (myProfile) {
+        // Standardizing the global session object
         window.sessionData = {
-            user_id: user.id,
+            user_id: user.id, 
             role: myProfile.role,
             full_name: myProfile.full_name,
             tenantId: myProfile.tenant_id
@@ -332,7 +333,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     populateDropdowns();
     
-    // Header Rendering
+    // 4. Header Rendering (Using your specific session structure)
     try {
         if (typeof renderProjectHeader === 'function') {
             const sessionForHeader = { 
@@ -348,10 +349,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     loadRequirements();
     if (typeof initSortable === 'function') initSortable();
 
-    console.log("App initialized. Project Status:", window.currentProjectStatus);
+    console.log("App initialized for:", window.sessionData?.full_name);
+    console.log("Governance Status:", window.currentProjectStatus);
 
-    // KEBAB AUTO-CLOSE LISTENER
+    // 5. KEBAB AUTO-CLOSE LISTENER
     document.addEventListener('click', (event) => {
+        // If the click is NOT inside a kebab-container, hide all menus
         if (!event.target.closest('.kebab-container')) {
             document.querySelectorAll('[id^="kebab-"]').forEach(menu => {
                 menu.classList.add('hidden');

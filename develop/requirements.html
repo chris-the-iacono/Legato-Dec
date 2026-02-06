@@ -838,7 +838,8 @@ window.rollupToRequirement = async (reqId = window.selectedReqId, steps = null) 
 
     // 4. AUDIT LOG: Unified capture
     // Corrected label with Emoji for UI Visibility
-    const auditLabel = isCR ? "?? CHANGE REQUEST" : "Baseline Adjustment";
+    const auditLabel = isCR ? "\u26A0\uFE0F CHANGE REQUEST" : "Baseline Adjustment";
+	//const auditLabel = isCR ? "?? CHANGE REQUEST" : "Baseline Adjustment";
     const auditContent = editingStepId 
         ? `${auditLabel} (v${resultStep.version_number}): $${calculatedCost.toLocaleString()} (${hours}h). Reason: ${changeReason}`
         : `Task created (v1 Baseline). Budgeted at $${calculatedCost.toLocaleString()} (${hours}h @ $${effectiveRate}/h)`;
@@ -1264,8 +1265,10 @@ window.toggleKebab = (id) => {
     if (menu) menu.classList.remove('hidden');
 };
         
-        // Note Loading
-        async function loadTaskNotes(taskId) {
+        
+		//Note Loading
+		// Note Loading
+async function loadTaskNotes(taskId) {
     const container = document.getElementById('notes-container');
     if (!container) return;
 
@@ -1288,13 +1291,21 @@ window.toggleKebab = (id) => {
             const ts = d.toLocaleDateString('en-US') + ' ' + 
                        d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
 
+            // CSS Tweak: Check if this note is a Change Request
+            const isCR = n.content.includes('CHANGE REQUEST');
+            
+            // Apply special styling if it's a Change Request
+            const contentStyle = isCR 
+                ? 'text-amber-700 font-bold bg-amber-50 p-1 rounded border border-amber-100' 
+                : 'text-gray-700';
+
             return `
                 <div class="p-2 bg-gray-50 rounded border mb-2 border-gray-100 shadow-sm">
                     <div class="flex justify-between items-center mb-1">
                         <p class="text-[10px] font-black text-indigo-600 uppercase">${n.user_profiles?.full_name || 'System'}</p>
                         <p class="text-[9px] text-gray-400 font-mono">${ts}</p>
                     </div>
-                    <p class="text-xs text-gray-700">${n.content}</p>
+                    <p class="text-xs ${contentStyle}">${n.content}</p>
                 </div>`;
         }).join('');
     }

@@ -731,7 +731,6 @@ window.rollupToRequirement = async (reqId = window.selectedReqId, steps = null) 
     // 1. Validation & Pre-checks
     if (!window.selectedReqId) return alert("Select a requirement first.");
     
-    // Check if we are editing an existing step or creating a new one
     const editingStepId = document.getElementById('step-id-hidden')?.value; 
     const title = document.getElementById('step-title-input')?.value.trim();
     const assignedId = document.getElementById('step-assign-select')?.value;
@@ -742,7 +741,7 @@ window.rollupToRequirement = async (reqId = window.selectedReqId, steps = null) 
         return alert("Fill all required fields (Title, Assignee, and Hours > 0).");
     }
 
-    // 2. MATH LOGIC: Calculate cost based on the assigned user's rate
+    // 2. MATH LOGIC
     const assignedUser = (window.teamMembers || []).find(m => m.user_id === assignedId);
     const effectiveRate = (assignedUser && parseFloat(assignedUser.hourly_cost) > 0) 
         ? parseFloat(assignedUser.hourly_cost) 
@@ -757,12 +756,12 @@ window.rollupToRequirement = async (reqId = window.selectedReqId, steps = null) 
 
     let resultStep;
     let error;
+    let isCR = false; 
 
     if (editingStepId) {
         // --- UPDATE EXISTING STEP ---
         if (!changeReason) return alert("Please provide a reason for this estimate change.");
         
-        // Fetch current version to increment it
         const { data: currentStep } = await supabase
             .from('steps')
             .select('version_number')
@@ -770,6 +769,11 @@ window.rollupToRequirement = async (reqId = window.selectedReqId, steps = null) 
             .single();
         
         const nextVersion = (parseInt(currentStep?.version_number) || 1) + 1;
+
+        // GOVERNANCE GATE
+        if (window.currentProjectStatus === 'active' && currentStep.version_number >= 1) {
+            isCR = true;
+        }
         
         const { data, error: updateError } = await supabase.from('steps')
             .update({
@@ -777,7 +781,7 @@ window.rollupToRequirement = async (reqId = window.selectedReqId, steps = null) 
                 assigned_to: assignedId,
                 estimated_hours: hours,
                 cost: calculatedCost,
-                version_number: nextVersion, // Version Increment
+                version_number: nextVersion,
                 updated_at: new Date().toISOString()
             })
             .eq('step_id', editingStepId)
@@ -805,7 +809,7 @@ window.rollupToRequirement = async (reqId = window.selectedReqId, steps = null) 
             cost: calculatedCost,
             sequence_order: nextOrder,
             status: 'pending',
-            version_number: 1 // Original Baseline
+            version_number: 1 
         }]).select().single();
 
         resultStep = data;
@@ -814,16 +818,21 @@ window.rollupToRequirement = async (reqId = window.selectedReqId, steps = null) 
 
     if (error) return alert("Save failed: " + error.message);
 
-    // 4. AUDIT LOG: Unified capture for traceability
+    // 4. AUDIT LOG: Unified capture
+    const auditLabel = isCR ? "?? CHANGE REQUEST" : "Baseline Adjustment";
     const auditContent = editingStepId 
-        ? `Estimate Updated (v${resultStep.version_number}): $${calculatedCost.toLocaleString()} (${hours}h). Reason: ${changeReason}`
-        : `Task created (v1). Budgeted at $${calculatedCost.toLocaleString()} (${hours}h @ $${effectiveRate}/h)`;
+        ? `${auditLabel} (v${resultStep.version_number}): $${calculatedCost.toLocaleString()} (${hours}h). Reason: ${changeReason}`
+        : `Task created (v1 Baseline). Budgeted at $${calculatedCost.toLocaleString()} (${hours}h @ $${effectiveRate}/h)`;
 
-    await supabase.from('task_notes').insert([{ 
-        task_id: resultStep.step_id, 
-        user_id: window.sessionData?.user_id, 
-        content: auditContent 
-    }]);
+    // Calling your utility function for the actual write
+    await appendNoteToActivity(resultStep.step_id, auditContent);
+
+    // 5. SYNC
+    window.closeTaskSlider();
+    if (window.rollupToRequirement) await window.rollupToRequirement(window.selectedReqId);
+    if (typeof window.refreshSteps === 'function') await window.refreshSteps();
+    if (typeof window.loadRequirements === 'function') window.loadRequirements();
+};
 
     // 5. SYNC: Close UI and trigger the Hardened Engine Rollup
     window.closeTaskSlider();
@@ -1304,26 +1313,61 @@ window.toggleKebab = (id) => {
         
         // Note Loading
         async function loadTaskNotes(taskId) {
-            const { data: notes } = await supabase.from('task_notes').select(`*, user_profiles(full_name)`).eq('task_id', taskId).order('created_at', {ascending:true});
-            const container = document.getElementById('notes-container');
-            if(notes && container) {
-                container.innerHTML = notes.map(n => `<div class="p-2 bg-gray-50 rounded border mb-1"><p class="text-[10px] font-bold text-indigo-600">${n.user_profiles?.full_name}</p><p class="text-xs">${n.content}</p></div>`).join('');
-            }
-        }
+    const container = document.getElementById('notes-container');
+    if (!container) return;
+
+    // Standardized to your 'user_profiles' table name
+    const { data: notes, error } = await supabase
+        .from('task_notes')
+        .select(`*, user_profiles(full_name)`)
+        .eq('task_id', taskId)
+        .order('created_at', { ascending: false }); // Newest on top
+
+    if (error) {
+        console.error("Load Notes Error:", error.message);
+        return;
+    }
+
+    if (notes && container) {
+        container.innerHTML = notes.map(n => {
+            // Formatting: MM/DD/YYYY HH:MM AM/PM
+            const d = new Date(n.created_at);
+            const ts = d.toLocaleDateString('en-US') + ' ' + 
+                       d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+
+            return `
+                <div class="p-2 bg-gray-50 rounded border mb-2 border-gray-100 shadow-sm">
+                    <div class="flex justify-between items-center mb-1">
+                        <p class="text-[10px] font-black text-indigo-600 uppercase">${n.user_profiles?.full_name || 'System'}</p>
+                        <p class="text-[9px] text-gray-400 font-mono">${ts}</p>
+                    </div>
+                    <p class="text-xs text-gray-700">${n.content}</p>
+                </div>`;
+        }).join('');
+    }
+}
         
-        window.appendNote = async () => {
-             // (Logic placeholder - implemented in full earlier)
-             alert("Note appended!");
-        }
-        
-        async function appendNoteToActivity(taskId, content) {
+        // Keeping your existing naming convention, simply ensuring it uses the session data
+async function appendNoteToActivity(taskId, content) {
     if (!taskId || !content) return;
-    await supabase.from('task_notes').insert([{ 
+    const { error } = await supabase.from('task_notes').insert([{ 
         task_id: taskId, 
         user_id: window.sessionData?.user_id, 
         content: content 
     }]);
+    if (error) console.error("Note Audit Error:", error.message);
 }
+
+// Full implementation of appendNote for manual slider entries
+window.appendNote = async () => {
+    const input = document.getElementById('manual-note-input');
+    const taskId = document.getElementById('step-id-hidden')?.value;
+    if (!input || !input.value.trim() || !taskId) return;
+
+    await appendNoteToActivity(taskId, `Manual Note: ${input.value.trim()}`);
+    input.value = '';
+    loadTaskNotes(taskId); // Refresh the list
+};
 /* ==========================================
            GLOBAL EVENT LISTENERS
            ========================================== */

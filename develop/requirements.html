@@ -770,7 +770,7 @@ window.rollupToRequirement = async (reqId = window.selectedReqId, steps = null) 
         
         const nextVersion = (parseInt(currentStep?.version_number) || 1) + 1;
 
-        // GOVERNANCE GATE
+        // GOVERNANCE GATE: Flag as CR if Project is Active and a baseline exists
         if (window.currentProjectStatus === 'active' && currentStep.version_number >= 1) {
             isCR = true;
         }
@@ -824,93 +824,26 @@ window.rollupToRequirement = async (reqId = window.selectedReqId, steps = null) 
         ? `${auditLabel} (v${resultStep.version_number}): $${calculatedCost.toLocaleString()} (${hours}h). Reason: ${changeReason}`
         : `Task created (v1 Baseline). Budgeted at $${calculatedCost.toLocaleString()} (${hours}h @ $${effectiveRate}/h)`;
 
-    // Calling your utility function for the actual write
     await appendNoteToActivity(resultStep.step_id, auditContent);
 
-    // 5. SYNC
-    window.closeTaskSlider();
-    if (window.rollupToRequirement) await window.rollupToRequirement(window.selectedReqId);
-    if (typeof window.refreshSteps === 'function') await window.refreshSteps();
-    if (typeof window.loadRequirements === 'function') window.loadRequirements();
-};
-
-    // 5. SYNC: Close UI and trigger the Hardened Engine Rollup
+    // 5. SYNC: Close UI, Rollup budget, and Refresh UI
     window.closeTaskSlider();
     
-    // The Engine Rollup updates requirements.total_budget and requirements.estimated_hours
     if (window.rollupToRequirement) {
         await window.rollupToRequirement(window.selectedReqId);
     }
     
-    // Refresh the Task List (Right Panel)
     if (typeof window.refreshSteps === 'function') {
         await window.refreshSteps();
     } else if (typeof window.loadSteps === 'function') {
         await window.loadSteps(window.selectedReqId);
     }
     
-    // Refresh the Requirements List (Left Panel) to reflect new budget totals
     if (typeof window.loadRequirements === 'function') {
         window.loadRequirements();
     }
-};
-
-        window.updateStep = async (id) => {
-    // 0. RBAC GUARD: Only Admin, PM, or TL can trigger this database update
-    const canUpdate = ['admin', 'project_manager', 'team_leader'].includes(window.sessionData?.role);
-    if (!canUpdate) {
-        alert("Access Denied: You do not have permission to modify task details.");
-        return;
-    }
-
-    const cleanStepId = String(id).trim().replace(/['"]/g, '');
-
-    // 1. Pull current values from the Step Editor UI
-    const title = document.getElementById('step-title-input')?.value.trim();
-    const assignedId = document.getElementById('step-assign-select')?.value;
-    const hours = parseFloat(document.getElementById('step-hours-input')?.value) || 0;
-
-    // 2. MATH LOGIC: Recalculate cost in case assignee or hours changed
-    const assignedUser = (window.teamMembers || []).find(m => m.user_id === assignedId);
-    const effectiveRate = (assignedUser && parseFloat(assignedUser.hourly_cost) > 0) 
-        ? parseFloat(assignedUser.hourly_cost) 
-        : (window.projectBlendedRate || 0);
     
-    const calculatedCost = hours * effectiveRate;
-
-    // 3. PERSISTENCE: Update the 'steps' table
-    const { error } = await supabase.from('steps').update({
-        title: title,
-        assigned_to: assignedId,
-        estimated_hours: hours,
-        cost: calculatedCost, // Update with the newly calculated math
-        updated_at: new Date().toISOString()
-    }).eq('step_id', cleanStepId);
-
-    if (error) return alert("Update failed: " + error.message);
-
-    // 4. AUDIT LOG: Record the budget change in the activity feed
-    if (typeof appendNoteToActivity === 'function') {
-        await appendNoteToActivity(cleanStepId, `Baseline updated: ${hours}h @ $${effectiveRate}/h (Total: $${calculatedCost.toLocaleString()})`);
-    }
-
-    // 5. SYNC: Close UI, trigger requirement-level rollup, and refresh list
-    if (typeof window.closeTaskSlider === 'function') {
-        window.closeTaskSlider();
-    }
-    
-    // --- THE CRITICAL ROLLUP ---
-    // Recalculates the parent requirement's total_budget based on this update
-    await window.rollupToRequirement(window.selectedReqId);
-
-    // Refresh the task list UI to show the new cost/hours
-    if (typeof window.refreshSteps === 'function') {
-        await window.refreshSteps();
-    } else if (typeof loadSteps === 'function') {
-        await loadSteps(window.selectedReqId);
-    }
-
-    console.log(`Task ${cleanStepId} updated and budget rolled up.`);
+    console.log(`Task ${resultStep.step_id} saved successfully.`);
 };
 		//-----Added 1/30 @ 2:00 re-tested at 2:28
 		

@@ -1229,7 +1229,7 @@ window.openReqSlider = async (id = null) => {
         
         if (req) {
             // Populate Fields
-            titleEl.innerText = req.title || "Requirement Details"; // Header Title
+            titleEl.innerText = req.title || "Requirement Details"; // Header Title Changed from req.name 2/9/26
             titleInput.value = req.title || ''; // Input Field
             
             if (assignSelect) assignSelect.value = req.assigned_to || '';

@@ -137,8 +137,8 @@
             <div>
                 <h2 id="req-editor-title" class="font-bold text-lg text-indigo-900">Requirement Details</h2>
                 <div class="flex gap-2 items-center">
-                    <p class="text-[10px] text-indigo-400 font-bold uppercase">Budget Version: <span id="req-version-display">0</span></p>
-                    <span id="req-status-badge" class="text-[9px] px-2 py-0.5 rounded-full font-bold uppercase bg-green-100 text-green-700">Active</span>
+                    <p class="text-[10px] text-indigo-400 font-bold uppercase">Budget Version: <span id="req-version-display">1</span></p>
+                    <span id="req-status-badge" class="text-[9px] px-2 py-0.5 rounded-full font-bold uppercase bg-blue-100 text-blue-700">Active</span>
                 </div>
             </div>
             <button onclick="window.closeReqSlider()" class="text-gray-400 hover:text-indigo-600 transition-colors">
@@ -151,31 +151,26 @@
         <div class="p-6 space-y-6 overflow-y-auto h-[calc(100vh-80px)]">
             <div class="space-y-4">
                 <div>
-                    <label class="text-[11px] font-bold text-gray-500 uppercase ml-1">Title</label>
-                    <input type="text" id="req-title-input" data-admin-only placeholder="e.g. Database Migration" class="w-full border-gray-200 rounded-lg text-sm p-3 border outline-none focus:ring-2 focus:ring-indigo-500 disabled:bg-gray-50 disabled:text-gray-400">
+                    <label class="text-[11px] font-bold text-gray-500 uppercase ml-1">Requirement Name</label>
+                    <input type="text" id="req-title-input" placeholder="e.g. Database Migration" class="w-full border-gray-200 rounded-lg text-sm p-3 border outline-none focus:ring-2 focus:ring-indigo-500 disabled:bg-gray-50 disabled:text-gray-400">
                 </div>
                 
                 <div class="grid grid-cols-2 gap-4">
                     <div class="flex flex-col">
-                        <label class="text-[11px] font-bold text-gray-500 uppercase mb-1 ml-1">Accountable</label>
-                        <select id="req-assign-select" data-admin-only onchange="window.handleUserSelection('req')" class="bg-white border-gray-200 rounded-lg text-sm p-3 border disabled:bg-gray-50"></select>
+                        <label class="text-[11px] font-bold text-gray-500 uppercase mb-1 ml-1">Accountable (Owner)</label>
+                        <select id="req-assign-select" onchange="window.handleUserSelection('req')" class="bg-white border-gray-200 rounded-lg text-sm p-3 border disabled:bg-gray-50"></select>
                     </div>
                     <div class="flex flex-col">
-                        <label class="text-[11px] font-bold text-gray-500 uppercase mb-1 ml-1">Applied Rate</label>
-                        <input type="number" id="req-applied-rate" readonly class="bg-gray-100 border-gray-200 rounded-lg text-sm p-3 font-mono text-gray-500 border">
+                        <label class="text-[11px] font-bold text-gray-500 uppercase mb-1 ml-1">Est. Total Hours</label>
+                        <input type="number" id="req-hours-input" readonly class="bg-gray-50 border-gray-200 rounded-lg text-sm p-3 font-mono text-gray-500 border">
                     </div>
-                </div>
-
-                <div>
-                    <label class="text-[11px] font-bold text-gray-500 uppercase mb-1 ml-1">Estimated Budget (Hours)</label>
-                    <input type="number" id="req-hours-input" data-admin-only placeholder="0" class="w-full border-gray-200 rounded-lg text-sm p-3 border disabled:bg-gray-50">
                 </div>
 
                 <div class="pt-4" id="req-admin-actions">
                     <button id="req-save-btn" onclick="window.addRequirement()" class="w-full bg-indigo-600 text-white py-3 rounded-lg text-sm font-bold hover:bg-indigo-700 shadow-lg transition-all">
-                        Update Baseline Budget
+                        Re-assign Accountability
                     </button>
-                    <p class="text-[10px] text-gray-400 text-center mt-2 italic">Note: Saving will create a new timestamped baseline version.</p>
+                    <p class="text-[10px] text-gray-400 text-center mt-2 italic">Note: Changing the Accountable owner will log a version update in the audit trail.</p>
                 </div>
             </div>
 
@@ -196,7 +191,7 @@
                 <h2 id="task-editor-title" class="font-bold text-lg text-blue-900">Task Details</h2>
                 <div class="flex gap-2 items-center">
                     <p class="text-[10px] text-blue-400 font-bold uppercase tracking-tight">Version: <span id="step-version-display">0</span></p>
-                    <span id="step-baseline-tag" class="text-[9px] bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded font-black uppercase">v0 Baseline</span>
+                    <span id="step-baseline-tag" class="text-[9px] bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded font-black uppercase">Baseline</span>
                 </div>
             </div>
             <button onclick="window.closeTaskSlider()" class="text-gray-400 hover:text-blue-600 transition-colors">
@@ -206,19 +201,31 @@
         
         <div class="flex-grow overflow-y-auto p-6 space-y-8">
             <div class="space-y-4 pb-6 border-b border-gray-100">
-                <h3 class="text-[11px] font-black text-gray-400 uppercase tracking-widest">Active Estimate</h3>
+                <h3 class="text-[11px] font-black text-gray-400 uppercase tracking-widest">Task Definition & Scope</h3>
+                
                 <div>
                     <label class="text-[10px] font-bold text-gray-400 uppercase ml-1">Task Title</label>
-                    <input type="text" id="step-title-input" data-admin-only class="w-full border-gray-200 rounded-lg text-sm p-3 border">
+                    <input type="text" id="step-title-input" class="w-full border-gray-200 rounded-lg text-sm p-3 border">
                 </div>
+
+                <div>
+                    <label class="text-[10px] font-bold text-gray-400 uppercase ml-1">Scope & Technical Details</label>
+                    <textarea id="step-scope-details" placeholder="Describe specifics, deliverables, or technical constraints..." class="w-full border-gray-200 rounded-lg text-sm p-3 border h-24 resize-none focus:ring-2 focus:ring-blue-500 outline-none"></textarea>
+                </div>
+
+                <div>
+                    <label class="text-[10px] font-bold text-gray-400 uppercase ml-1">Documentation Link (BRD/Spec)</label>
+                    <input type="url" id="step-brd-link" placeholder="https://docs.google.com/..." class="w-full border-gray-200 rounded-lg text-sm p-3 border text-blue-600 underline">
+                </div>
+
                 <div class="grid grid-cols-2 gap-4">
                     <div class="flex flex-col">
-                        <label class="text-[10px] font-bold text-gray-400 uppercase mb-1 ml-1">Responsible</label>
-                        <select id="step-assign-select" data-admin-only class="border-gray-200 rounded-lg text-sm p-3 bg-gray-50 border"></select>
+                        <label class="text-[10px] font-bold text-gray-400 uppercase mb-1 ml-1">Responsible (Doer)</label>
+                        <select id="step-assign-select" class="border-gray-200 rounded-lg text-sm p-3 bg-gray-50 border"></select>
                     </div>
                     <div class="flex flex-col">
                         <label class="text-[10px] font-bold text-gray-400 uppercase mb-1 ml-1">Est. Hrs</label>
-                        <input type="number" id="step-hours-input" data-admin-only class="border-gray-200 rounded-lg text-sm p-3 border">
+                        <input type="number" id="step-hours-input" class="border-gray-200 rounded-lg text-sm p-3 border">
                     </div>
                 </div>
 
@@ -228,11 +235,11 @@
                 </div>
                 
                 <div class="space-y-3 pt-2">
-                    <button id="task-save-btn" data-admin-only onclick="window.submitStep()" class="w-full bg-blue-600 text-white py-3 rounded-lg text-xs font-bold hover:bg-blue-700 transition-all shadow-md">
+                    <button id="task-save-btn" onclick="window.submitStep()" class="w-full bg-blue-600 text-white py-3 rounded-lg text-xs font-bold hover:bg-blue-700 transition-all shadow-md">
                         Save & Increment Version
                     </button>
                     
-                    <button id="delete-task-btn" data-admin-only class="w-full bg-white text-red-600 border border-red-100 py-2 rounded-lg text-[10px] font-bold hover:bg-red-50 transition-all uppercase tracking-wider">
+                    <button id="delete-task-btn" class="w-full bg-white text-red-600 border border-red-100 py-2 rounded-lg text-[10px] font-bold hover:bg-red-50 transition-all uppercase tracking-wider">
                         Remove Task from Baseline
                     </button>
                 </div>

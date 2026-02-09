@@ -1182,7 +1182,7 @@ window.openReqSlider = async (id = null) => {
     const assignSelect = document.getElementById('req-assign-select');
 
     // 2. Reset Form Fields
-    //titleInput.value = '';
+    titleInput.value = '';
     hoursInput.value = 0;
     if (assignSelect) assignSelect.selectedIndex = 0;
     if (versionEl) versionEl.innerText = '0';
@@ -1229,8 +1229,8 @@ window.openReqSlider = async (id = null) => {
         
         if (req) {
             // Populate Fields
-            titleEl.innerText = req.name || "Requirement Details"; // Header Title
-            titleInput.value = req.name || ''; // Input Field
+            titleEl.innerText = req.title || "Requirement Details"; // Header Title
+            titleInput.value = req.title || ''; // Input Field
             
             if (assignSelect) assignSelect.value = req.assigned_to || '';
             hoursInput.value = req.estimated_hours || 0;

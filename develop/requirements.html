@@ -1146,7 +1146,7 @@ async function loadRequirementHistory(reqId) {
         // We select the task name and the audit fields from the steps table
         const { data: taskHist, error: taskError } = await supabase
             .from('steps')
-            .select('name, updated_at, last_changed_by, change_reason, version_number') 
+            .select('title, updated_at, last_changed_by, change_reason, version_number') 
             .eq('requirement_id', reqId);
 
         if (taskError) throw taskError;

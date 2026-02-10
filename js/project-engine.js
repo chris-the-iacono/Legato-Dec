@@ -136,6 +136,65 @@ export async function syncHierarchyStatus(requirementId, projectId) {
     }
 }
 
+window.reassignAccountability = async function() {
+    const reqId = window.currentReqId; // Assuming this is set when opening the slider
+    const newUserId = document.getElementById('req-assign-select').value;
+    const selectEl = document.getElementById('req-assign-select');
+    const newUserName = selectEl.options[selectEl.selectedIndex].text;
+    const changeReason = document.getElementById('req-change-reason').value;
+    const currentBudget = document.getElementById('req-hours-input').value;
+    const versionDisplay = document.getElementById('req-version-display');
+    const currentVersion = parseInt(versionDisplay.innerText) || 1;
+
+    if (!changeReason || changeReason.trim().length < 5) {
+        alert("Please provide a meaningful reason for this governance change (min 5 chars).");
+        return;
+    }
+
+    try {
+        // 1. Update the Main Requirement Table
+        const { error: reqError } = await supabase
+            .from('requirements')
+            .update({ 
+                user_id: newUserId,
+                version_number: currentVersion + 1 
+            })
+            .eq('id', reqId);
+
+        if (reqError) throw reqError;
+
+        // 2. Insert the History Snapshot
+        const { error: histError } = await supabase
+            .from('requirement_history')
+            .insert([{
+                requirement_id: reqId,
+                version_number: currentVersion + 1,
+                change_summary: `Accountability assigned to ${newUserName}`,
+                change_reason: changeReason,
+                changed_by_name: window.currentUserFullName || 'System User', 
+                assigned_to_name: newUserName,
+                total_budget: parseFloat(currentBudget) || 0
+            }]);
+
+        if (histError) throw histError;
+
+        // 3. UI Cleanup & Refresh
+        document.getElementById('req-change-reason').value = ""; // Clear reason
+        versionDisplay.innerText = currentVersion + 1; // Increment display
+        
+        // Refresh the audit trail using our new unified function
+        if (window.loadRequirementHistory) {
+            await window.loadRequirementHistory(reqId);
+        }
+
+        alert("Governance record updated successfully.");
+
+    } catch (err) {
+        console.error("Governance Update Failed:", err.message);
+        alert("Failed to update accountability. Check console for details.");
+    }
+};
+
 /**
  * 3. REAL-TIME LISTENER
  */

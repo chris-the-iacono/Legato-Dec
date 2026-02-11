@@ -136,6 +136,87 @@ export async function syncHierarchyStatus(requirementId, projectId) {
     }
 }
 
+
+
+window.saveRequirementGovernance = async function() {
+    // 1. Identify Context (New vs Update)
+    const reqId = window.currentReqId || window.selectedReqId;
+    const isUpdate = !!reqId;
+
+    // 2. Pull Data from UI
+    const name = document.getElementById('req-title-input').value;
+    const assigneeId = document.getElementById('req-assign-select').value;
+    const assignDropdown = document.getElementById('req-assign-select');
+    const assigneeName = assignDropdown.options[assignDropdown.selectedIndex]?.text || 'Unassigned';
+    const hours = parseFloat(document.getElementById('req-hours-input').value) || 0;
+    const changeReason = document.getElementById('req-change-reason').value;
+    const currentVersion = parseInt(document.getElementById('req-version-display').innerText) || 1;
+
+    // 3. Validation
+    if (!name) { alert("Requirement Name is required."); return; }
+    if (isUpdate && (!changeReason || changeReason.trim().length < 5)) {
+        alert("Please provide a reason for this governance update (min 5 chars).");
+        return;
+    }
+
+    try {
+        const nextVersion = isUpdate ? currentVersion + 1 : 1;
+        
+        // 4. Construct Payload (No Rate/Cost - only Scope & Accountability)
+        const payload = {
+            name: name,
+            user_id: assigneeId, // Accountable Owner
+            version_number: nextVersion,
+            estimated_hours: hours,
+            updated_at: new Date().toISOString()
+        };
+
+        let result;
+        if (isUpdate) {
+            result = await supabase.from('requirements').update(payload).eq('id', reqId).select().single();
+        } else {
+            // New Requirement Setup
+            const newRecord = { 
+                ...payload, 
+                project_id: localStorage.getItem('selected_project_id'),
+                tenant_id: window.sessionData.tenantId 
+            };
+            result = await supabase.from('requirements').insert([newRecord]).select().single();
+        }
+
+        if (result.error) throw result.error;
+
+        // 5. Log to History Table
+        const { error: histError } = await supabase
+            .from('requirement_history')
+            .insert([{
+                requirement_id: isUpdate ? reqId : result.data.id,
+                version_number: nextVersion,
+                change_summary: isUpdate ? `Baseline updated to v${nextVersion}` : 'Requirement Created',
+                change_reason: isUpdate ? changeReason : 'Initial Creation',
+                changed_by_name: window.sessionData?.full_name || 'System User',
+                assigned_to_name: assigneeName,
+                total_budget: hours // Budget is tracked in hours for governance
+            }]);
+
+        if (histError) console.error("History Log Error:", histError);
+
+        // 6. UI Refresh
+        alert(isUpdate ? "Governance Update Saved." : "New Requirement Created.");
+        document.getElementById('req-change-reason').value = "";
+        
+        if (window.closeReqSlider) window.closeReqSlider();
+        if (window.loadRequirements) await window.loadRequirements();
+
+    } catch (err) {
+        console.error("Critical Save Error:", err.message);
+        alert("Save failed. See console for details.");
+    }
+};
+
+
+
+/* 2/11/26 removed when consolidating/eplacing both addRequirement and reassignAccountability with one clean, unified function: saveRequirementGovernance.
 window.reassignAccountability = async function() {
     const reqId = window.currentReqId; // Assuming this is set when opening the slider
     const newUserId = document.getElementById('req-assign-select').value;
@@ -194,6 +275,7 @@ window.reassignAccountability = async function() {
         alert("Failed to update accountability. Check console for details.");
     }
 };
+*/
 
 /**
  * 3. REAL-TIME LISTENER

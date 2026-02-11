@@ -1119,8 +1119,9 @@ window.openReqSlider = async (id = null) => {
     const versionEl = document.getElementById('req-version-display');
     const statusBadge = document.getElementById('req-status-badge');
     const historyContainer = document.getElementById('req-history-list');
+    const reasonWrapper = document.getElementById('req-reason-wrapper');
 
-    // 0. Permission Check: Admin, PM, and TL can edit.
+    // 0. Permission Check
     const userRole = (window.sessionData?.role || '').toLowerCase();
     const canEdit = ['admin', 'project_manager', 'team_leader'].includes(userRole);
 
@@ -1128,31 +1129,34 @@ window.openReqSlider = async (id = null) => {
     const titleInput = document.getElementById('req-title-input');
     const hoursInput = document.getElementById('req-hours-input');
     const assignSelect = document.getElementById('req-assign-select');
+    const reasonInput = document.getElementById('req-change-reason');
 
     // 2. Reset Form Fields
     titleInput.value = '';
     hoursInput.value = 0;
+    if (reasonInput) reasonInput.value = '';
     if (assignSelect) assignSelect.selectedIndex = 0;
-    if (versionEl) versionEl.innerText = '0';
+    if (versionEl) versionEl.innerText = '1';
     if (historyContainer) historyContainer.innerHTML = '';
 
     // --- APPLY RBAC LOCKS ---
     titleInput.readOnly = !canEdit;
     if (assignSelect) assignSelect.disabled = !canEdit;
+    hoursInput.readOnly = true; // Source of Truth = Tasks
     
-    // STRATEGIC CHANGE: Hours are now ALWAYS read-only (Source of Truth = Tasks)
-    hoursInput.readOnly = true; 
-    
-    if (btnEl) {
-        btnEl.style.display = canEdit ? 'block' : 'none';
-    }
+    if (btnEl) btnEl.style.display = canEdit ? 'block' : 'none';
 
     if (!id) {
         // --- MODE: CREATE NEW ---
-        window.selectedReqId = null; 
+        window.selectedReqId = null;
+        window.currentReqId = null; 
         titleEl.innerText = "Add New Requirement";
         btnEl.innerText = "Create Requirement";
-        btnEl.onclick = () => window.addRequirement(); 
+        
+        // Hide reason wrapper for brand new requirements
+        if (reasonWrapper) reasonWrapper.style.display = 'none';
+
+        btnEl.onclick = () => window.saveRequirementGovernance(); 
         
         if(statusBadge) {
             statusBadge.innerText = 'Draft';
@@ -1161,13 +1165,15 @@ window.openReqSlider = async (id = null) => {
     } else {
         // --- MODE: EDIT EXISTING ---
         const cleanId = String(id).trim().replace(/['"]/g, '');
-        window.selectedReqId = cleanId; 
+        window.selectedReqId = cleanId;
+        window.currentReqId = cleanId; 
         
-        // Fetch using the CORRECT column name: req_id
+        if (reasonWrapper) reasonWrapper.style.display = 'block';
+
         const { data: req, error } = await supabase
             .from('requirements')
             .select('*')
-            .eq('req_id', cleanId)
+            .eq('req_id', cleanId) // PRIMARY KEY: req_id
             .single();
         
         if (error) {
@@ -1177,15 +1183,15 @@ window.openReqSlider = async (id = null) => {
         
         if (req) {
             // Populate Fields
-            titleEl.innerText = req.title || "Requirement Details"; // Header Title Changed from req.name 2/9/26
-            titleInput.value = req.title || ''; // Input Field
+            titleEl.innerText = "Requirement Details";
+            titleInput.value = req.title || ''; // PROPERTY: title
             
-            if (assignSelect) assignSelect.value = req.assigned_to || '';
+            // Map to assigned_to per your current schema
+            if (assignSelect) assignSelect.value = req.assigned_to || ''; 
+            
             hoursInput.value = req.estimated_hours || 0;
-            
             if(versionEl) versionEl.innerText = req.version_number || '1';
             
-            // Status Badge Logic
             if(statusBadge) {
                 statusBadge.innerText = req.status || 'Active';
                 statusBadge.className = req.status === 'Complete' 
@@ -1193,14 +1199,14 @@ window.openReqSlider = async (id = null) => {
                     : "text-[9px] px-2 py-0.5 rounded-full font-bold uppercase bg-blue-100 text-blue-700";
             }
 
-            // STRATEGIC CHANGE: Use the new History Engine (Step 2)
-            if (typeof loadRequirementHistory === 'function') {
-                loadRequirementHistory(cleanId);
+            // Load History
+            if (typeof window.loadRequirementHistory === 'function') {
+                window.loadRequirementHistory(cleanId);
             }
 
-            // STRATEGIC CHANGE: Re-assign Accountability (RACI: A)
-            btnEl.innerText = "Re-assign Accountability";
-            btnEl.onclick = () => window.addRequirement(); 
+            // Point to Unified Governance Function
+            btnEl.innerText = "Update Accountability & Baseline";
+            btnEl.onclick = () => window.saveRequirementGovernance(); 
         }
     }
     

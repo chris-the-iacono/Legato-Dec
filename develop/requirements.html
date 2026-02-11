@@ -133,60 +133,57 @@
     </main>
 
     <section id="req-editor-panel" class="side-slider">
-        <div class="flex justify-between items-center p-4 border-b bg-indigo-50">
+    <div class="flex justify-between items-center p-4 border-b bg-indigo-50">
+        <div>
+            <h2 id="req-editor-title" class="font-bold text-lg text-indigo-900">Requirement Details</h2>
+            <div class="flex gap-2 items-center">
+                <p class="text-[10px] text-indigo-400 font-bold uppercase">Budget Version: <span id="req-version-display">1</span></p>
+                <span id="req-status-badge" class="text-[9px] px-2 py-0.5 rounded-full font-bold uppercase bg-blue-100 text-blue-700">Active</span>
+            </div>
+        </div>
+        <button onclick="window.closeReqSlider()" class="text-gray-400 hover:text-indigo-600">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+        </button>
+    </div>
+    
+    <div class="p-6 space-y-6 overflow-y-auto h-[calc(100vh-80px)]">
+        <div class="space-y-4">
             <div>
-                <h2 id="req-editor-title" class="font-bold text-lg text-indigo-900">Requirement Details</h2>
-                <div class="flex gap-2 items-center">
-                    <p class="text-[10px] text-indigo-400 font-bold uppercase">Budget Version: <span id="req-version-display">1</span></p>
-                    <span id="req-status-badge" class="text-[9px] px-2 py-0.5 rounded-full font-bold uppercase bg-blue-100 text-blue-700">Active</span>
+                <label class="text-[11px] font-bold text-gray-500 uppercase ml-1">Requirement Name</label>
+                <input type="text" id="req-title-input" class="w-full border-gray-200 rounded-lg text-sm p-3 border outline-none focus:ring-2 focus:ring-indigo-500">
+            </div>
+            
+            <div class="grid grid-cols-2 gap-4">
+                <div class="flex flex-col">
+                    <label class="text-[11px] font-bold text-gray-500 uppercase mb-1 ml-1">Accountable (Owner)</label>
+                    <select id="req-assign-select" class="bg-white border-gray-200 rounded-lg text-sm p-3 border"></select>
+                </div>
+                <div class="flex flex-col">
+                    <label class="text-[11px] font-bold text-gray-500 uppercase mb-1 ml-1">Est. Total Hours</label>
+                    <input type="number" id="req-hours-input" readonly class="bg-gray-50 border-gray-200 rounded-lg text-sm p-3 font-mono text-gray-500 border">
                 </div>
             </div>
-            <button onclick="window.closeReqSlider()" class="text-gray-400 hover:text-indigo-600 transition-colors">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-            </button>
-        </div>
-        
-        <div class="p-6 space-y-6 overflow-y-auto h-[calc(100vh-80px)]">
-            <div class="space-y-4">
-                <div>
-                    <label class="text-[11px] font-bold text-gray-500 uppercase ml-1">Requirement Name</label>
-                    <input type="text" id="req-title-input" placeholder="e.g. Database Migration" class="w-full border-gray-200 rounded-lg text-sm p-3 border outline-none focus:ring-2 focus:ring-indigo-500 disabled:bg-gray-50 disabled:text-gray-400">
-                </div>
-                
-                <div class="grid grid-cols-2 gap-4">
-                    <div class="flex flex-col">
-                        <label class="text-[11px] font-bold text-gray-500 uppercase mb-1 ml-1">Accountable (Owner)</label>
-                        <select id="req-assign-select" onchange="window.handleUserSelection('req')" class="bg-white border-gray-200 rounded-lg text-sm p-3 border disabled:bg-gray-50"></select>
-                    </div>
-                    <div class="flex flex-col">
-                        <label class="text-[11px] font-bold text-gray-500 uppercase mb-1 ml-1">Est. Total Hours</label>
-                        <input type="number" id="req-hours-input" readonly class="bg-gray-50 border-gray-200 rounded-lg text-sm p-3 font-mono text-gray-500 border">
-                    </div>
+
+            <div class="pt-4 space-y-4" id="req-admin-actions">
+                <div id="req-reason-wrapper">
+                    <label class="text-[10px] font-bold text-amber-600 uppercase ml-1">Reason for Governance Change</label>
+                    <textarea id="req-change-reason" placeholder="Explain the baseline or ownership shift..." class="w-full border-amber-200 rounded-lg text-sm p-3 border bg-amber-50/30 outline-none focus:ring-2 focus:ring-amber-500 h-20 resize-none"></textarea>
                 </div>
 
-                <div class="pt-4 space-y-4" id="req-admin-actions">
-    				<div id="req-reason-wrapper">
-        				<label class="text-[10px] font-bold text-amber-600 uppercase ml-1">Reason for Governance Change</label>
-        				<textarea id="req-change-reason" placeholder="Required for owner or baseline adjustments..." class="w-full border-amber-200 rounded-lg text-sm p-3 border bg-amber-50/30 outline-none focus:ring-2 focus:ring-amber-500 h-20 resize-none"></textarea>
-    				</div>
-
-    				<button id="req-save-btn" onclick="window.reassignAccountability()" class="w-full bg-indigo-600 text-white py-3 rounded-lg text-sm font-bold hover:bg-indigo-700 shadow-lg transition-all">
-        Update Accountability & Baseline
-    				</button>
-    				<p class="text-[10px] text-gray-400 text-center mt-2 italic">Note: Saving will increment the version and log a snapshot to the audit trail.</p>
-				</div>
-            </div>
-
-            <div id="req-history-section" class="mt-10 pt-8 border-t border-gray-100">
-                <h3 class="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4">Baseline History & Audit Trail</h3>
-                <div id="req-history-list" class="space-y-4">
-                    <p class="text-xs text-gray-400 italic text-center py-4">No history records found.</p>
-                </div>
+                <button id="req-save-btn" onclick="window.saveRequirementGovernance()" class="w-full bg-indigo-600 text-white py-3 rounded-lg text-sm font-bold hover:bg-indigo-700 shadow-lg transition-all">
+                    Update Accountability & Baseline
+                </button>
             </div>
         </div>
-    </section>
+
+        <div id="req-history-section" class="mt-10 pt-8 border-t border-gray-100">
+            <h3 class="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4">Baseline History & Audit Trail</h3>
+            <div id="req-history-list" class="space-y-4"></div>
+        </div>
+    </div>
+</section>
 
     <section id="task-editor-panel" class="side-slider">
         <input type="hidden" id="step-id-hidden">
@@ -945,118 +942,6 @@ function populateDropdowns() {
         });
     });
 }
-
-window.addRequirement = async () => {
-    // 0. Admin Permission Guard
-    const isAdmin = window.sessionData?.role === 'admin';
-    if (!isAdmin) {
-        console.error("Access Denied: Non-admin attempt to save requirement.");
-        return;
-    }
-
-    // 1. Pull Data from UI
-    // Note: 'name' is used in SQL table, while 'title' was used in your legacy JS
-    const name = document.getElementById('req-title-input').value; 
-    const hours = parseFloat(document.getElementById('req-hours-input').value) || 0;
-    const rate = parseFloat(document.getElementById('req-applied-rate').value) || 0;
-    const assigneeId = document.getElementById('req-assign-select').value;
-    
-    // Get the display name of the assignee for the audit trail
-    const assignDropdown = document.getElementById('req-assign-select');
-    const assigneeName = assignDropdown.options[assignDropdown.selectedIndex]?.text || 'Unassigned';
-
-    const isUpdate = !!window.selectedReqId;
-    let nextVersion = 1;
-    let currentTotalBudget = hours * rate;
-
-    // 2. Logic for Versioning (Fetch existing version if this is an update)
-    if (isUpdate) {
-        const { data: current, error: fetchError } = await supabase
-            .from('requirements')
-            .select('version_number')
-            .eq('req_id', window.selectedReqId)
-            .single();
-        
-        if (!fetchError && current) {
-            nextVersion = (current.version_number || 1) + 1;
-        }
-    }
-
-    // 3. Construct Main Payload for the 'requirements' table
-    const payload = {
-        name: name,
-        estimated_hours: hours,
-        assigned_to: assigneeId,
-        blended_rate: rate, // Mapping to your SQL 'blended_rate' column
-        total_budget: currentTotalBudget,
-        version_number: nextVersion,
-        updated_at: new Date().toISOString()
-    };
-
-    // 4. Execution Block
-    try {
-        let result;
-        if (isUpdate) {
-            result = await supabase.from('requirements')
-                .update(payload)
-                .eq('req_id', window.selectedReqId)
-                .select()
-                .single();
-        } else {
-            const newRecord = { 
-                ...payload, 
-                project_id: localStorage.getItem('selected_project_id'), 
-                tenant_id: window.sessionData.tenantId 
-            };
-            result = await supabase.from('requirements').insert([newRecord]).select().single();
-        }
-
-
-        if (result.error) throw result.error;
-
-        // --- WRITE TO DEDICATED HISTORY TABLE ---
-        // This ensures the audit trail persists even if the requirement is edited again
-        const historyPayload = {
-            requirement_id: isUpdate ? window.selectedReqId : result.data.req_id,
-            version_number: nextVersion,
-            total_budget: currentTotalBudget,
-            assigned_to_name: assigneeName,
-            changed_by_name: window.sessionData.full_name || 'Admin',
-            change_summary: isUpdate ? `Updated baseline to v${nextVersion}` : 'Initial baseline created',
-            created_at: new Date().toISOString()
-        };
-
-        const { error: historyError } = await supabase
-            .from('requirement_history')
-            .insert([historyPayload]);
-
-        if (historyError) console.error("History Log Error:", historyError);
-
-        // 5. UI Response Handling
-        // Update the Task Header if this is the currently selected requirement
-        const titleDisplay = document.getElementById('selected-req-title-display');
-        if (titleDisplay && window.selectedReqId) {
-             titleDisplay.innerText = `2. ${name}`;
-        }
-
-        if (typeof window.closeReqSlider === 'function') window.closeReqSlider();
-        
-        if (typeof window.loadRequirements === 'function') {
-            await window.loadRequirements(); 
-        } else {
-            location.reload();
-        }
-
-    } catch (err) {
-        console.error("Critical Save Error:", err);
-        // Using a basic notification style since alert() is discouraged
-        const statusBadge = document.getElementById('req-status-badge');
-        if(statusBadge) {
-            statusBadge.innerText = "Error Saving";
-            statusBadge.className = "text-[9px] px-2 py-0.5 rounded-full font-bold uppercase bg-red-100 text-red-700";
-        }
-    }
-};
 
 // --- REQUIREMENT LIST ENGINE ---
 async function loadRequirements() {

@@ -136,24 +136,23 @@ export async function syncHierarchyStatus(requirementId, projectId) {
     }
 }
 
-
-
 window.saveRequirementGovernance = async function() {
     // 1. Identify Context (New vs Update)
     const reqId = window.currentReqId || window.selectedReqId;
     const isUpdate = !!reqId;
 
     // 2. Pull Data from UI
-    const name = document.getElementById('req-title-input').value;
+    const nameInput = document.getElementById('req-title-input').value; 
     const assigneeId = document.getElementById('req-assign-select').value;
     const assignDropdown = document.getElementById('req-assign-select');
     const assigneeName = assignDropdown.options[assignDropdown.selectedIndex]?.text || 'Unassigned';
     const hours = parseFloat(document.getElementById('req-hours-input').value) || 0;
     const changeReason = document.getElementById('req-change-reason').value;
-    const currentVersion = parseInt(document.getElementById('req-version-display').innerText) || 1;
+    const versionDisplay = document.getElementById('req-version-display');
+    const currentVersion = parseInt(versionDisplay ? versionDisplay.innerText : 1) || 1;
 
     // 3. Validation
-    if (!name) { alert("Requirement Name is required."); return; }
+    if (!nameInput) { alert("Requirement Title is required."); return; }
     if (isUpdate && (!changeReason || changeReason.trim().length < 5)) {
         alert("Please provide a reason for this governance update (min 5 chars).");
         return;
@@ -162,10 +161,10 @@ window.saveRequirementGovernance = async function() {
     try {
         const nextVersion = isUpdate ? currentVersion + 1 : 1;
         
-        // 4. Construct Payload (No Rate/Cost - only Scope & Accountability)
+        // 4. Construct Payload - Corrected keys for requirements table
         const payload = {
-            name: name,
-            user_id: assigneeId, // Accountable Owner
+            title: nameInput,         // AUDIT FIX: Was 'name'
+            assigned_to: assigneeId,  // AUDIT FIX: Was 'user_id'
             version_number: nextVersion,
             estimated_hours: hours,
             updated_at: new Date().toISOString()
@@ -173,7 +172,12 @@ window.saveRequirementGovernance = async function() {
 
         let result;
         if (isUpdate) {
-            result = await supabase.from('requirements').update(payload).eq('id', reqId).select().single();
+            // AUDIT FIX: Primary Key is 'req_id'
+            result = await supabase.from('requirements')
+                .update(payload)
+                .eq('req_id', reqId)
+                .select()
+                .single();
         } else {
             // New Requirement Setup
             const newRecord = { 
@@ -190,92 +194,31 @@ window.saveRequirementGovernance = async function() {
         const { error: histError } = await supabase
             .from('requirement_history')
             .insert([{
-                requirement_id: isUpdate ? reqId : result.data.id,
+                requirement_id: isUpdate ? reqId : result.data.req_id, // AUDIT FIX: Was .id
                 version_number: nextVersion,
                 change_summary: isUpdate ? `Baseline updated to v${nextVersion}` : 'Requirement Created',
                 change_reason: isUpdate ? changeReason : 'Initial Creation',
                 changed_by_name: window.sessionData?.full_name || 'System User',
                 assigned_to_name: assigneeName,
-                total_budget: hours // Budget is tracked in hours for governance
+                total_budget: hours 
             }]);
 
         if (histError) console.error("History Log Error:", histError);
 
         // 6. UI Refresh
         alert(isUpdate ? "Governance Update Saved." : "New Requirement Created.");
-        document.getElementById('req-change-reason').value = "";
+        if (document.getElementById('req-change-reason')) {
+            document.getElementById('req-change-reason').value = "";
+        }
         
         if (window.closeReqSlider) window.closeReqSlider();
         if (window.loadRequirements) await window.loadRequirements();
 
     } catch (err) {
         console.error("Critical Save Error:", err.message);
-        alert("Save failed. See console for details.");
+        alert("Save failed: " + err.message);
     }
 };
-
-
-
-/* 2/11/26 removed when consolidating/eplacing both addRequirement and reassignAccountability with one clean, unified function: saveRequirementGovernance.
-window.reassignAccountability = async function() {
-    const reqId = window.currentReqId; // Assuming this is set when opening the slider
-    const newUserId = document.getElementById('req-assign-select').value;
-    const selectEl = document.getElementById('req-assign-select');
-    const newUserName = selectEl.options[selectEl.selectedIndex].text;
-    const changeReason = document.getElementById('req-change-reason').value;
-    const currentBudget = document.getElementById('req-hours-input').value;
-    const versionDisplay = document.getElementById('req-version-display');
-    const currentVersion = parseInt(versionDisplay.innerText) || 1;
-
-    if (!changeReason || changeReason.trim().length < 5) {
-        alert("Please provide a meaningful reason for this governance change (min 5 chars).");
-        return;
-    }
-
-    try {
-        // 1. Update the Main Requirement Table
-        const { error: reqError } = await supabase
-            .from('requirements')
-            .update({ 
-                user_id: newUserId,
-                version_number: currentVersion + 1 
-            })
-            .eq('id', reqId);
-
-        if (reqError) throw reqError;
-
-        // 2. Insert the History Snapshot
-        const { error: histError } = await supabase
-            .from('requirement_history')
-            .insert([{
-                requirement_id: reqId,
-                version_number: currentVersion + 1,
-                change_summary: `Accountability assigned to ${newUserName}`,
-                change_reason: changeReason,
-                changed_by_name: window.currentUserFullName || 'System User', 
-                assigned_to_name: newUserName,
-                total_budget: parseFloat(currentBudget) || 0
-            }]);
-
-        if (histError) throw histError;
-
-        // 3. UI Cleanup & Refresh
-        document.getElementById('req-change-reason').value = ""; // Clear reason
-        versionDisplay.innerText = currentVersion + 1; // Increment display
-        
-        // Refresh the audit trail using our new unified function
-        if (window.loadRequirementHistory) {
-            await window.loadRequirementHistory(reqId);
-        }
-
-        alert("Governance record updated successfully.");
-
-    } catch (err) {
-        console.error("Governance Update Failed:", err.message);
-        alert("Failed to update accountability. Check console for details.");
-    }
-};
-*/
 
 /**
  * 3. REAL-TIME LISTENER

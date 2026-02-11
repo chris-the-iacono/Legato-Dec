@@ -223,22 +223,24 @@ window.loadRequirementHistory = async function(reqId) {
     const historyContainer = document.getElementById('req-history-list');
     if (!historyContainer) return;
 
+    // AUDIT FIX: Sanitize ID to ensure it's a clean string for Supabase
+    const cleanId = String(reqId).trim().replace(/['"]/g, '');
+
     try {
         // 1. Fetch Governance History (Indigo Cards)
         const { data: govHistory, error: govError } = await supabase
             .from('requirement_history')
             .select('*')
-            .eq('requirement_id', reqId)
+            .eq('requirement_id', cleanId)
             .order('created_at', { ascending: false });
 
         if (govError) throw govError;
 
         // 2. Fetch Operational History via Virtual Path (Blue Cards)
-        // Step A: Get all step IDs for this requirement
         const { data: steps, error: stepsError } = await supabase
             .from('steps')
             .select('step_id')
-            .eq('requirement_id', reqId);
+            .eq('requirement_id', cleanId);
 
         if (stepsError) throw stepsError;
         
@@ -254,20 +256,20 @@ window.loadRequirementHistory = async function(reqId) {
                 .ilike('note', '%CHANGE REQUEST%')
                 .order('created_at', { ascending: false });
             
-            if (!notesError) taskNotes = notes;
+            if (!notesError) taskNotes = notes || [];
         }
 
         // 3. Clear and Render
         historyContainer.innerHTML = '';
         
-        if (govHistory.length === 0 && taskNotes.length === 0) {
+        if ((!govHistory || govHistory.length === 0) && taskNotes.length === 0) {
             historyContainer.innerHTML = '<p class="text-xs text-gray-400 italic text-center py-4">No history records found.</p>';
             return;
         }
 
-        // 4. Combine and Sort (Simple merge for display)
+        // 4. Combine and Sort
         const combined = [
-            ...govHistory.map(h => ({ ...h, type: 'GOV' })),
+            ...(govHistory || []).map(h => ({ ...h, type: 'GOV' })),
             ...taskNotes.map(n => ({ ...n, type: 'OPS' }))
         ].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
@@ -276,27 +278,25 @@ window.loadRequirementHistory = async function(reqId) {
             let cardHtml = '';
 
             if (item.type === 'GOV') {
-                // Indigo Governance Card
                 cardHtml = `
-                    <div class="p-3 bg-indigo-50 border border-indigo-100 rounded-lg shadow-sm">
+                    <div class="p-3 bg-indigo-50 border border-indigo-100 rounded-lg shadow-sm mb-3">
                         <div class="flex justify-between items-start mb-1">
                             <span class="text-[10px] font-bold text-indigo-600 uppercase">Baseline v${item.version_number}</span>
                             <span class="text-[9px] text-indigo-400">${dateStr}</span>
                         </div>
                         <p class="text-xs font-semibold text-indigo-900">${item.change_summary}</p>
                         <p class="text-[11px] text-indigo-700 mt-1 italic">"${item.change_reason}"</p>
-                        <div class="mt-2 text-[10px] text-indigo-500">By: ${item.changed_by_name}</div>
+                        <div class="mt-2 text-[10px] text-indigo-500 font-medium">By: ${item.changed_by_name}</div>
                     </div>`;
             } else {
-                // Blue Operational Card
                 cardHtml = `
-                    <div class="p-3 bg-blue-50 border border-blue-100 rounded-lg shadow-sm">
+                    <div class="p-3 bg-blue-50 border border-blue-100 rounded-lg shadow-sm mb-3">
                         <div class="flex justify-between items-start mb-1">
                             <span class="text-[10px] font-bold text-blue-600 uppercase">Task Adjustment</span>
                             <span class="text-[9px] text-blue-400">${dateStr}</span>
                         </div>
-                        <p class="text-xs text-blue-800 line-clamp-2">${item.note}</p>
-                        <div class="mt-2 text-[10px] text-blue-500">Source: Task ID ${item.task_id}</div>
+                        <p class="text-xs text-blue-800 line-clamp-3">${item.note}</p>
+                        <div class="mt-2 text-[10px] text-blue-500 font-mono">Source: Task ID ${item.task_id}</div>
                     </div>`;
             }
             historyContainer.insertAdjacentHTML('beforeend', cardHtml);
@@ -306,7 +306,6 @@ window.loadRequirementHistory = async function(reqId) {
         console.error("Error loading history:", err.message);
         historyContainer.innerHTML = '<p class="text-xs text-red-500 text-center py-4">Failed to load history.</p>';
     }
-
 };
 /**
  * 3. REAL-TIME LISTENER

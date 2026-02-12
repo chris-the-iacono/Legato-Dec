@@ -43,7 +43,7 @@ export async function handleSignOut() {
 
 /**
  * Check Access: Verifies session and fetches Tenant/Profile data
- * Audit Fix: Uses .maybeSingle() and provides full module fallbacks to prevent UI crashes.
+ * Correction: Maps database 'tenant_name' to session property.
  */
 export async function checkAccess() {
     // 1. Check if a basic Auth session exists
@@ -55,7 +55,6 @@ export async function checkAccess() {
     }
 
     // 2. STEP 1: Fetch Profile 
-    // CHANGE: Used .maybeSingle() to prevent 406 error if row is missing
     const { data: profile, error: profileError } = await supabase
         .from('user_profiles')
         .select('role, tenant_id, full_name, hourly_cost') 
@@ -64,13 +63,12 @@ export async function checkAccess() {
 
     if (profileError || !profile) {
         console.warn("Profile missing for authenticated user. Providing fallback session.");
-        // FIX: Added 'modules' object here so renderProjectHeader doesn't crash
         return {
             user: session.user,
             fullName: session.user.email,
             role: 'Guest',
             tenantId: null,
-            tenantName: 'No Workspace',
+            tenantName: 'Guest',
             hourlyRate: 0,
             modules: {
                 module_requirements: false,
@@ -82,10 +80,10 @@ export async function checkAccess() {
     }
 
     // 3. STEP 2: Fetch Tenant data
-    // CHANGE: Used .maybeSingle() for consistency
+    // FIX: Specifically selecting tenant_name column
     const { data: tenant, error: tenantError } = await supabase
         .from('tenants')
-        .select('*')
+        .select('tenant_name, module_requirements, module_risks, module_issues, module_changes')
         .eq('tenant_id', profile.tenant_id)
         .maybeSingle();
 
@@ -99,7 +97,8 @@ export async function checkAccess() {
         fullName: profile.full_name || session.user.email.split('@')[0], 
         role: profile.role || 'Member',
         tenantId: profile.tenant_id,
-        tenantName: tenant?.name || "Workspace",
+        // FIX: Mapping database column 'tenant_name' to 'tenantName'
+        tenantName: tenant?.tenant_name || "Project", 
         hourlyRate: profile.hourly_cost || 0,
         modules: {
             module_requirements: tenant?.module_requirements ?? true,

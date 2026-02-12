@@ -62,7 +62,7 @@ export function renderProjectHeader(session, activeTab, projectName = "Select Pr
 
                     <div class="flex flex-col">
                         <span class="text-[10px] font-black text-indigo-600 uppercase tracking-widest flex items-center leading-none">
-    						${session.tenantName ? session.tenantName + ' Workspace' : 'Workspace'} ${envBadge}
+    						${session.tenantName} Workspace ${envBadge}
 						</span>
                         <h1 class="text-sm font-bold text-gray-900 mt-1">${projectName}</h1>
                     </div>

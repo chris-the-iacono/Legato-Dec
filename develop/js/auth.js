@@ -43,7 +43,7 @@ export async function handleSignOut() {
 
 /**
  * Check Access: Verifies session and fetches Tenant/Profile data
- * Fixed: Uses two-step fetch and maps 'hourly_cost' to 'hourlyRate'
+ * Fixed: Explicitly maps return keys to match components.js expectations
  */
 export async function checkAccess() {
     // 1. Check if a basic Auth session exists
@@ -64,11 +64,16 @@ export async function checkAccess() {
 
     if (profileError || !profile) {
         console.error("Profile Fetch Error (Check if columns exist):", profileError);
-        return null;
+        // Fallback: Return at least the email if profile fails so the app doesn't crash
+        return {
+            user: session.user,
+            fullName: session.user.email,
+            role: 'User',
+            tenantId: null
+        };
     }
 
     // 3. STEP 2: Fetch Tenant data separately
-    // This bypasses the need for a complex database JOIN
     const { data: tenant, error: tenantError } = await supabase
         .from('tenants')
         .select('*')
@@ -80,13 +85,13 @@ export async function checkAccess() {
     }
 
     // 4. RETURN UNIFIED SESSION OBJECT
+    // These keys (fullName, role, tenantName) are mapped to match renderProjectHeader
     return {
         user: session.user,
-        fullName: profile.full_name || "User",
-        role: profile.role || 'user',
+        fullName: profile.full_name || session.user.email.split('@')[0], 
+        role: profile.role || 'Member',
         tenantId: profile.tenant_id,
-        tenantName: tenant?.name || "Organization",
-        // Mapping database 'hourly_cost' to frontend 'hourlyRate'
+        tenantName: tenant?.name || "Workspace",
         hourlyRate: profile.hourly_cost || 0,
         modules: {
             module_requirements: tenant?.module_requirements ?? true,

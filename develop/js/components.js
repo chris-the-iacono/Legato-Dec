@@ -27,9 +27,15 @@ export function renderProjectHeader(session, activeTab, projectName = "Select Pr
         envBadge = '<span class="bg-blue-500 text-white px-2 py-0.5 text-[10px] font-bold rounded ml-2 shadow-sm animate-pulse">STAGE</span>';
     }
 
-    // 3. ADMIN CHECK
+    // 3. ADMIN CHECK & NAVIGATION LOGIC
     const isAdmin = session.role === 'admin' || session.role === 'owner';
     const isDashboard = activeTab === 'dashboard';
+    const isWindshield = activeTab === 'windshield';
+
+    // NAVIGATION REROUTING:
+    // If we are deep in requirements/risks, go back to Windshield.
+    // If we are on Windshield, go back to Project Selection.
+    const backDestination = (isWindshield) ? 'index.html' : 'windshield.html';
 
     // 4. DEFINE TABS (Filtered by purchased modules)
     const allTabs = [
@@ -47,7 +53,7 @@ export function renderProjectHeader(session, activeTab, projectName = "Select Pr
             <div class="max-w-7xl mx-auto px-4 flex justify-between items-center h-14 border-b border-gray-100">
                 <div class="flex items-center space-x-4">
                     ${!isDashboard ? `
-                        <button onclick="window.location.href='index.html'" class="p-1.5 hover:bg-gray-100 rounded-full transition text-gray-400 mr-1" title="Back to Selection">
+                        <button onclick="window.location.href='${backDestination}'" class="p-1.5 hover:bg-gray-100 rounded-full transition text-gray-400 mr-1" title="Back">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
                             </svg>
@@ -63,6 +69,11 @@ export function renderProjectHeader(session, activeTab, projectName = "Select Pr
                 </div>
 
                 <div class="flex items-center space-x-3">
+                    <div class="hidden sm:flex flex-col items-end mr-2 pr-3 border-r border-gray-100 text-right">
+                        <span class="text-[11px] font-black text-gray-900 leading-none">${session.fullName || 'User'}</span>
+                        <span class="text-[9px] font-bold text-indigo-500 uppercase tracking-tighter mt-1">${session.role || 'Member'}</span>
+                    </div>
+
                     <div class="relative" id="header-settings-wrapper" onmouseleave="document.getElementById('settings-dropdown').classList.add('hidden')">
                         <button onclick="document.getElementById('settings-dropdown').classList.toggle('hidden')" 
                                 class="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors border border-gray-100 bg-gray-50/50"
@@ -88,7 +99,7 @@ export function renderProjectHeader(session, activeTab, projectName = "Select Pr
 
                     ${isAdmin ? `
                         <a href="admin.html" class="hidden md:inline-flex text-[11px] font-bold bg-indigo-600 text-white px-3 py-1.5 rounded-lg hover:bg-indigo-700 transition shadow-sm uppercase tracking-tight">
-                            Team Management
+                            Team
                         </a>
                     ` : ''}
                     
@@ -100,7 +111,7 @@ export function renderProjectHeader(session, activeTab, projectName = "Select Pr
                 </div>
             </div>
 
-            ${!isDashboard ? `
+            ${(!isDashboard) ? `
                 <div class="max-w-7xl mx-auto px-4">
                     <nav class="-mb-px flex space-x-8 overflow-x-auto no-scrollbar">
                         ${visibleTabs.map(tab => `
@@ -130,13 +141,11 @@ export function renderProjectHeader(session, activeTab, projectName = "Select Pr
 
 /**
  * DYNAMIC MODAL ENGINE
- * Injects the Edit Details modal into the DOM only when requested.
  */
 window.openProjectDetails = async () => {
     const projectId = localStorage.getItem('selected_project_id');
     if (!projectId) return alert("No project selected.");
 
-    // Fetch current project data
     const { data: project, error } = await supabase
         .from('projects')
         .select('*')
@@ -145,12 +154,10 @@ window.openProjectDetails = async () => {
 
     if (error) return console.error("Fetch Error:", error);
 
-    // Create Modal Backdrop
     const modalOverlay = document.createElement('div');
     modalOverlay.id = 'dynamic-project-modal';
     modalOverlay.className = 'fixed inset-0 bg-gray-900/60 backdrop-blur-sm z-[3000] flex items-center justify-center p-4';
     
-    // RBAC Check
     const allowedRoles = ['admin', 'owner', 'project_manager'];
     const canEdit = allowedRoles.includes(window.currentSession?.role?.toLowerCase());
 
@@ -204,14 +211,13 @@ window.saveProjectDetails = async (id) => {
         alert("Update failed: " + error.message);
     } else {
         document.getElementById('dynamic-project-modal').remove();
-        // Reload to update the header title and badges
         location.reload();
     }
 };
 
 window.archiveProject = async () => {
     const projectId = localStorage.getItem('selected_project_id');
-    if (!confirm("Are you sure you want to archive this project? It will be hidden from the main dashboard.")) return;
+    if (!confirm("Are you sure you want to archive this project?")) return;
 
     const { error } = await supabase
         .from('projects')
@@ -222,5 +228,4 @@ window.archiveProject = async () => {
     else window.location.href = 'index.html';
 };
 
-// Export the engine functions so they are globally available via this module
 export { rollupToRequirement, syncHierarchyStatus };

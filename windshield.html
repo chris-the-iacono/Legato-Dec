@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Windshield | Project Hub</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50">
+
+    <div id="main-header"></div>
+
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div class="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-4">
+            <div>
+                <nav class="flex mb-4" aria-label="Breadcrumb">
+                    <ol class="flex items-center space-x-2 text-[10px] font-bold uppercase tracking-widest">
+                        <li><a href="index.html" class="text-gray-400 hover:text-indigo-600 transition">Projects</a></li>
+                        <li class="text-gray-300">/</li>
+                        <li class="text-indigo-600" id="breadcrumb-project-name">Loading...</li>
+                    </ol>
+                </nav>
+                <h1 id="windshield-title" class="text-4xl font-black text-gray-900 tracking-tight">Project Baseline</h1>
+                <p id="windshield-brief" class="text-gray-500 mt-2 max-w-2xl italic">Initializing project workspace...</p>
+            </div>
+            
+            <div class="bg-white p-4 rounded-2xl border border-gray-200 shadow-sm flex items-center gap-4">
+                <div class="relative w-16 h-16">
+                    <svg class="w-full h-full" viewBox="0 0 36 36">
+                        <path class="text-gray-100" stroke-width="3" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                        <path id="health-circle" class="text-green-500 transition-all duration-1000" stroke-width="3" stroke-dasharray="100, 100" stroke-linecap="round" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                    </svg>
+                    <div class="absolute inset-0 flex items-center justify-center">
+                        <span id="health-value" class="text-xs font-black">--</span>
+                    </div>
+                </div>
+                <div>
+                    <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Project Health</p>
+                    <p id="health-status" class="text-sm font-black text-gray-900 uppercase">Stable</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            
+            <div class="lg:col-span-2 space-y-8">
+                <section class="bg-white rounded-3xl border border-gray-100 shadow-sm p-8">
+                    <h3 class="text-lg font-black text-gray-900 mb-6 flex items-center gap-2">
+                        <span class="w-2 h-6 bg-indigo-600 rounded-full"></span>
+                        Project Intent (Business Case)
+                    </h3>
+                    <p id="display-reason" class="text-gray-600 leading-relaxed text-sm whitespace-pre-line">No business case provided.</p>
+                </section>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
+                        <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-4">Executive Sponsor</p>
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 bg-indigo-50 rounded-full flex items-center justify-center text-indigo-600 font-bold">ES</div>
+                            <p id="display-sponsor" class="font-black text-gray-900">Not Assigned</p>
+                        </div>
+                    </div>
+                    <div class="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
+                        <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-4">Project Manager</p>
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 bg-emerald-50 rounded-full flex items-center justify-center text-emerald-600 font-bold">PM</div>
+                            <p id="display-pm" class="font-black text-gray-900">Not Assigned</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="space-y-8">
+                <section class="bg-gray-900 rounded-3xl p-8 text-white shadow-xl">
+                    <h3 class="text-sm font-bold uppercase tracking-widest mb-6 opacity-60">Governance Rules</h3>
+                    <div class="space-y-6">
+                        <div>
+                            <div class="flex justify-between items-center mb-2">
+                                <span class="text-xs font-medium">PM Auto-Approve Limit</span>
+                                <span id="display-pm-limit" class="text-indigo-400 font-black">--%</span>
+                            </div>
+                            <div class="w-full bg-gray-800 h-1 rounded-full"><div class="bg-indigo-500 h-1 rounded-full w-[10%]"></div></div>
+                        </div>
+                        <div>
+                            <div class="flex justify-between items-center mb-2">
+                                <span class="text-xs font-medium">Exec Approval Required Above</span>
+                                <span id="display-exec-limit" class="text-emerald-400 font-black">--%</span>
+                            </div>
+                            <div class="w-full bg-gray-800 h-1 rounded-full"><div class="bg-emerald-500 h-1 rounded-full w-[25%]"></div></div>
+                        </div>
+                    </div>
+                    <div class="mt-8 pt-8 border-t border-gray-800">
+                        <button onclick="window.location.href='requirements.html'" class="w-full bg-white text-gray-900 py-4 rounded-2xl font-black text-sm hover:bg-gray-100 transition shadow-lg">
+                            Manage Requirements &rarr;
+                        </button>
+                    </div>
+                </section>
+            </div>
+        </div>
+    </main>
+
+<script type="module">
+    import { supabase } from './js/config.js';
+    import { checkAccess } from './js/auth.js';
+    import { renderProjectHeader } from './js/components.js';
+
+    let currentProjectId = localStorage.getItem('selected_project_id');
+
+    document.addEventListener('DOMContentLoaded', async () => {
+        const sessionData = await checkAccess();
+        if (!sessionData || !currentProjectId) return window.location.href = 'index.html';
+
+        renderProjectHeader(sessionData, 'windshield', 'Project Hub');
+        await loadWindshieldData();
+    });
+
+    async function loadWindshieldData() {
+        try {
+            // JOIN user_profiles to get names for the sponsor/pm
+            const { data: p, error } = await supabase
+                .from('projects')
+                .select(`
+                    *,
+                    sponsor:executive_sponsor_id ( full_name ),
+                    pm:project_manager_id ( full_name )
+                `)
+                .eq('id', currentProjectId)
+                .single();
+
+            if (error) throw error;
+
+            // Update UI
+            document.getElementById('breadcrumb-project-name').innerText = p.name;
+            document.getElementById('windshield-title').innerText = p.title || p.name;
+            document.getElementById('windshield-brief').innerText = p.project_brief || "Enter a project brief in settings.";
+            document.getElementById('display-reason').innerText = p.project_reason || "No strategic reason provided.";
+            document.getElementById('display-sponsor').innerText = p.sponsor?.full_name || "Unassigned";
+            document.getElementById('display-pm').innerText = p.pm?.full_name || "Unassigned";
+            document.getElementById('display-pm-limit').innerText = `${p.threshold_pm_limit}%`;
+            document.getElementById('display-exec-limit').innerText = `${p.threshold_exec_limit}%`;
+            
+            // Health Circle Logic
+            const health = p.health_score || 100;
+            document.getElementById('health-value').innerText = health;
+            const healthCircle = document.getElementById('health-circle');
+            healthCircle.setAttribute('stroke-dasharray', `${health}, 100`);
+            
+            if (health < 50) healthCircle.classList.replace('text-green-500', 'text-red-500');
+            else if (health < 80) healthCircle.classList.replace('text-green-500', 'text-yellow-500');
+
+        } catch (err) {
+            console.error("Windshield Error:", err);
+        }
+    }
+</script>
+</body>
+</html>

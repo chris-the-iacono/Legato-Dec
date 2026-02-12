@@ -43,7 +43,7 @@ export async function handleSignOut() {
 
 /**
  * Check Access: Verifies session and fetches Tenant/Profile data
- * Fixed: Explicitly maps return keys to match components.js expectations
+ * Audit Fix: Uses .maybeSingle() and provides full module fallbacks to prevent UI crashes.
  */
 export async function checkAccess() {
     // 1. Check if a basic Auth session exists
@@ -55,37 +55,45 @@ export async function checkAccess() {
     }
 
     // 2. STEP 1: Fetch Profile 
-    // Uses 'hourly_cost' to match your database column name
+    // CHANGE: Used .maybeSingle() to prevent 406 error if row is missing
     const { data: profile, error: profileError } = await supabase
         .from('user_profiles')
         .select('role, tenant_id, full_name, hourly_cost') 
         .eq('user_id', session.user.id)
-        .single();
+        .maybeSingle(); 
 
     if (profileError || !profile) {
-        console.error("Profile Fetch Error (Check if columns exist):", profileError);
-        // Fallback: Return at least the email if profile fails so the app doesn't crash
+        console.warn("Profile missing for authenticated user. Providing fallback session.");
+        // FIX: Added 'modules' object here so renderProjectHeader doesn't crash
         return {
             user: session.user,
             fullName: session.user.email,
-            role: 'User',
-            tenantId: null
+            role: 'Guest',
+            tenantId: null,
+            tenantName: 'No Workspace',
+            hourlyRate: 0,
+            modules: {
+                module_requirements: false,
+                module_risks: false,
+                module_issues: false,
+                module_changes: false
+            }
         };
     }
 
-    // 3. STEP 2: Fetch Tenant data separately
+    // 3. STEP 2: Fetch Tenant data
+    // CHANGE: Used .maybeSingle() for consistency
     const { data: tenant, error: tenantError } = await supabase
         .from('tenants')
         .select('*')
         .eq('tenant_id', profile.tenant_id)
-        .single();
+        .maybeSingle();
 
     if (tenantError) {
         console.warn("Tenant Fetch Warning:", tenantError);
     }
 
     // 4. RETURN UNIFIED SESSION OBJECT
-    // These keys (fullName, role, tenantName) are mapped to match renderProjectHeader
     return {
         user: session.user,
         fullName: profile.full_name || session.user.email.split('@')[0], 

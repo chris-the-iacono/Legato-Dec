@@ -109,4 +109,128 @@ export function renderProjectHeader(session, activeTab, projectName = "Select Pr
                     
                     <div class="h-6 w-px bg-gray-200 mx-1"></div>
                     
-                    <button id="global-signout" class="text-xs font-bold text-gray-400 hover:text-
+                    <button id="global-signout" class="text-xs font-bold text-gray-400 hover:text-red-600 transition">
+                        Sign Out
+                    </button>
+                </div>
+            </div>
+
+            ${(!isDashboard) ? `
+                <div class="max-w-7xl mx-auto px-4">
+                    <nav class="-mb-px flex space-x-8 overflow-x-auto no-scrollbar">
+                        ${visibleTabs.map(tab => `
+                            <a href="${tab.link}" 
+                               class="whitespace-nowrap py-3 px-1 border-b-2 font-bold text-xs transition-all duration-200 tracking-tight
+                               ${activeTab === tab.id 
+                                   ? 'border-indigo-500 text-indigo-600' 
+                                   : 'border-transparent text-gray-400 hover:text-gray-600 hover:border-gray-300'}">
+                                ${tab.name}
+                            </a>
+                        `).join('')}
+                    </nav>
+                </div>
+            ` : ''}
+        </header>
+    `;
+
+    // 7. ATTACH EVENTS
+    const signOutBtn = document.getElementById('global-signout');
+    if (signOutBtn) {
+        signOutBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            handleSignOut(); 
+        });
+    }
+}
+
+/**
+ * DYNAMIC MODAL ENGINE
+ */
+window.openProjectDetails = async () => {
+    const projectId = localStorage.getItem('selected_project_id');
+    if (!projectId) return alert("No project selected.");
+
+    const { data: project, error } = await supabase
+        .from('projects')
+        .select('*')
+        .eq('id', projectId)
+        .single();
+
+    if (error) return console.error("Fetch Error:", error);
+
+    const modalOverlay = document.createElement('div');
+    modalOverlay.id = 'dynamic-project-modal';
+    modalOverlay.className = 'fixed inset-0 bg-gray-900/60 backdrop-blur-sm z-[3000] flex items-center justify-center p-4';
+    
+    const allowedRoles = ['admin', 'owner', 'project_manager'];
+    const canEdit = allowedRoles.includes(window.currentSession?.role?.toLowerCase());
+
+    modalOverlay.innerHTML = `
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200">
+            <div class="p-6 border-b border-gray-100 flex justify-between items-center">
+                <h2 class="text-lg font-black text-gray-900 uppercase tracking-tight">Project Details</h2>
+                <button onclick="document.getElementById('dynamic-project-modal').remove()" class="text-gray-400 hover:text-gray-600">&times;</button>
+            </div>
+            <div class="p-6 space-y-4">
+                <div>
+                    <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Project Title</label>
+                    <input id="edit-project-title" type="text" value="${project.title}" ${!canEdit ? 'disabled' : ''} 
+                           class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none disabled:bg-gray-50">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Status</label>
+                    <select id="edit-project-status" ${!canEdit ? 'disabled' : ''} 
+                            class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none disabled:bg-gray-50">
+                        <option value="Active" ${project.status === 'Active' ? 'selected' : ''}>Active</option>
+                        <option value="On Hold" ${project.status === 'On Hold' ? 'selected' : ''}>On Hold</option>
+                        <option value="Cancelled" ${project.status === 'Cancelled' ? 'selected' : ''}>Cancelled</option>
+                        <option value="Complete" ${project.status === 'Complete' ? 'selected' : ''}>Complete</option>
+                    </select>
+                </div>
+                <div class="pt-4 flex gap-3">
+                    <button onclick="document.getElementById('dynamic-project-modal').remove()" 
+                            class="flex-1 px-4 py-2 border border-gray-200 rounded-lg text-xs font-bold text-gray-600 hover:bg-gray-50 transition-colors">Cancel</button>
+                    ${canEdit ? `
+                        <button onclick="window.saveProjectDetails('${project.id}')" 
+                                class="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg text-xs font-bold hover:bg-indigo-700 transition-shadow shadow-md">Save Changes</button>
+                    ` : ''}
+
+                </div>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(modalOverlay);
+};
+
+window.saveProjectDetails = async (id) => {
+    const title = document.getElementById('edit-project-title').value;
+    const status = document.getElementById('edit-project-status').value;
+
+    const { error } = await supabase
+        .from('projects')
+        .update({ title, status })
+        .eq('id', id);
+
+    if (error) {
+        alert("Update failed: " + error.message);
+    } else {
+        document.getElementById('dynamic-project-modal').remove();
+        location.reload();
+    }
+};
+
+window.archiveProject = async () => {
+    const projectId = localStorage.getItem('selected_project_id');
+    if (!confirm("Are you sure you want to archive this project?")) return;
+
+    const { error } = await supabase
+        .from('projects')
+        .update({ status: 'Archived' })
+        .eq('id', projectId);
+
+    if (error) alert(error.message);
+    else window.location.href = 'index.html';
+};
+
+export { rollupToRequirement, syncHierarchyStatus };

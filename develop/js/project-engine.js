@@ -307,6 +307,53 @@ window.loadRequirementHistory = async function(reqId) {
         historyContainer.innerHTML = '<p class="text-xs text-red-500 text-center py-4">Failed to load history.</p>';
     }
 };
+
+/**
+ * project-engine.js 
+ * Updated logic for your existing change_items schema
+ */
+
+window.recordChangeDraft = async (stepId, newData, delta) => {
+    // 1. Context Fetch
+    const { data: step } = await supabase
+        .from('steps')
+        .select(`
+            requirement_id, 
+            tenant_id, 
+            estimated_hours,
+            projects(id)
+        `)
+        .eq('step_id', stepId)
+        .single();
+
+    // 2. Create formal Change Item record using your exact schema
+    const { data: changeItem, error: crError } = await supabase
+        .from('change_items')
+        .insert([{
+            project_id: step.projects.id,
+            tenant_id: step.tenant_id,
+            requirement_id: step.requirement_id,
+            title: `Variance: ${newData.title}`,
+            change_type: 'Cost/Schedule Variance',
+            change_reason: newData.changeReason || 'Threshold exceeded',
+            original_hours: step.estimated_hours,
+            requested_hours: newData.estimated_hours,
+            total_cost_rollup: newData.cost,
+            change_status: 'Pending',
+            change_accountable: window.sessionData?.userId, // The user who triggered the change
+            adds_requirement: false,
+            adds_steps: false
+        }]).select().single();
+
+    if (crError) throw crError;
+
+    // 3. Virtual Path Audit Trail
+    const auditContent = `?? CHANGE REQUEST #${changeItem.change_number} GENERATED: ${delta.toFixed(1)}% variance.`;
+    await window.appendNoteToActivity(stepId, auditContent);
+
+    return changeItem;
+};
+
 /**
  * 3. REAL-TIME LISTENER
  */

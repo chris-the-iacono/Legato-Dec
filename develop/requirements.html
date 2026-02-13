@@ -755,6 +755,17 @@ window.rollupToRequirement = async (reqId = window.selectedReqId, steps = null) 
     // 1. Validation & Pre-checks
     if (!window.selectedReqId) return alert("Select a requirement first.");
     
+    // Check User Status (Instructional Guard)
+    const { data: profile } = await supabase
+        .from('user_profiles')
+        .select('user_status')
+        .eq('user_id', window.sessionData?.userId)
+        .single();
+
+    if (profile?.user_status !== 'Active' && profile?.user_status !== undefined) {
+        return alert(`Submission blocked. Your current status is: ${profile.user_status}`);
+    }
+    
     const editingStepId = document.getElementById('step-id-hidden')?.value; 
     const title = document.getElementById('step-title-input')?.value.trim();
     const assignedId = document.getElementById('step-assign-select')?.value;
@@ -786,25 +797,34 @@ window.rollupToRequirement = async (reqId = window.selectedReqId, steps = null) 
         // --- UPDATE EXISTING STEP ---
         if (!changeReason) return alert("Please provide a reason for this estimate change.");
         
+        // FETCH CURRENT DATA & PROJECT THRESHOLDS
         const { data: currentStep } = await supabase
             .from('steps')
-            .select('version_number')
+            .select(`
+                version_number, 
+                cost, 
+                projects(cost_threshold, schedule_threshold, status)
+            `)
             .eq('step_id', editingStepId)
             .single();
         
         const nextVersion = (parseInt(currentStep?.version_number) || 1) + 1;
+        const projectSettings = currentStep?.projects || {};
+        const projectStatus = (projectSettings.status || 'Planning').toLowerCase();
 
-        // --- IMPROVED GOVERNANCE GATE ---
-        // Dynamically checks for project status in multiple possible global locations
-        const projectStatus = (
-            window.currentProjectStatus || 
-            window.projectData?.status || 
-            'planning'
-        ).toLowerCase();
+        // --- THE CIRCUIT BREAKER CALCULATION ---
+        if (projectStatus === 'active') {
+            const oldCost = parseFloat(currentStep.cost) || 0;
+            const costDiff = calculatedCost - oldCost;
+            // Calculate % change relative to the previous version
+            const percentChange = oldCost === 0 ? 100 : (costDiff / oldCost) * 100;
+            const threshold = parseFloat(projectSettings.cost_threshold) || 0;
 
-        // Flag as CR if Project is Active and a baseline (v1) already exists
-        if (projectStatus === 'active' && currentStep.version_number >= 1) {
-            isCR = true;
+            if (percentChange > threshold) {
+                isCR = true;
+                const proceed = confirm(`?? This change represents a ${percentChange.toFixed(1)}% increase, which exceeds the project threshold of ${threshold}%. \n\nThis will be logged as a formal CHANGE REQUEST. Do you wish to proceed?`);
+                if (!proceed) return;
+            }
         }
         
         const { data, error: updateError } = await supabase.from('steps')
@@ -822,7 +842,7 @@ window.rollupToRequirement = async (reqId = window.selectedReqId, steps = null) 
         resultStep = data;
         error = updateError;
     } else {
-        // --- INSERT NEW STEP ---
+        // --- INSERT NEW STEP (Logic remains identical) ---
         const { data: existing } = await supabase
             .from('steps')
             .select('sequence_order')
@@ -850,35 +870,30 @@ window.rollupToRequirement = async (reqId = window.selectedReqId, steps = null) 
 
     if (error) return alert("Save failed: " + error.message);
 
-    // 4. AUDIT LOG: Unified capture
-    // Corrected label with Emoji for UI Visibility
-    const auditLabel = isCR ? "\u26A0\uFE0F CHANGE REQUEST" : "Baseline Adjustment";
-	//const auditLabel = isCR ? "?? CHANGE REQUEST" : "Baseline Adjustment";
+    // 4. AUDIT LOG: Patterns for your "Virtual Path" fetch
+    const auditLabel = isCR ? "?? CHANGE REQUEST" : "Baseline Adjustment";
     const auditContent = editingStepId 
         ? `${auditLabel} (v${resultStep.version_number}): $${calculatedCost.toLocaleString()} (${hours}h). Reason: ${changeReason}`
         : `Task created (v1 Baseline). Budgeted at $${calculatedCost.toLocaleString()} (${hours}h @ $${effectiveRate}/h)`;
 
-    // Persist to task_notes via utility function
     await appendNoteToActivity(resultStep.step_id, auditContent);
 
-    // 5. SYNC: Close UI, Rollup budget, and Refresh UI
+    // 5. SYNC & UI REFRESH
     window.closeTaskSlider();
     
-    if (window.rollupToRequirement) {
-        await window.rollupToRequirement(window.selectedReqId);
-    }
+    if (window.rollupToRequirement) await window.rollupToRequirement(window.selectedReqId);
     
-    if (typeof window.refreshSteps === 'function') {
-        await window.refreshSteps();
-    } else if (typeof window.loadSteps === 'function') {
-        await window.loadSteps(window.selectedReqId);
-    }
+    // Check for specific refresh functions
+    if (typeof window.refreshSteps === 'function') await window.refreshSteps();
+    else if (typeof window.loadSteps === 'function') await window.loadSteps(window.selectedReqId);
     
-    if (typeof window.loadRequirements === 'function') {
-        window.loadRequirements();
-    }
+    if (typeof window.loadRequirements === 'function') window.loadRequirements();
     
-    console.log(`Task ${resultStep.step_id} saved successfully. Status: ${isCR ? 'CR Generated' : 'Baseline Updated'}`);
+    // If it was a CR, we can optionally redirect to the changes page for more detail
+    if (isCR) {
+        console.log("CR Triggered. Redirecting to Audit Trail.");
+        // window.location.href = `changes.html?step_id=${resultStep.step_id}`; 
+    }
 };
 		//-----Added 1/30 @ 2:00 re-tested at 2:28
 		

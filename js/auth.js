@@ -86,6 +86,10 @@ export async function checkAccess() {
         .select('tenant_name, module_requirements, module_risks, module_issues, module_changes')
         .eq('tenant_id', profile.tenant_id)
         .maybeSingle();
+		
+	// DEBUG LOG
+	console.log("Profile Tenant ID:", profile.tenant_id);
+	console.log("Tenant Table Result:", tenant);
 
     if (tenantError) {
         console.warn("Tenant Fetch Warning:", tenantError);

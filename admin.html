@@ -6,34 +6,105 @@
     <title>Super Admin | Pro-Man</title>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="bg-gray-900 min-h-screen text-gray-100">
+<body class="bg-gray-900 min-h-screen text-gray-100 font-sans">
 
-    <nav class="bg-gray-800 border-b border-gray-700 p-4">
-        <div class="max-w-7xl mx-auto flex justify-between items-center">
-            <h1 class="text-xl font-bold text-indigo-400">Application Control Center</h1>
-            <a href="index.html" class="text-sm text-gray-400 hover:text-white">Exit to App</a>
+    <nav class="bg-gray-800 border-b border-gray-700 sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 h-16 flex justify-between items-center">
+            <div class="flex items-center space-x-3">
+                <div class="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center font-black text-white">P</div>
+                <h1 class="text-xl font-bold tracking-tight">Control Center</h1>
+            </div>
+            <a href="index.html" class="text-xs font-bold uppercase tracking-widest text-gray-400 hover:text-white transition">Exit to App</a>
         </div>
     </nav>
 
-    <main class="max-w-7xl mx-auto py-10 px-4">
-        <h2 class="text-2xl font-bold mb-6">Tenant Subscription Management</h2>
+    <main class="max-w-7xl mx-auto py-10 px-4 space-y-12">
+        
+        <section>
+            <div class="flex justify-between items-end mb-6">
+                <div>
+                    <h2 class="text-2xl font-bold">Team Management</h2>
+                    <p class="text-gray-400 text-sm mt-1">Add new profiles and associate them with active projects.</p>
+                </div>
+                <button onclick="toggleInviteModal()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-bold transition shadow-lg">
+                    + Add Team Member
+                </button>
+            </div>
 
-        <div class="bg-gray-800 shadow-xl rounded-lg overflow-hidden border border-gray-700">
-            <table class="min-w-full divide-y divide-gray-700">
-                <thead class="bg-gray-900">
-                    <tr>
-                        <th class="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase">Tenant Name</th>
-                        <th class="px-6 py-4 text-center text-xs font-semibold text-gray-400 uppercase tracking-widest">Requirements</th>
-                        <th class="px-6 py-4 text-center text-xs font-semibold text-gray-400 uppercase tracking-widest">Risks</th>
-                        <th class="px-6 py-4 text-center text-xs font-semibold text-gray-400 uppercase tracking-widest">Issues</th>
-                        <th class="px-6 py-4 text-center text-xs font-semibold text-gray-400 uppercase tracking-widest">Changes</th>
-                    </tr>
-                </thead>
-                <tbody id="tenant-admin-list" class="divide-y divide-gray-700">
-                    </tbody>
-            </table>
-        </div>
+            <div class="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden shadow-2xl">
+                <table class="min-w-full divide-y divide-gray-700">
+                    <thead class="bg-gray-900/50">
+                        <tr>
+                            <th class="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Name</th>
+                            <th class="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Role</th>
+                            <th class="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Associated Projects</th>
+                            <th class="px-6 py-4 text-right text-[10px] font-black text-gray-400 uppercase tracking-widest">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="team-list" class="divide-y divide-gray-700">
+                        </tbody>
+                </table>
+            </div>
+        </section>
+
+        <section>
+            <h2 class="text-2xl font-bold mb-6">Tenant Subscription Management</h2>
+            <div class="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden shadow-2xl">
+                <table class="min-w-full divide-y divide-gray-700">
+                    <thead class="bg-gray-900/50">
+                        <tr>
+                            <th class="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Tenant Name</th>
+                            <th class="px-6 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Reqs</th>
+                            <th class="px-6 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Risks</th>
+                            <th class="px-6 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Issues</th>
+                            <th class="px-6 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Changes</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tenant-admin-list" class="divide-y divide-gray-700">
+                        </tbody>
+                </table>
+            </div>
+        </section>
     </main>
+
+    <div id="invite-modal" class="hidden fixed inset-0 bg-gray-900/80 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+        <div class="bg-gray-800 border border-gray-700 w-full max-w-md rounded-2xl shadow-2xl overflow-hidden">
+            <div class="p-6 border-b border-gray-700 flex justify-between items-center">
+                <h3 class="font-bold text-lg">Add Team Member</h3>
+                <button onclick="toggleInviteModal()" class="text-gray-400 hover:text-white">&times;</button>
+            </div>
+            <form id="invite-form" class="p-6 space-y-4">
+                <div>
+                    <label class="block text-[10px] font-black text-gray-400 uppercase mb-1">Full Name</label>
+                    <input type="text" id="new-user-name" required class="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-black text-gray-400 uppercase mb-1">Email (Placeholder)</label>
+                    <input type="email" id="new-user-email" required class="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-[10px] font-black text-gray-400 uppercase mb-1">App Role</label>
+                        <select id="new-user-role" class="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-sm outline-none">
+                            <option value="Member">Member</option>
+                            <option value="PM">Project Manager</option>
+                            <option value="Admin">Admin</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-black text-gray-400 uppercase mb-1">Assign to Project</label>
+                        <select id="new-user-project" class="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-sm outline-none">
+                            <option value="">None / Floating</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="pt-4 flex space-x-3">
+                    <button type="button" onclick="toggleInviteModal()" class="flex-1 px-4 py-2 border border-gray-600 rounded-lg text-xs font-bold hover:bg-gray-700 transition">Cancel</button>
+                    <button type="submit" class="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg text-xs font-bold hover:bg-indigo-700 shadow-lg">Create Profile</button>
+                </div>
+            </form>
+        </div>
+    </div>
 
     <script type="module">
         import { supabase } from './js/config.js';
@@ -42,41 +113,110 @@
         let adminSession = null;
 
         document.addEventListener('DOMContentLoaded', async () => {
-            // Verify Super Admin Role
             adminSession = await checkAccess();
-            if (adminSession.role !== 'admin') {
+            if (adminSession.role.toLowerCase() !== 'admin') {
                 alert("Access Denied: Super Admin role required.");
                 window.location.href = 'index.html';
                 return;
             }
             loadTenants();
+            loadTeam();
+            loadProjectDropdown();
         });
 
+        // --- SECTION: TEAM MANAGEMENT ---
+
+        async function loadTeam() {
+            const { data: users, error } = await supabase
+                .from('user_profiles')
+                .select('*')
+                .eq('tenant_id', adminSession.tenantId);
+
+            if (error) return console.error(error);
+
+            const container = document.getElementById('team-list');
+            container.innerHTML = users.map(u => `
+                <tr class="hover:bg-gray-750/50 transition">
+                    <td class="px-6 py-4">
+                        <div class="text-sm font-bold text-white">${u.full_name}</div>
+                        <div class="text-[10px] text-gray-500">ID: ...${u.user_id.slice(-8)}</div>
+                    </td>
+                    <td class="px-6 py-4">
+                        <span class="text-[10px] font-black px-2 py-1 rounded bg-indigo-900/40 text-indigo-400 uppercase">${u.role}</span>
+                    </td>
+                    <td class="px-6 py-4 text-sm text-gray-400">---</td>
+                    <td class="px-6 py-4 text-right">
+                        <span class="text-[10px] font-bold text-green-500 uppercase">Active</span>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        async function loadProjectDropdown() {
+            const { data: projects } = await supabase
+                .from('projects')
+                .select('id, title')
+                .eq('tenant_id', adminSession.tenantId);
+            
+            const select = document.getElementById('new-user-project');
+            if (projects) {
+                projects.forEach(p => {
+                    const opt = document.createElement('option');
+                    opt.value = p.id;
+                    opt.textContent = p.title;
+                    select.appendChild(opt);
+                });
+            }
+        }
+
+        window.toggleInviteModal = () => {
+            document.getElementById('invite-modal').classList.toggle('hidden');
+        };
+
+        document.getElementById('invite-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const name = document.getElementById('new-user-name').value;
+            const role = document.getElementById('new-user-role').value;
+            const projectId = document.getElementById('new-user-project').value;
+
+            // Simple row creation for now (Placeholder user_id for dev testing)
+            const { data, error } = await supabase
+                .from('user_profiles')
+                .insert([{
+                    user_id: crypto.randomUUID(), // Temporarily generating UUID until Auth is wired
+                    full_name: name,
+                    role: role,
+                    tenant_id: adminSession.tenantId
+                }]).select();
+
+            if (error) {
+                alert("Error: " + error.message);
+            } else {
+                // If a project was selected, link them in the future project_members table
+                toggleInviteModal();
+                loadTeam();
+            }
+        });
+
+        // --- SECTION: SUBSCRIPTIONS ---
+
         async function loadTenants() {
-            // Fetch tenants and their subscription toggles
             const { data: tenants, error } = await supabase
                 .from('tenants')
-                .select(`
-                    tenant_id,
-                    tenant_name,
-                    subscriptions (*)
-                `);
+                .select('*');
 
             if (error) return console.error(error);
 
             const container = document.getElementById('tenant-admin-list');
-            container.innerHTML = tenants.map(t => {
-                const sub = t.subscriptions[0] || {};
-                return `
-                    <tr class="hover:bg-gray-750 transition">
-                        <td class="px-6 py-4 font-medium text-white">${t.tenant_name}</td>
-                        <td class="px-6 py-4 text-center">${renderToggle(t.tenant_id, 'module_requirements', sub.module_requirements)}</td>
-                        <td class="px-6 py-4 text-center">${renderToggle(t.tenant_id, 'module_risks', sub.module_risks)}</td>
-                        <td class="px-6 py-4 text-center">${renderToggle(t.tenant_id, 'module_issues', sub.module_issues)}</td>
-                        <td class="px-6 py-4 text-center">${renderToggle(t.tenant_id, 'module_changes', sub.module_changes)}</td>
-                    </tr>
-                `;
-            }).join('');
+            container.innerHTML = tenants.map(t => `
+                <tr class="hover:bg-gray-750/50 transition">
+                    <td class="px-6 py-4 font-bold text-indigo-400">${t.tenant_name}</td>
+                    <td class="px-6 py-4 text-center">${renderToggle(t.tenant_id, 'module_requirements', t.module_requirements)}</td>
+                    <td class="px-6 py-4 text-center">${renderToggle(t.tenant_id, 'module_risks', t.module_risks)}</td>
+                    <td class="px-6 py-4 text-center">${renderToggle(t.tenant_id, 'module_issues', t.module_issues)}</td>
+                    <td class="px-6 py-4 text-center">${renderToggle(t.tenant_id, 'module_changes', t.module_changes)}</td>
+                </tr>
+            `).join('');
         }
 
         function renderToggle(tenantId, column, value) {
@@ -84,17 +224,17 @@
                 <input type="checkbox" 
                     ${value ? 'checked' : ''} 
                     onchange="toggleModule('${tenantId}', '${column}', this.checked)"
-                    class="w-5 h-5 rounded border-gray-600 bg-gray-700 text-indigo-600 focus:ring-indigo-500">
+                    class="w-4 h-4 rounded border-gray-600 bg-gray-900 text-indigo-600 focus:ring-indigo-500 transition cursor-pointer">
             `;
         }
 
         window.toggleModule = async (tenantId, column, isEnabled) => {
             const { error } = await supabase
-                .from('subscriptions')
+                .from('tenants')
                 .update({ [column]: isEnabled })
                 .eq('tenant_id', tenantId);
             
-            if (error) alert("Error updating subscription: " + error.message);
+            if (error) alert("Update failed: " + error.message);
         };
     </script>
 </body>

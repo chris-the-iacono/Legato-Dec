@@ -24,6 +24,9 @@
                     <p class="text-[10px] text-gray-500 font-medium">Manage formal project variances</p>
                 </div>
                 <div class="flex items-center space-x-2">
+                    <button onclick="createNewManualCR()" class="p-1.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition shadow-sm" title="New Change Request">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 4v16m8-8H4" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </button>
                     <select id="cr-group-by" onchange="loadCRList()" class="text-[10px] font-bold border-gray-200 rounded bg-white px-2 py-1 outline-none">
                         <option value="none">Sort: Newest</option>
                         <option value="requirement">Group: Requirement</option>
@@ -122,6 +125,11 @@
                 .order('created_at', { ascending: false });
 
             const container = document.getElementById('cr-list');
+            if (!changes || changes.length === 0) {
+                container.innerHTML = `<p class="text-[10px] text-center text-gray-400 font-bold uppercase mt-10">No records found</p>`;
+                return;
+            }
+
             if (groupBy === 'requirement') {
                 const grouped = changes.reduce((acc, cr) => {
                     const key = cr.requirements?.title || 'General/Unassigned';
@@ -139,9 +147,12 @@
         };
 
         function renderCRCard(cr) {
-            const statusColor = cr.change_status === 'Approved' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700';
+            let statusColor = 'bg-yellow-100 text-yellow-700';
+            if (cr.change_status === 'Approved') statusColor = 'bg-green-100 text-green-700';
+            if (cr.change_status === 'Rejected') statusColor = 'bg-red-100 text-red-700';
+
             return `
-                <div onclick="loadCRDetail('${cr.change_id}')" class="p-4 mb-2 bg-white border border-gray-200 rounded-xl hover:border-indigo-500 cursor-pointer shadow-sm group">
+                <div onclick="loadCRDetail('${cr.change_id}')" class="p-4 mb-2 bg-white border border-gray-200 rounded-xl hover:border-indigo-500 cursor-pointer shadow-sm group transition-all">
                     <div class="flex justify-between items-start mb-2">
                         <span class="text-[10px] font-black text-indigo-600 uppercase">CR-${cr.change_number || 'X'}</span>
                         <span class="text-[8px] font-black px-1.5 py-0.5 rounded ${statusColor} uppercase">${cr.change_status || 'Draft'}</span>
@@ -152,10 +163,12 @@
 
         window.loadCRDetail = async (id) => {
             const { data: cr } = await supabase.from('change_items').select('*, user_profiles:change_accountable(full_name)').eq('change_id', id).single();
+            if (!cr) return;
+
             document.getElementById('cr-empty-state').classList.add('hidden');
             document.getElementById('cr-form-container').classList.remove('hidden');
+            
             document.getElementById('display-cr-id').innerText = `CR-${cr.change_number}`;
-            document.getElementById('display-cr-status').innerText = cr.change_status;
             document.getElementById('cr-status-select').value = cr.change_status || 'Pending';
             document.getElementById('display-cr-title').innerText = cr.title;
             document.getElementById('display-cr-accountable').innerText = cr.user_profiles?.full_name || 'System';
@@ -173,7 +186,7 @@
             
             const updates = {
                 change_type: document.getElementById('cr-type').value,
-                requested_hours: parseFloat(document.getElementById('cr-hours').value),
+                requested_hours: parseFloat(document.getElementById('cr-hours').value) || 0,
                 change_reason: document.getElementById('cr-reason').value,
                 impact_analysis: document.getElementById('cr-impact').value,
                 change_status: status,
@@ -182,12 +195,56 @@
 
             if (status === 'Approved') {
                 updates.approved_at = new Date().toISOString();
-                updates.approved_by = window.sessionData?.full_name;
+                // Assumes sessionData is available via auth.js or global
+                updates.approved_by = window.sessionData?.full_name || 'Authorized Admin';
             }
 
             const { error } = await supabase.from('change_items').update(updates).eq('change_id', id);
-            if (error) alert(error.message);
-            else { alert("CR Updated & Processed."); loadCRList(); }
+            if (error) {
+                alert(error.message);
+            } else {
+                alert("CR Updated & Governance Engine Notified.");
+                loadCRList();
+            }
+        };
+
+        window.createNewManualCR = async () => {
+            const title = prompt("Enter a Title for this Change Request:");
+            if (!title) return;
+
+            try {
+                // Get latest sequence
+                const { data: latest } = await supabase
+                    .from('change_items')
+                    .select('change_number')
+                    .order('change_number', { ascending: false })
+                    .limit(1)
+                    .single();
+
+                const newNumber = (latest?.change_number || 0) + 1;
+
+                const { data: newCR, error } = await supabase
+                    .from('change_items')
+                    .insert([{
+                        project_id: currentProjectId,
+                        title: title,
+                        change_number: newNumber,
+                        change_status: 'Draft',
+                        change_type: 'Manual Variance',
+                        created_at: new Date().toISOString()
+                    }])
+                    .select()
+                    .single();
+
+                if (error) throw error;
+
+                await loadCRList();
+                loadCRDetail(newCR.change_id);
+                
+            } catch (err) {
+                console.error("Initiation Error:", err.message);
+                alert("Creation failed: " + err.message);
+            }
         };
 
         window.exportToPDF = () => {
@@ -195,8 +252,7 @@
             const doc = new jsPDF();
             const crId = document.getElementById('display-cr-id').innerText;
             
-            // GOVERNANCE HEADER
-            doc.setFillColor(79, 70, 229); // Indigo
+            doc.setFillColor(79, 70, 229); 
             doc.rect(0, 0, 210, 40, 'F');
             doc.setTextColor(255, 255, 255);
             doc.setFontSize(22);

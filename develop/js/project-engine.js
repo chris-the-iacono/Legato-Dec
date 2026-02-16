@@ -219,6 +219,7 @@ window.saveRequirementGovernance = async function() {
         alert("Save failed: " + err.message);
     }
 };
+
 window.loadRequirementHistory = async function(reqId) {
     const historyContainer = document.getElementById('req-history-list');
     if (!historyContainer) return;
@@ -226,7 +227,7 @@ window.loadRequirementHistory = async function(reqId) {
     const cleanId = String(reqId).trim().replace(/['"]/g, '');
 
     try {
-        // 1. Fetch Governance History (Indigo)
+        // 1. Fetch Governance
         const { data: govHistory, error: govError } = await supabase
             .from('requirement_history')
             .select('*')
@@ -235,7 +236,7 @@ window.loadRequirementHistory = async function(reqId) {
 
         if (govError) throw govError;
 
-        // 2. Fetch Formal Change Requests (Amber)
+        // 2. Fetch Formal CRs
         const { data: formalCRs, error: crError } = await supabase
             .from('change_items')
             .select('*, user_profiles:change_accountable(full_name)')
@@ -244,7 +245,7 @@ window.loadRequirementHistory = async function(reqId) {
 
         if (crError) throw crError;
 
-        // 3. Fetch Operational History (Blue)
+        // 3. Fetch Steps for Virtual Path
         const { data: steps, error: stepsError } = await supabase
             .from('steps')
             .select('step_id')
@@ -276,7 +277,7 @@ window.loadRequirementHistory = async function(reqId) {
         // --- DEBUG LOGGING ---
         console.log("Merged Audit Trail Data:", combined);
 
-        // 5. Clear and Render
+        // 5. Render
         historyContainer.innerHTML = '';
         
         if (combined.length === 0) {
@@ -295,10 +296,10 @@ window.loadRequirementHistory = async function(reqId) {
                             <span class="text-[9px] font-black bg-indigo-600 text-white px-1.5 py-0.5 rounded uppercase tracking-tighter">Governance</span>
                             <span class="text-[9px] text-indigo-400 font-mono">${dateStr}</span>
                         </div>
-                        <p class="text-xs font-bold text-indigo-900 mt-1 uppercase text-[10px]">Baseline v${item.version_number}</p>
-                        <p class="text-xs text-indigo-800">${item.change_summary}</p>
+                        <p class="text-xs font-bold text-indigo-900 mt-1 uppercase text-[10px]">Baseline v${item.version_number || 1}</p>
+                        <p class="text-xs text-indigo-800">${item.change_summary || ''}</p>
                         <p class="text-[11px] text-indigo-600 italic mt-1">"${item.change_reason || 'No reason provided'}"</p>
-                        <div class="mt-2 text-[9px] text-indigo-500 font-bold">BY: ${item.changed_by_name}</div>
+                        <div class="mt-2 text-[9px] text-indigo-500 font-bold">BY: ${item.changed_by_name || 'System'}</div>
                     </div>`;
             } else if (item.type === 'CR') {
                 cardHtml = `
@@ -307,14 +308,35 @@ window.loadRequirementHistory = async function(reqId) {
                             <span class="text-[9px] font-black bg-amber-600 text-white px-1.5 py-0.5 rounded uppercase tracking-tighter">Formal CR</span>
                             <span class="text-[9px] text-amber-500 font-mono">${dateStr}</span>
                         </div>
-                        <p class="text-xs font-bold text-amber-900 mt-1">${item.title}</p>
+                        <p class="text-xs font-bold text-amber-900 mt-1">${item.title || 'Untitled Change'}</p>
                         <div class="flex justify-between items-center mt-2">
-                            <span class="text-[9px] px-1.5 py-0.5 rounded bg-white border border-amber-200 text-amber-7
+                            <span class="text-[9px] px-1.5 py-0.5 rounded bg-white border border-amber-200 text-amber-700 font-black uppercase">
+                                ${item.change_status || 'Pending'}
+                            </span>
+                            <span class="text-[9px] text-amber-600 font-bold">Acc: ${item.user_profiles?.full_name || 'Unassigned'}</span>
+                        </div>
+                    </div>`;
+            } else {
+                cardHtml = `
+                    <div class="p-3 bg-blue-50 border-l-4 border-blue-500 rounded-r-lg shadow-sm mb-3">
+                        <div class="flex justify-between items-start mb-1">
+                            <span class="text-[9px] font-black bg-blue-600 text-white px-1.5 py-0.5 rounded uppercase tracking-tighter">Operational</span>
+                            <span class="text-[9px] text-blue-400 font-mono">${dateStr}</span>
+                        </div>
+                        <p class="text-xs text-blue-900 mt-1 leading-relaxed">${item.content || ''}</p>
+                        <div class="mt-2 pt-2 border-t border-blue-100 text-[9px] text-blue-400 font-mono italic">
+                            Source: Step ID ${item.task_id}
+                        </div>
+                    </div>`;
+            }
+            historyContainer.insertAdjacentHTML('beforeend', cardHtml);
+        });
 
-/**
- * project-engine.js 
- * Updated logic for your existing change_items schema
- */
+    } catch (err) {
+        console.error("Error loading history:", err.message);
+        historyContainer.innerHTML = '<p class="text-xs text-red-500 text-center py-4">Failed to load history.</p>';
+    }
+};
 
 window.recordChangeDraft = async (stepId, newData, delta) => {
     // 1. Context Fetch

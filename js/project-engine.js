@@ -223,11 +223,11 @@ window.loadRequirementHistory = async function(reqId) {
     const historyContainer = document.getElementById('req-history-list');
     if (!historyContainer) return;
 
-    // AUDIT FIX: Sanitize ID
+    // Sanitize ID
     const cleanId = String(reqId).trim().replace(/['"]/g, '');
 
     try {
-        // 1. Fetch Governance History (Indigo Cards) - Baseline changes
+        // 1. Fetch Governance History (Indigo Cards)
         const { data: govHistory, error: govError } = await supabase
             .from('requirement_history')
             .select('*')
@@ -236,7 +236,7 @@ window.loadRequirementHistory = async function(reqId) {
 
         if (govError) throw govError;
 
-        // 2. Fetch Formal Change Requests (Amber Cards) - Threshold breaches
+        // 2. Fetch Formal Change Requests (Amber Cards)
         const { data: formalCRs, error: crError } = await supabase
             .from('change_items')
             .select('*, user_profiles:change_accountable(full_name)')
@@ -256,17 +256,17 @@ window.loadRequirementHistory = async function(reqId) {
         const stepIds = steps.map(s => s.step_id);
         let taskNotes = [];
 
-        // 4. STEP B: Operational Note Fetch 
-        // FIX: Corrected task_id -> step_id AND note -> note_text
+        // 4. Fetch from task_notes using YOUR specific schema: task_id and content
         if (stepIds.length > 0) {
             const { data: notes, error: notesError } = await supabase
                 .from('task_notes')
                 .select('*')
-                .in('step_id', stepIds) 
-                .ilike('note_text', '%CHANGE REQUEST%') 
+                .in('task_id', stepIds) // Aligned: Uses task_id (int)
+                .ilike('content', '%CHANGE REQUEST%') // Aligned: Uses content (text)
                 .order('created_at', { ascending: false });
             
             if (!notesError) taskNotes = notes || [];
+            else console.error("Query Error on task_notes:", notesError);
         }
 
         // 5. Combine and Sort all 3 Streams
@@ -306,7 +306,7 @@ window.loadRequirementHistory = async function(reqId) {
                             <span class="text-[10px] font-bold text-amber-700 uppercase">Change Request #${item.change_number || ''}</span>
                             <span class="text-[9px] text-amber-500">${dateStr}</span>
                         </div>
-                        <p class="text-xs font-bold text-amber-900">${item.title}</p>
+                        <p class="text-xs font-bold text-amber-900 line-clamp-2">${item.title}</p>
                         <div class="flex justify-between mt-2 text-[9px] font-black uppercase tracking-widest">
                             <span class="px-1.5 py-0.5 rounded ${item.change_status === 'Approved' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}">
                                 ${item.change_status}
@@ -321,8 +321,8 @@ window.loadRequirementHistory = async function(reqId) {
                             <span class="text-[10px] font-bold text-blue-600 uppercase">Task Adjustment</span>
                             <span class="text-[9px] text-blue-400">${dateStr}</span>
                         </div>
-                        <p class="text-xs text-blue-800 line-clamp-3">${item.note_text}</p>
-                        <div class="mt-2 text-[10px] text-blue-500 font-mono">Source: Step ID ${item.step_id}</div>
+                        <p class="text-xs text-blue-800 line-clamp-3">${item.content}</p>
+                        <div class="mt-2 text-[10px] text-blue-500 font-mono italic">Virtual Path Log (Step ID ${item.task_id})</div>
                     </div>`;
             }
             historyContainer.insertAdjacentHTML('beforeend', cardHtml);

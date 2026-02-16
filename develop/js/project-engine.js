@@ -380,13 +380,14 @@ window.recordChangeDraft = async (stepId, newData, delta) => {
 };
 
 /**
- * 3. REAL-TIME LISTENER
+ * 3. REAL-TIME LISTENER (Enhanced with Governance Monitor)
  */
 export const initializeProjectEngine = () => {
-    console.log("?? Project Engine: Initializing Connection...");
+    console.log("? Project Engine: Initializing Real-Time Governance...");
 
     const channel = supabase
         .channel('project-automation-channel')
+        // EXISTING: Monitor Step changes for rollups
         .on(
             'postgres_changes', 
             { event: '*', schema: 'public', table: 'steps' }, 
@@ -397,9 +398,47 @@ export const initializeProjectEngine = () => {
                 if (requirementId) {
                     await rollupToRequirement(requirementId);
                     await syncHierarchyStatus(requirementId, projectId);
+                    if (typeof window.loadRequirements === 'function') window.loadRequirements();
+                }
+            }
+        )
+        // NEW: Monitor Change Items for automated versioning
+        .on(
+            'postgres_changes',
+            { event: 'UPDATE', schema: 'public', table: 'change_items' },
+            async (payload) => {
+                // Check if status JUST changed to Approved
+                if (payload.new.change_status === 'Approved' && payload.old.change_status !== 'Approved') {
+                    console.log("?? CR Approved. Updating Requirement Version...");
                     
-                    if (typeof window.loadRequirements === 'function') {
-                        window.loadRequirements();
+                    const reqId = payload.new.requirement_id;
+                    if (!reqId) return;
+
+                    // 1. Get current requirement version
+                    const { data: req } = await supabase
+                        .from('requirements')
+                        .select('version_number')
+                        .eq('req_id', reqId)
+                        .single();
+
+                    // 2. Increment Version
+                    const newVersion = (req?.version_number || 1) + 1;
+
+                    // 3. Update Requirement baseline
+                    const { error: updateErr } = await supabase
+                        .from('requirements')
+                        .update({ 
+                            version_number: newVersion,
+                            updated_at: new Date().toISOString()
+                        })
+                        .eq('req_id', reqId);
+
+                    if (!updateErr) {
+                        console.log(`? Requirement ${reqId} promoted to v${newVersion}`);
+                        // Refresh UI if on the main page
+                        if (typeof window.loadRequirements === 'function') window.loadRequirements();
+                        // Refresh the slider history if open
+                        if (typeof window.loadRequirementHistory === 'function') window.loadRequirementHistory(reqId);
                     }
                 }
             }

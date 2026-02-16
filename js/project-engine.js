@@ -223,11 +223,10 @@ window.loadRequirementHistory = async function(reqId) {
     const historyContainer = document.getElementById('req-history-list');
     if (!historyContainer) return;
 
-    // Sanitize ID
     const cleanId = String(reqId).trim().replace(/['"]/g, '');
 
     try {
-        // 1. Fetch Governance History (Indigo Cards)
+        // 1. Fetch Governance History (Indigo)
         const { data: govHistory, error: govError } = await supabase
             .from('requirement_history')
             .select('*')
@@ -236,7 +235,7 @@ window.loadRequirementHistory = async function(reqId) {
 
         if (govError) throw govError;
 
-        // 2. Fetch Formal Change Requests (Amber Cards)
+        // 2. Fetch Formal Change Requests (Amber)
         const { data: formalCRs, error: crError } = await supabase
             .from('change_items')
             .select('*, user_profiles:change_accountable(full_name)')
@@ -245,7 +244,7 @@ window.loadRequirementHistory = async function(reqId) {
 
         if (crError) throw crError;
 
-        // 3. Fetch Operational History via Virtual Path (Blue Cards)
+        // 3. Fetch Operational History (Blue)
         const { data: steps, error: stepsError } = await supabase
             .from('steps')
             .select('step_id')
@@ -256,27 +255,28 @@ window.loadRequirementHistory = async function(reqId) {
         const stepIds = steps.map(s => s.step_id);
         let taskNotes = [];
 
-        // 4. Fetch from task_notes using YOUR specific schema: task_id and content
         if (stepIds.length > 0) {
             const { data: notes, error: notesError } = await supabase
                 .from('task_notes')
                 .select('*')
-                .in('task_id', stepIds) // Aligned: Uses task_id (int)
-                .ilike('content', '%CHANGE REQUEST%') // Aligned: Uses content (text)
+                .in('task_id', stepIds) 
+                .ilike('content', '%CHANGE REQUEST%') 
                 .order('created_at', { ascending: false });
             
             if (!notesError) taskNotes = notes || [];
-            else console.error("Query Error on task_notes:", notesError);
         }
 
-        // 5. Combine and Sort all 3 Streams
+        // 4. Combine and Sort
         const combined = [
             ...(govHistory || []).map(h => ({ ...h, type: 'GOV' })),
             ...(formalCRs || []).map(c => ({ ...c, type: 'CR' })),
             ...taskNotes.map(n => ({ ...n, type: 'OPS' }))
         ].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
-        // 6. Clear and Render
+        // --- DEBUG LOGGING ---
+        console.log("Merged Audit Trail Data:", combined);
+
+        // 5. Clear and Render
         historyContainer.innerHTML = '';
         
         if (combined.length === 0) {
@@ -290,49 +290,26 @@ window.loadRequirementHistory = async function(reqId) {
 
             if (item.type === 'GOV') {
                 cardHtml = `
-                    <div class="p-3 bg-indigo-50 border border-indigo-100 rounded-lg shadow-sm mb-3">
+                    <div class="p-3 bg-indigo-50 border-l-4 border-indigo-500 rounded-r-lg shadow-sm mb-3">
                         <div class="flex justify-between items-start mb-1">
-                            <span class="text-[10px] font-bold text-indigo-600 uppercase">Baseline v${item.version_number}</span>
-                            <span class="text-[9px] text-indigo-400">${dateStr}</span>
+                            <span class="text-[9px] font-black bg-indigo-600 text-white px-1.5 py-0.5 rounded uppercase tracking-tighter">Governance</span>
+                            <span class="text-[9px] text-indigo-400 font-mono">${dateStr}</span>
                         </div>
-                        <p class="text-xs font-semibold text-indigo-900">${item.change_summary}</p>
-                        <p class="text-[11px] text-indigo-700 mt-1 italic">"${item.change_reason}"</p>
-                        <div class="mt-2 text-[10px] text-indigo-500 font-medium">By: ${item.changed_by_name}</div>
+                        <p class="text-xs font-bold text-indigo-900 mt-1 uppercase text-[10px]">Baseline v${item.version_number}</p>
+                        <p class="text-xs text-indigo-800">${item.change_summary}</p>
+                        <p class="text-[11px] text-indigo-600 italic mt-1">"${item.change_reason || 'No reason provided'}"</p>
+                        <div class="mt-2 text-[9px] text-indigo-500 font-bold">BY: ${item.changed_by_name}</div>
                     </div>`;
             } else if (item.type === 'CR') {
                 cardHtml = `
-                    <div class="p-3 bg-amber-50 border border-amber-200 rounded-lg shadow-sm mb-3">
+                    <div class="p-3 bg-amber-50 border-l-4 border-amber-500 rounded-r-lg shadow-sm mb-3">
                         <div class="flex justify-between items-start mb-1">
-                            <span class="text-[10px] font-bold text-amber-700 uppercase">Change Request #${item.change_number || ''}</span>
-                            <span class="text-[9px] text-amber-500">${dateStr}</span>
+                            <span class="text-[9px] font-black bg-amber-600 text-white px-1.5 py-0.5 rounded uppercase tracking-tighter">Formal CR</span>
+                            <span class="text-[9px] text-amber-500 font-mono">${dateStr}</span>
                         </div>
-                        <p class="text-xs font-bold text-amber-900 line-clamp-2">${item.title}</p>
-                        <div class="flex justify-between mt-2 text-[9px] font-black uppercase tracking-widest">
-                            <span class="px-1.5 py-0.5 rounded ${item.change_status === 'Approved' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}">
-                                ${item.change_status}
-                            </span>
-                            <span class="text-amber-600">Accountable: ${item.user_profiles?.full_name || 'System'}</span>
-                        </div>
-                    </div>`;
-            } else {
-                cardHtml = `
-                    <div class="p-3 bg-blue-50 border border-blue-100 rounded-lg shadow-sm mb-3">
-                        <div class="flex justify-between items-start mb-1">
-                            <span class="text-[10px] font-bold text-blue-600 uppercase">Task Adjustment</span>
-                            <span class="text-[9px] text-blue-400">${dateStr}</span>
-                        </div>
-                        <p class="text-xs text-blue-800 line-clamp-3">${item.content}</p>
-                        <div class="mt-2 text-[10px] text-blue-500 font-mono italic">Virtual Path Log (Step ID ${item.task_id})</div>
-                    </div>`;
-            }
-            historyContainer.insertAdjacentHTML('beforeend', cardHtml);
-        });
-
-    } catch (err) {
-        console.error("Error loading history:", err.message);
-        historyContainer.innerHTML = '<p class="text-xs text-red-500 text-center py-4">Failed to load history.</p>';
-    }
-};
+                        <p class="text-xs font-bold text-amber-900 mt-1">${item.title}</p>
+                        <div class="flex justify-between items-center mt-2">
+                            <span class="text-[9px] px-1.5 py-0.5 rounded bg-white border border-amber-200 text-amber-7
 
 /**
  * project-engine.js 

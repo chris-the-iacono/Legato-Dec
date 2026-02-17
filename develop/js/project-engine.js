@@ -446,5 +446,52 @@ export const initializeProjectEngine = () => {
         .subscribe();
 };
 
+/**
+ * project-engine.js Addition February 17, 2025 12:00 PM
+ * Logic to calculate variance and determine if formal governance is required.
+ */
+export const calculateGovernanceDelta = (oldCost, newCost, threshold) => {
+    const diff = newCost - oldCost;
+    const percentChange = oldCost === 0 ? (newCost > 0 ? 100 : 0) : (diff / oldCost) * 100;
+    return {
+        percentChange: percentChange.toFixed(1),
+        diff: diff,
+        isBreached: percentChange > threshold
+    };
+};
+
+/**
+ * project-engine.js Addition
+ * Handles the database persistence for an automated Change Request.
+ */
+export const createAutomatedCR = async (projectId, reqId, stepTitle, deltaObj, reason) => {
+    // 1. Get next CR sequence number
+    const { data: latest } = await supabase
+        .from('change_items')
+        .select('change_number')
+        .eq('project_id', projectId)
+        .order('change_number', { ascending: false })
+        .limit(1)
+        .single();
+
+    const newNumber = (latest?.change_number || 0) + 1;
+
+    // 2. Insert the CR record
+    const { data: cr, error } = await supabase.from('change_items').insert([{
+        project_id: projectId,
+        requirement_id: reqId,
+        change_number: newNumber,
+        title: `Breach: ${stepTitle}`,
+        change_reason: reason,
+        impact_analysis: `Automated CR: Cost increased by ${deltaObj.percentChange}% ($${deltaObj.diff.toLocaleString()}).`,
+        change_status: 'Pending',
+        total_cost_rollup: deltaObj.diff,
+        created_at: new Date().toISOString()
+    }]).select().single();
+
+    if (error) throw error;
+    return cr;
+};
+
 initializeProjectEngine();
 window.engineRollup = rollupToRequirement;

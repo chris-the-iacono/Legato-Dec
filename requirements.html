@@ -755,15 +755,11 @@ window.rollupToRequirement = async (reqId = window.selectedReqId, steps = null) 
     // 1. Validation & Pre-checks
     if (!window.selectedReqId) return alert("Select a requirement first.");
     
-    // Check User Status (Instructional Guard)
-    const { data: profile } = await supabase
-        .from('user_profiles')
-        .select('user_status')
-        .eq('user_id', window.sessionData?.userId)
-        .single();
+    const { data: profile } = await supabase.from('user_profiles')
+        .select('user_status').eq('user_id', window.sessionData?.userId).single();
 
     if (profile?.user_status !== 'Active' && profile?.user_status !== undefined) {
-        return alert(`Submission blocked. Your current status is: ${profile.user_status}`);
+        return alert(`Submission blocked. Status: ${profile.user_status}`);
     }
     
     const editingStepId = document.getElementById('step-id-hidden')?.value; 
@@ -772,128 +768,84 @@ window.rollupToRequirement = async (reqId = window.selectedReqId, steps = null) 
     const hours = parseFloat(document.getElementById('step-hours-input')?.value) || 0;
     const changeReason = document.getElementById('step-change-reason')?.value.trim(); 
     
-    if (!title || !assignedId || hours <= 0) {
-        return alert("Fill all required fields (Title, Assignee, and Hours > 0).");
-    }
+    if (!title || !assignedId || hours <= 0) return alert("Fill all required fields.");
 
     // 2. MATH LOGIC
     const assignedUser = (window.teamMembers || []).find(m => m.user_id === assignedId);
     const effectiveRate = (assignedUser && parseFloat(assignedUser.hourly_cost) > 0) 
-        ? parseFloat(assignedUser.hourly_cost) 
-        : (window.projectBlendedRate || 0);
-    
+        ? parseFloat(assignedUser.hourly_cost) : (window.projectBlendedRate || 0);
     const calculatedCost = hours * effectiveRate;
 
     // 3. RBAC Guard
-    const userRole = window.sessionData?.role;
-    const canAddTask = ['admin', 'project_manager', 'team_leader'].includes(userRole);
-    if (!canAddTask) return alert("Access Denied: Insufficient permissions.");
+    if (!['admin', 'project_manager', 'team_leader'].includes(window.sessionData?.role)) {
+        return alert("Access Denied.");
+    }
 
-    let resultStep;
-    let error;
-    let isCR = false; 
+    let resultStep, error, isCR = false, crId = null;
 
     if (editingStepId) {
-        // --- UPDATE EXISTING STEP ---
-        if (!changeReason) return alert("Please provide a reason for this estimate change.");
+        if (!changeReason) return alert("Please provide a reason for this change.");
         
-        // FETCH CURRENT DATA & PROJECT THRESHOLDS
-        const { data: currentStep } = await supabase
-            .from('steps')
-            .select(`
-                version_number, 
-                cost, 
-                projects(cost_threshold, schedule_threshold, status)
-            `)
-            .eq('step_id', editingStepId)
-            .single();
+        // Fetch current data & project thresholds
+        const { data: currentStep } = await supabase.from('steps')
+            .select(`version_number, cost, projects(id, threshold_pm_limit, status)`)
+            .eq('step_id', editingStepId).single();
         
-        const nextVersion = (parseInt(currentStep?.version_number) || 1) + 1;
-        const projectSettings = currentStep?.projects || {};
-        const projectStatus = (projectSettings.status || 'Planning').toLowerCase();
+        const proj = currentStep?.projects || {};
+        
+        // --- CIRCUIT BREAKER (via Project Engine) ---
+        if (proj.status?.toLowerCase() === 'active') {
+            const delta = projectEngine.calculateGovernanceDelta(
+                parseFloat(currentStep.cost) || 0, 
+                calculatedCost, 
+                parseFloat(proj.threshold_pm_limit) || 10
+            );
 
-        // --- THE CIRCUIT BREAKER CALCULATION ---
-        if (projectStatus === 'active') {
-            const oldCost = parseFloat(currentStep.cost) || 0;
-            const costDiff = calculatedCost - oldCost;
-            // Calculate % change relative to the previous version
-            const percentChange = oldCost === 0 ? 100 : (costDiff / oldCost) * 100;
-            const threshold = parseFloat(projectSettings.cost_threshold) || 0;
-
-            if (percentChange > threshold) {
-                isCR = true;
-                const proceed = confirm(`?? This change represents a ${percentChange.toFixed(1)}% increase, which exceeds the project threshold of ${threshold}%. \n\nThis will be logged as a formal CHANGE REQUEST. Do you wish to proceed?`);
-                if (!proceed) return;
+            if (delta.isBreached) {
+                if (!confirm(`?? BREACH: ${delta.percentChange}% increase. Trigger Change Request?`)) return;
+                
+                const newCR = await projectEngine.createAutomatedCR(
+                    proj.id, window.selectedReqId, title, delta, changeReason
+                );
+                if (newCR) { isCR = true; crId = newCR.change_id; }
             }
         }
         
-        const { data, error: updateError } = await supabase.from('steps')
-            .update({
-                title: title,
-                assigned_to: assignedId,
-                estimated_hours: hours,
-                cost: calculatedCost,
-                version_number: nextVersion,
-                updated_at: new Date().toISOString()
-            })
-            .eq('step_id', editingStepId)
-            .select().single();
+        const { data, error: updateError } = await supabase.from('steps').update({
+            title, assigned_to: assignedId, estimated_hours: hours, cost: calculatedCost,
+            version_number: (parseInt(currentStep?.version_number) || 1) + 1,
+            updated_at: new Date().toISOString()
+        }).eq('step_id', editingStepId).select().single();
         
-        resultStep = data;
-        error = updateError;
+        resultStep = data; error = updateError;
     } else {
-        // --- INSERT NEW STEP (Logic remains identical) ---
-        const { data: existing } = await supabase
-            .from('steps')
-            .select('sequence_order')
-            .eq('requirement_id', window.selectedReqId)
-            .order('sequence_order', { ascending: false })
-            .limit(1);
-        
-        const nextOrder = (existing?.[0]?.sequence_order || 0) + 10;
+        // --- INSERT NEW STEP ---
+        const { data: existing } = await supabase.from('steps').select('sequence_order')
+            .eq('requirement_id', window.selectedReqId).order('sequence_order', { descending: false });
+        const nextOrder = (existing?.reverse()?.[0]?.sequence_order || 0) + 10;
 
         const { data, error: insertError } = await supabase.from('steps').insert([{
-            requirement_id: window.selectedReqId,
-            tenant_id: window.sessionData?.tenantId,
-            title: title,
-            assigned_to: assignedId,
-            estimated_hours: hours,
-            cost: calculatedCost,
-            sequence_order: nextOrder,
-            status: 'pending',
-            version_number: 1 
+            requirement_id: window.selectedReqId, tenant_id: window.sessionData?.tenantId,
+            title, assigned_to: assignedId, estimated_hours: hours, cost: calculatedCost,
+            sequence_order: nextOrder, status: 'pending', version_number: 1 
         }]).select().single();
 
-        resultStep = data;
-        error = insertError;
+        resultStep = data; error = insertError;
     }
 
     if (error) return alert("Save failed: " + error.message);
 
-    // 4. AUDIT LOG: Patterns for your "Virtual Path" fetch
-    const auditLabel = isCR ? "?? CHANGE REQUEST" : "Baseline Adjustment";
-    const auditContent = editingStepId 
-        ? `${auditLabel} (v${resultStep.version_number}): $${calculatedCost.toLocaleString()} (${hours}h). Reason: ${changeReason}`
-        : `Task created (v1 Baseline). Budgeted at $${calculatedCost.toLocaleString()} (${hours}h @ $${effectiveRate}/h)`;
+    // 4. AUDIT LOG (Triggers the Virtual Path)
+    const label = isCR ? "?? CHANGE REQUEST" : "Baseline Adjustment";
+    const note = `${label} (v${resultStep.version_number}): $${calculatedCost.toLocaleString()} (${hours}h). Reason: ${changeReason} ${isCR ? `[CR_ID: ${crId}]` : ''}`;
+    await appendNoteToActivity(resultStep.step_id, note);
 
-    await appendNoteToActivity(resultStep.step_id, auditContent);
-
-    // 5. SYNC & UI REFRESH
+    // 5. SYNC & REFRESH
     window.closeTaskSlider();
-    
     if (window.rollupToRequirement) await window.rollupToRequirement(window.selectedReqId);
-    
-    // Check for specific refresh functions
     if (typeof window.refreshSteps === 'function') await window.refreshSteps();
-    else if (typeof window.loadSteps === 'function') await window.loadSteps(window.selectedReqId);
-    
     if (typeof window.loadRequirements === 'function') window.loadRequirements();
-    
-    // If it was a CR, we can optionally redirect to the changes page for more detail
-    if (isCR) {
-        console.log("CR Triggered. Redirecting to Audit Trail.");
-        // window.location.href = `changes.html?step_id=${resultStep.step_id}`; 
-    }
+    if (isCR) alert("Governance record created. See Changes tab.");
 };
 		//-----Added 1/30 @ 2:00 re-tested at 2:28
 		

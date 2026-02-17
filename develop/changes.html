@@ -209,43 +209,49 @@
         };
 
         window.createNewManualCR = async () => {
-            const title = prompt("Enter a Title for this Change Request:");
-            if (!title) return;
+    const title = prompt("Enter a Title for this Change Request:");
+    if (!title) return;
 
-            try {
-                // Get latest sequence
-                const { data: latest } = await supabase
-                    .from('change_items')
-                    .select('change_number')
-                    .order('change_number', { ascending: false })
-                    .limit(1)
-                    .single();
+    try {
+        // 1. Get the latest sequence number for this project
+        const { data: latest } = await supabase
+            .from('change_items')
+            .select('change_number')
+            .eq('project_id', currentProjectId)
+            .order('change_number', { ascending: false })
+            .limit(1)
+            .single();
 
-                const newNumber = (latest?.change_number || 0) + 1;
+        const newNumber = (latest?.change_number || 0) + 1;
 
-                const { data: newCR, error } = await supabase
-                    .from('change_items')
-                    .insert([{
-                        project_id: currentProjectId,
-                        title: title,
-                        change_number: newNumber,
-                        change_status: 'Draft',
-                        change_type: 'Manual Variance',
-                        created_at: new Date().toISOString()
-                    }])
-                    .select()
-                    .single();
+        // 2. Insert the new record immediately to generate a UUID
+        const { data: newCR, error } = await supabase
+            .from('change_items')
+            .insert([{
+                project_id: currentProjectId,
+                title: title,
+                change_number: newNumber,
+                change_status: 'Draft',
+                change_type: 'Manual Entry',
+                change_accountable: (await supabase.auth.getUser()).data.user?.id, // Auto-assign to creator
+                created_at: new Date().toISOString()
+            }])
+            .select()
+            .single();
 
-                if (error) throw error;
+        if (error) throw error;
 
-                await loadCRList();
-                loadCRDetail(newCR.change_id);
-                
-            } catch (err) {
-                console.error("Initiation Error:", err.message);
-                alert("Creation failed: " + err.message);
-            }
-        };
+        // 3. UI Sync: Reload the sidebar and immediately open the new CR for editing
+        await loadCRList();
+        loadCRDetail(newCR.change_id);
+        
+        alert(`CR-${newNumber} Initialized. You can now complete the Impact Analysis.`);
+        
+    } catch (err) {
+        console.error("Initiation Error:", err.message);
+        alert("Critical: Could not save new Change Log item.");
+    }
+};
 
         window.exportToPDF = () => {
             const { jsPDF } = window.jspdf;

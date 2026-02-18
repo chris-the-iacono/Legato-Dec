@@ -755,8 +755,17 @@ window.rollupToRequirement = async (reqId = window.selectedReqId, steps = null) 
     // 1. Validation & Pre-checks
     if (!window.selectedReqId) return alert("Select a requirement first.");
     
+    // FIX 1: Robust User ID Retrieval (prevents 400 Bad Request if sessionData is stale)
+    let userId = window.sessionData?.userId;
+    if (!userId) {
+        const { data: authUser } = await supabase.auth.getUser();
+        userId = authUser?.user?.id;
+    }
+
+    if (!userId) return alert("Session expired. Please log in again.");
+
     const { data: profile } = await supabase.from('user_profiles')
-        .select('user_status').eq('user_id', window.sessionData?.userId).single();
+        .select('user_status').eq('user_id', userId).single();
 
     if (profile?.user_status !== 'Active' && profile?.user_status !== undefined) {
         return alert(`Submission blocked. Status: ${profile.user_status}`);
@@ -786,15 +795,24 @@ window.rollupToRequirement = async (reqId = window.selectedReqId, steps = null) 
     if (editingStepId) {
         if (!changeReason) return alert("Please provide a reason for this change.");
         
-        // Fetch current data & project thresholds
-        const { data: currentStep } = await supabase.from('steps')
-            .select(`version_number, cost, projects(id, threshold_pm_limit, status)`)
+        // FIX 2: Corrected Join Syntax (projects!inner) to resolve 400 Error
+        const { data: currentStep, error: fetchStepError } = await supabase.from('steps')
+            .select(`
+                version_number, 
+                cost, 
+                projects!inner(id, threshold_pm_limit, status)
+            `)
             .eq('step_id', editingStepId).single();
+        
+        if (fetchStepError) {
+            console.error("Step Fetch Error:", fetchStepError);
+            return alert("Could not verify project thresholds. Check console.");
+        }
         
         const proj = currentStep?.projects || {};
         
         // --- CIRCUIT BREAKER (via Project Engine) ---
-        if (proj.status?.toLowerCase() === 'active') {
+        if (proj.status?.toLowerCase() === 'active' && proj.id) {
             const delta = projectEngine.calculateGovernanceDelta(
                 parseFloat(currentStep.cost) || 0, 
                 calculatedCost, 
@@ -822,7 +840,8 @@ window.rollupToRequirement = async (reqId = window.selectedReqId, steps = null) 
         // --- INSERT NEW STEP ---
         const { data: existing } = await supabase.from('steps').select('sequence_order')
             .eq('requirement_id', window.selectedReqId).order('sequence_order', { descending: false });
-        const nextOrder = (existing?.reverse()?.[0]?.sequence_order || 0) + 10;
+        
+        const nextOrder = (existing?.[0]?.sequence_order || 0) + 10;
 
         const { data, error: insertError } = await supabase.from('steps').insert([{
             requirement_id: window.selectedReqId, tenant_id: window.sessionData?.tenantId,
@@ -844,7 +863,9 @@ window.rollupToRequirement = async (reqId = window.selectedReqId, steps = null) 
     window.closeTaskSlider();
     if (window.rollupToRequirement) await window.rollupToRequirement(window.selectedReqId);
     if (typeof window.refreshSteps === 'function') await window.refreshSteps();
+    else if (typeof window.loadSteps === 'function') await window.loadSteps(window.selectedReqId);
     if (typeof window.loadRequirements === 'function') window.loadRequirements();
+    
     if (isCR) alert("Governance record created. See Changes tab.");
 };
 		//-----Added 1/30 @ 2:00 re-tested at 2:28

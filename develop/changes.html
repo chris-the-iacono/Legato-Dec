@@ -114,29 +114,19 @@
 
     // 2. INITIALIZATION
     document.addEventListener('DOMContentLoaded', async () => {
-        // Authenticate and get session
         const session = await checkAccess();
-        window.sessionData = session; // Store globally for approval logic
+        window.sessionData = session;
 
-        // Validate Project Context
         if (!currentProjectId || currentProjectId === "undefined") {
             console.error("No Project ID found. Redirecting...");
             window.location.href = 'index.html';
             return;
         }
 
-        // Render Page Header
         const projectName = localStorage.getItem('selected_project_name') || "Project Details";
         renderProjectHeader(session, 'changes', projectName);
 
-        // Populate the CR List
         await loadCRList();
-
-        // Attach listeners for UI interactions
-        const groupSelect = document.getElementById('cr-group-by');
-        if (groupSelect) {
-            groupSelect.addEventListener('change', loadCRList);
-        }
     });
 
     // 3. CORE LOGIC FUNCTIONS
@@ -144,9 +134,10 @@
         const groupByElement = document.getElementById('cr-group-by');
         const groupBy = groupByElement ? groupByElement.value : 'none';
 
+        // FIXED: Added !requirement_id to disambiguate the join
         const { data: changes, error } = await supabase
             .from('change_items')
-            .select('*, user_profiles:change_accountable(full_name), requirements(title)')
+            .select('*, user_profiles:change_accountable(full_name), requirements!requirement_id(title)')
             .eq('project_id', currentProjectId)
             .order('created_at', { ascending: false });
 
@@ -199,9 +190,10 @@
     }
 
     window.loadCRDetail = async (id) => {
+        // FIXED: Added !requirement_id to disambiguate the join
         const { data: cr } = await supabase
             .from('change_items')
-            .select('*, user_profiles:change_accountable(full_name)')
+            .select('*, user_profiles:change_accountable(full_name), requirements!requirement_id(title)')
             .eq('change_id', id)
             .single();
 

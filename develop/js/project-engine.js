@@ -1,6 +1,7 @@
 import { supabase } from './config.js';
 
 /**
+ * Feb 18 1:25 PM
  * 1. rollupToRequirement
  * Sums cost of active steps and updates the requirement baseline.
  */

@@ -38,7 +38,7 @@
                             <th class="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Name</th>
                             <th class="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Role</th>
                             <th class="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Associated Projects</th>
-                            <th class="px-6 py-4 text-right text-[10px] font-black text-gray-400 uppercase tracking-widest">Status</th>
+                            <th class="px-6 py-4 text-right text-[10px] font-black text-gray-400 uppercase tracking-widest">Account Status</th>
                         </tr>
                     </thead>
                     <tbody id="team-list" class="divide-y divide-gray-700">
@@ -146,11 +146,45 @@
                     </td>
                     <td class="px-6 py-4 text-sm text-gray-400">---</td>
                     <td class="px-6 py-4 text-right">
-                        <span class="text-[10px] font-bold text-green-500 uppercase">Active</span>
+                        <select 
+                            onchange="updateUserStatus('${u.user_id}', this.value)"
+                            class="bg-transparent text-[10px] font-bold uppercase outline-none cursor-pointer focus:ring-1 focus:ring-indigo-500 rounded px-1 ${getStatusColor(u.user_status)}"
+                        >
+                            <option value="Active" class="bg-gray-800 text-green-500" ${u.user_status === 'Active' ? 'selected' : ''}>Active</option>
+                            <option value="Pending" class="bg-gray-800 text-amber-500" ${u.user_status === 'Pending' ? 'selected' : ''}>Pending</option>
+                            <option value="Inactive" class="bg-gray-800 text-gray-500" ${u.user_status === 'Inactive' ? 'selected' : ''}>Inactive</option>
+                            <option value="Suspended" class="bg-gray-800 text-red-500" ${u.user_status === 'Suspended' ? 'selected' : ''}>Suspended</option>
+                        </select>
                     </td>
                 </tr>
             `).join('');
         }
+
+        // Helper for Dropdown Colors
+        function getStatusColor(status) {
+            switch(status) {
+                case 'Active': return 'text-green-500';
+                case 'Pending': return 'text-amber-500';
+                case 'Suspended': return 'text-red-500';
+                default: return 'text-gray-500';
+            }
+        }
+
+        // Database Update Logic
+        window.updateUserStatus = async (userId, newStatus) => {
+            const { error } = await supabase
+                .from('user_profiles')
+                .update({ user_status: newStatus })
+                .eq('user_id', userId);
+
+            if (error) {
+                alert("Update failed: " + error.message);
+                loadTeam(); // Refresh to revert UI
+            } else {
+                console.log(`User status updated to ${newStatus}`);
+                loadTeam(); // Refresh to apply color change
+            }
+        };
 
         async function loadProjectDropdown() {
             const { data: projects } = await supabase
@@ -179,20 +213,19 @@
             const role = document.getElementById('new-user-role').value;
             const projectId = document.getElementById('new-user-project').value;
 
-            // Simple row creation for now (Placeholder user_id for dev testing)
             const { data, error } = await supabase
                 .from('user_profiles')
                 .insert([{
-                    user_id: crypto.randomUUID(), // Temporarily generating UUID until Auth is wired
+                    user_id: crypto.randomUUID(), 
                     full_name: name,
                     role: role,
+                    user_status: 'Active', // Defaulting to Active when Admin creates manually
                     tenant_id: adminSession.tenantId
                 }]).select();
 
             if (error) {
                 alert("Error: " + error.message);
             } else {
-                // If a project was selected, link them in the future project_members table
                 toggleInviteModal();
                 loadTeam();
             }

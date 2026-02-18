@@ -272,23 +272,25 @@
 </body>
 </html>
 	<script type="module">
-    import { rollupToRequirement } from './js/project-engine.js';
-    // Attach it to the window so your existing logic can call it
-    window.engineRollup = rollupToRequirement;
-	</script>
-    <script type="module"> 
-        import { supabase, MODULES } from './js/config.js';
-        import { checkAccess } from './js/auth.js';
-        import { renderProjectHeader } from './js/components.js';
-		import './js/project-engine.js';
+    // 1. UNIFIED IMPORTS
+    import { supabase, MODULES } from './js/config.js';
+    import { checkAccess } from './js/auth.js';
+    import { renderProjectHeader } from './js/components.js';
+    // Import both the engine object and the rollup function
+    import { projectEngine, rollupToRequirement } from './js/project-engine.js';
 
-        // We will use window.sessionData globally
-let projectId = new URLSearchParams(window.location.search).get('id');
-        let tenantId = null; 
-        window.selectedReqId = null; // Ensuring global scope
-        window.selectedStepId = null;
-        window.projectBlendedRate = 0;
-        window.teamMembers = [];
+    // 2. GLOBAL ATTACHMENTS (Ensures your other functions can see these)
+    window.projectEngine = projectEngine;
+    window.engineRollup = rollupToRequirement;
+    window.supabase = supabase;
+
+    // 3. GLOBAL STATE VARIABLES
+    let projectId = new URLSearchParams(window.location.search).get('id');
+    let tenantId = null; 
+    window.selectedReqId = null; 
+    window.selectedStepId = null;
+    window.projectBlendedRate = 0;
+    window.teamMembers = [];
 
         // 1. AUTH & INITIALIZATION
 document.addEventListener('DOMContentLoaded', async () => {

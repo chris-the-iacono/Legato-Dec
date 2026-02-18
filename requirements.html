@@ -755,7 +755,7 @@ window.rollupToRequirement = async (reqId = window.selectedReqId, steps = null) 
     // 1. Validation & Pre-checks
     if (!window.selectedReqId) return alert("Select a requirement first.");
     
-    // FIX 1: Robust User ID Retrieval (prevents 400 Bad Request if sessionData is stale)
+    // FIX 1: Robust User ID Retrieval
     let userId = window.sessionData?.userId;
     if (!userId) {
         const { data: authUser } = await supabase.auth.getUser();
@@ -767,6 +767,7 @@ window.rollupToRequirement = async (reqId = window.selectedReqId, steps = null) 
     const { data: profile } = await supabase.from('user_profiles')
         .select('user_status').eq('user_id', userId).single();
 
+    // Strict Status Check
     if (profile?.user_status !== 'Active' && profile?.user_status !== undefined) {
         return alert(`Submission blocked. Status: ${profile.user_status}`);
     }
@@ -795,12 +796,15 @@ window.rollupToRequirement = async (reqId = window.selectedReqId, steps = null) 
     if (editingStepId) {
         if (!changeReason) return alert("Please provide a reason for this change.");
         
-        // FIX 2: Corrected Join Syntax (projects!inner) to resolve 400 Error
+        // FIX 2: Corrected Nested Join Path (Steps -> Requirements -> Projects)
         const { data: currentStep, error: fetchStepError } = await supabase.from('steps')
             .select(`
                 version_number, 
                 cost, 
-                projects!inner(id, threshold_pm_limit, status)
+                requirements!inner(
+                    project_id,
+                    projects!inner(id, threshold_pm_limit, status)
+                )
             `)
             .eq('step_id', editingStepId).single();
         
@@ -809,7 +813,8 @@ window.rollupToRequirement = async (reqId = window.selectedReqId, steps = null) 
             return alert("Could not verify project thresholds. Check console.");
         }
         
-        const proj = currentStep?.projects || {};
+        // Correct path to project data based on the nested query above
+        const proj = currentStep?.requirements?.projects || {};
         
         // --- CIRCUIT BREAKER (via Project Engine) ---
         if (proj.status?.toLowerCase() === 'active' && proj.id) {

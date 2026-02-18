@@ -104,192 +104,229 @@
     </div>
 
     <script type="module">
-        import { renderProjectHeader } from './js/components.js';
-        import { supabase } from './js/config.js';
-        import { checkAccess } from './js/auth.js';
+    import { renderProjectHeader } from './js/components.js';
+    import { supabase } from './js/config.js';
+    import { checkAccess } from './js/auth.js';
 
-        let currentProjectId = localStorage.getItem('selected_project_id');
+    // 1. GLOBAL STATE
+    const urlParams = new URLSearchParams(window.location.search);
+    let currentProjectId = urlParams.get('id') || localStorage.getItem('selected_project_id');
 
-        document.addEventListener('DOMContentLoaded', async () => {
-            const session = await checkAccess();
-            renderProjectHeader(session, 'changes', localStorage.getItem('selected_project_name'));
-            loadCRList();
-        });
+    // 2. INITIALIZATION
+    document.addEventListener('DOMContentLoaded', async () => {
+        // Authenticate and get session
+        const session = await checkAccess();
+        window.sessionData = session; // Store globally for approval logic
 
-        window.loadCRList = async () => {
-            const groupBy = document.getElementById('cr-group-by').value;
-            const { data: changes, error } = await supabase
-                .from('change_items')
-                .select('*, user_profiles:change_accountable(full_name), requirements(title)')
-                .eq('project_id', currentProjectId)
-                .order('created_at', { ascending: false });
-
-            const container = document.getElementById('cr-list');
-            if (!changes || changes.length === 0) {
-                container.innerHTML = `<p class="text-[10px] text-center text-gray-400 font-bold uppercase mt-10">No records found</p>`;
-                return;
-            }
-
-            if (groupBy === 'requirement') {
-                const grouped = changes.reduce((acc, cr) => {
-                    const key = cr.requirements?.title || 'General/Unassigned';
-                    if (!acc[key]) acc[key] = [];
-                    acc[key].push(cr);
-                    return acc;
-                }, {});
-                container.innerHTML = Object.entries(grouped).map(([req, items]) => `
-                    <div class="mb-6"><div class="text-[10px] font-black text-gray-400 px-2 mb-2 uppercase">${req}</div>
-                    ${items.map(cr => renderCRCard(cr)).join('')}</div>
-                `).join('');
-            } else {
-                container.innerHTML = changes.map(cr => renderCRCard(cr)).join('');
-            }
-        };
-
-        function renderCRCard(cr) {
-            let statusColor = 'bg-yellow-100 text-yellow-700';
-            if (cr.change_status === 'Approved') statusColor = 'bg-green-100 text-green-700';
-            if (cr.change_status === 'Rejected') statusColor = 'bg-red-100 text-red-700';
-
-            return `
-                <div onclick="loadCRDetail('${cr.change_id}')" class="p-4 mb-2 bg-white border border-gray-200 rounded-xl hover:border-indigo-500 cursor-pointer shadow-sm group transition-all">
-                    <div class="flex justify-between items-start mb-2">
-                        <span class="text-[10px] font-black text-indigo-600 uppercase">CR-${cr.change_number || 'X'}</span>
-                        <span class="text-[8px] font-black px-1.5 py-0.5 rounded ${statusColor} uppercase">${cr.change_status || 'Draft'}</span>
-                    </div>
-                    <h3 class="text-xs font-black text-gray-900 truncate">${cr.title}</h3>
-                </div>`;
+        // Validate Project Context
+        if (!currentProjectId || currentProjectId === "undefined") {
+            console.error("No Project ID found. Redirecting...");
+            window.location.href = 'index.html';
+            return;
         }
 
-        window.loadCRDetail = async (id) => {
-            const { data: cr } = await supabase.from('change_items').select('*, user_profiles:change_accountable(full_name)').eq('change_id', id).single();
-            if (!cr) return;
+        // Render Page Header
+        const projectName = localStorage.getItem('selected_project_name') || "Project Details";
+        renderProjectHeader(session, 'changes', projectName);
 
-            document.getElementById('cr-empty-state').classList.add('hidden');
-            document.getElementById('cr-form-container').classList.remove('hidden');
-            
-            document.getElementById('display-cr-id').innerText = `CR-${cr.change_number}`;
-            document.getElementById('cr-status-select').value = cr.change_status || 'Pending';
-            document.getElementById('display-cr-title').innerText = cr.title;
-            document.getElementById('display-cr-accountable').innerText = cr.user_profiles?.full_name || 'System';
-            document.getElementById('current-cr-uuid').value = cr.change_id;
-            document.getElementById('cr-type').value = cr.change_type || '';
-            document.getElementById('cr-hours').value = cr.requested_hours || 0;
-            document.getElementById('cr-cost').value = cr.total_cost_rollup || 0;
-            document.getElementById('cr-reason').value = cr.change_reason || '';
-            document.getElementById('cr-impact').value = cr.impact_analysis || '';
-        };
-
-        window.saveCRChanges = async () => {
-            const id = document.getElementById('current-cr-uuid').value;
-            const status = document.getElementById('cr-status-select').value;
-            
-            const updates = {
-                change_type: document.getElementById('cr-type').value,
-                requested_hours: parseFloat(document.getElementById('cr-hours').value) || 0,
-                change_reason: document.getElementById('cr-reason').value,
-                impact_analysis: document.getElementById('cr-impact').value,
-                change_status: status,
-                updated_at: new Date().toISOString()
-            };
-
-            if (status === 'Approved') {
-                updates.approved_at = new Date().toISOString();
-                // Assumes sessionData is available via auth.js or global
-                updates.approved_by = window.sessionData?.full_name || 'Authorized Admin';
-            }
-
-            const { error } = await supabase.from('change_items').update(updates).eq('change_id', id);
-            if (error) {
-                alert(error.message);
-            } else {
-                alert("CR Updated & Governance Engine Notified.");
-                loadCRList();
-            }
-        };
-
-        window.createNewManualCR = async () => {
-    const title = prompt("Enter a Title for this Change Request:");
-    if (!title) return;
-
-    try {
-        // 1. Get the latest sequence number for this project
-        const { data: latest } = await supabase
-            .from('change_items')
-            .select('change_number')
-            .eq('project_id', currentProjectId)
-            .order('change_number', { ascending: false })
-            .limit(1)
-            .single();
-
-        const newNumber = (latest?.change_number || 0) + 1;
-
-        // 2. Insert the new record immediately to generate a UUID
-        const { data: newCR, error } = await supabase
-            .from('change_items')
-            .insert([{
-                project_id: currentProjectId,
-                title: title,
-                change_number: newNumber,
-                change_status: 'Draft',
-                change_type: 'Manual Entry',
-                change_accountable: (await supabase.auth.getUser()).data.user?.id, // Auto-assign to creator
-                created_at: new Date().toISOString()
-            }])
-            .select()
-            .single();
-
-        if (error) throw error;
-
-        // 3. UI Sync: Reload the sidebar and immediately open the new CR for editing
+        // Populate the CR List
         await loadCRList();
-        loadCRDetail(newCR.change_id);
-        
-        alert(`CR-${newNumber} Initialized. You can now complete the Impact Analysis.`);
-        
-    } catch (err) {
-        console.error("Initiation Error:", err.message);
-        alert("Critical: Could not save new Change Log item.");
-    }
-};
 
-        window.exportToPDF = () => {
-            const { jsPDF } = window.jspdf;
-            const doc = new jsPDF();
-            const crId = document.getElementById('display-cr-id').innerText;
-            
-            doc.setFillColor(79, 70, 229); 
-            doc.rect(0, 0, 210, 40, 'F');
-            doc.setTextColor(255, 255, 255);
-            doc.setFontSize(22);
-            doc.text("CHANGE CONTROL DOCUMENT", 20, 25);
-            
-            doc.setTextColor(0, 0, 0);
-            doc.setFontSize(10);
-            doc.text(`REFERENCE: ${crId}`, 20, 50);
-            doc.text(`STATUS: ${document.getElementById('cr-status-select').value.toUpperCase()}`, 20, 55);
-            doc.text(`DATE: ${new Date().toLocaleDateString()}`, 20, 60);
-            doc.text(`ACCOUNTABLE: ${document.getElementById('display-cr-accountable').innerText}`, 20, 65);
-            
-            doc.setDrawColor(200, 200, 200);
-            doc.line(20, 75, 190, 75);
-            
-            doc.setFontSize(14);
-            doc.text("TITLE", 20, 85);
-            doc.setFontSize(11);
-            doc.text(document.getElementById('display-cr-title').innerText, 20, 92);
-            
-            doc.setFontSize(14);
-            doc.text("IMPACT ANALYSIS", 20, 110);
-            doc.setFontSize(10);
-            const splitImpact = doc.splitTextToSize(document.getElementById('cr-impact').value, 170);
-            doc.text(splitImpact, 20, 117);
-            
-            doc.text("__________________________", 20, 250);
-            doc.text("Authorizing Signature", 20, 255);
-            
-            doc.save(`${crId}_Governance_Doc.pdf`);
+        // Attach listeners for UI interactions
+        const groupSelect = document.getElementById('cr-group-by');
+        if (groupSelect) {
+            groupSelect.addEventListener('change', loadCRList);
+        }
+    });
+
+    // 3. CORE LOGIC FUNCTIONS
+    window.loadCRList = async () => {
+        const groupByElement = document.getElementById('cr-group-by');
+        const groupBy = groupByElement ? groupByElement.value : 'none';
+
+        const { data: changes, error } = await supabase
+            .from('change_items')
+            .select('*, user_profiles:change_accountable(full_name), requirements(title)')
+            .eq('project_id', currentProjectId)
+            .order('created_at', { ascending: false });
+
+        const container = document.getElementById('cr-list');
+        if (!container) return;
+
+        if (error) {
+            console.error("Fetch Error:", error.message);
+            container.innerHTML = `<p class="text-xs text-red-500 text-center mt-10">Error loading records.</p>`;
+            return;
+        }
+
+        if (!changes || changes.length === 0) {
+            container.innerHTML = `<p class="text-[10px] text-center text-gray-400 font-bold uppercase mt-10">No records found</p>`;
+            return;
+        }
+
+        if (groupBy === 'requirement') {
+            const grouped = changes.reduce((acc, cr) => {
+                const key = cr.requirements?.title || 'General/Unassigned';
+                if (!acc[key]) acc[key] = [];
+                acc[key].push(cr);
+                return acc;
+            }, {});
+
+            container.innerHTML = Object.entries(grouped).map(([req, items]) => `
+                <div class="mb-6">
+                    <div class="text-[10px] font-black text-gray-400 px-2 mb-2 uppercase">${req}</div>
+                    ${items.map(cr => renderCRCard(cr)).join('')}
+                </div>
+            `).join('');
+        } else {
+            container.innerHTML = changes.map(cr => renderCRCard(cr)).join('');
+        }
+    };
+
+    function renderCRCard(cr) {
+        let statusColor = 'bg-yellow-100 text-yellow-700';
+        if (cr.change_status === 'Approved') statusColor = 'bg-green-100 text-green-700';
+        if (cr.change_status === 'Rejected') statusColor = 'bg-red-100 text-red-700';
+
+        return `
+            <div onclick="loadCRDetail('${cr.change_id}')" class="p-4 mb-2 bg-white border border-gray-200 rounded-xl hover:border-indigo-500 cursor-pointer shadow-sm group transition-all">
+                <div class="flex justify-between items-start mb-2">
+                    <span class="text-[10px] font-black text-indigo-600 uppercase">CR-${cr.change_number || 'X'}</span>
+                    <span class="text-[8px] font-black px-1.5 py-0.5 rounded ${statusColor} uppercase">${cr.change_status || 'Draft'}</span>
+                </div>
+                <h3 class="text-xs font-black text-gray-900 truncate">${cr.title}</h3>
+            </div>`;
+    }
+
+    window.loadCRDetail = async (id) => {
+        const { data: cr } = await supabase
+            .from('change_items')
+            .select('*, user_profiles:change_accountable(full_name)')
+            .eq('change_id', id)
+            .single();
+
+        if (!cr) return;
+
+        document.getElementById('cr-empty-state')?.classList.add('hidden');
+        document.getElementById('cr-form-container')?.classList.remove('hidden');
+        
+        document.getElementById('display-cr-id').innerText = `CR-${cr.change_number}`;
+        document.getElementById('cr-status-select').value = cr.change_status || 'Pending';
+        document.getElementById('display-cr-title').innerText = cr.title;
+        document.getElementById('display-cr-accountable').innerText = cr.user_profiles?.full_name || 'System';
+        document.getElementById('current-cr-uuid').value = cr.change_id;
+        document.getElementById('cr-type').value = cr.change_type || '';
+        document.getElementById('cr-hours').value = cr.requested_hours || 0;
+        document.getElementById('cr-cost').value = cr.total_cost_rollup || 0;
+        document.getElementById('cr-reason').value = cr.change_reason || '';
+        document.getElementById('cr-impact').value = cr.impact_analysis || '';
+    };
+
+    window.saveCRChanges = async () => {
+        const id = document.getElementById('current-cr-uuid').value;
+        const status = document.getElementById('cr-status-select').value;
+        
+        const updates = {
+            change_type: document.getElementById('cr-type').value,
+            requested_hours: parseFloat(document.getElementById('cr-hours').value) || 0,
+            change_reason: document.getElementById('cr-reason').value,
+            impact_analysis: document.getElementById('cr-impact').value,
+            change_status: status,
+            updated_at: new Date().toISOString()
         };
-    </script>
+
+        if (status === 'Approved') {
+            updates.approved_at = new Date().toISOString();
+            updates.approved_by = window.sessionData?.full_name || 'Authorized Admin';
+        }
+
+        const { error } = await supabase.from('change_items').update(updates).eq('change_id', id);
+        if (error) {
+            alert(error.message);
+        } else {
+            alert("CR Updated & Governance Engine Notified.");
+            loadCRList();
+        }
+    };
+
+    window.createNewManualCR = async () => {
+        const title = prompt("Enter a Title for this Change Request:");
+        if (!title) return;
+
+        try {
+            const { data: latest } = await supabase
+                .from('change_items')
+                .select('change_number')
+                .eq('project_id', currentProjectId)
+                .order('change_number', { ascending: false })
+                .limit(1)
+                .single();
+
+            const newNumber = (latest?.change_number || 0) + 1;
+
+            const { data: newCR, error } = await supabase
+                .from('change_items')
+                .insert([{
+                    project_id: currentProjectId,
+                    title: title,
+                    change_number: newNumber,
+                    change_status: 'Draft',
+                    change_type: 'Manual Entry',
+                    change_accountable: window.sessionData?.user_id || (await supabase.auth.getUser()).data.user?.id,
+                    created_at: new Date().toISOString()
+                }])
+                .select()
+                .single();
+
+            if (error) throw error;
+
+            await loadCRList();
+            loadCRDetail(newCR.change_id);
+            alert(`CR-${newNumber} Initialized.`);
+            
+        } catch (err) {
+            console.error("Initiation Error:", err.message);
+            alert("Critical: Could not save new Change Log item.");
+        }
+    };
+
+    window.exportToPDF = () => {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF();
+        const crId = document.getElementById('display-cr-id').innerText;
+        
+        doc.setFillColor(79, 70, 229); 
+        doc.rect(0, 0, 210, 40, 'F');
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(22);
+        doc.text("CHANGE CONTROL DOCUMENT", 20, 25);
+        
+        doc.setTextColor(0, 0, 0);
+        doc.setFontSize(10);
+        doc.text(`REFERENCE: ${crId}`, 20, 50);
+        doc.text(`STATUS: ${document.getElementById('cr-status-select').value.toUpperCase()}`, 20, 55);
+        doc.text(`DATE: ${new Date().toLocaleDateString()}`, 20, 60);
+        doc.text(`ACCOUNTABLE: ${document.getElementById('display-cr-accountable').innerText}`, 20, 65);
+        
+        doc.setDrawColor(200, 200, 200);
+        doc.line(20, 75, 190, 75);
+        
+        doc.setFontSize(14);
+        doc.text("TITLE", 20, 85);
+        doc.setFontSize(11);
+        doc.text(document.getElementById('display-cr-title').innerText, 20, 92);
+        
+        doc.setFontSize(14);
+        doc.text("IMPACT ANALYSIS", 20, 110);
+        doc.setFontSize(10);
+        const splitImpact = doc.splitTextToSize(document.getElementById('cr-impact').value, 170);
+        doc.text(splitImpact, 20, 117);
+        
+        doc.text("__________________________", 20, 250);
+        doc.text("Authorizing Signature", 20, 255);
+        
+        doc.save(`${crId}_Governance_Doc.pdf`);
+    };
+</script>
 </body>
 </html>

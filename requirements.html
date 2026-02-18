@@ -827,7 +827,7 @@ window.rollupToRequirement = async (reqId = window.selectedReqId, steps = null) 
             );
 
             if (delta.isBreached) {
-                if (!confirm(`?? BREACH: ${delta.percentChange}% increase. Trigger Change Request?`)) return;
+                if (!confirm(`BREACH: ${delta.percentChange}% task cost increase. Start Change Request?`)) return;
                 
                 const newCR = await projectEngine.createAutomatedCR(
                     proj.id, window.selectedReqId, title, delta, changeReason

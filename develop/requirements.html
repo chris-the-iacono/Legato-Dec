@@ -827,7 +827,7 @@ window.rollupToRequirement = async (reqId = window.selectedReqId, steps = null) 
             );
 
             if (delta.isBreached) {
-                if (!confirm(`BREACH: ${delta.percentChange}% task cost increase. Start Change Request?`)) return;
+                if (!confirm(`${delta.percentChange}% task cost increase requires approval. Start Change Request workflow?`)) return;
                 
                 const newCR = await projectEngine.createAutomatedCR(
                     proj.id, window.selectedReqId, title, delta, changeReason
@@ -862,7 +862,7 @@ window.rollupToRequirement = async (reqId = window.selectedReqId, steps = null) 
     if (error) return alert("Save failed: " + error.message);
 
     // 4. AUDIT LOG (Triggers the Virtual Path)
-    const label = isCR ? "?? CHANGE REQUEST" : "Baseline Adjustment";
+    const label = isCR ? "CHANGE REQUEST" : "Baseline Adjustment";
     const note = `${label} (v${resultStep.version_number}): $${calculatedCost.toLocaleString()} (${hours}h). Reason: ${changeReason} ${isCR ? `[CR_ID: ${crId}]` : ''}`;
     await appendNoteToActivity(resultStep.step_id, note);
 

@@ -757,7 +757,6 @@ window.rollupToRequirement = async (reqId = window.selectedReqId, steps = null) 
     // 1. Validation & Pre-checks
     if (!window.selectedReqId) return alert("Select a requirement first.");
     
-    // FIX 1: Robust User ID Retrieval
     let userId = window.sessionData?.userId;
     if (!userId) {
         const { data: authUser } = await supabase.auth.getUser();
@@ -769,7 +768,6 @@ window.rollupToRequirement = async (reqId = window.selectedReqId, steps = null) 
     const { data: profile } = await supabase.from('user_profiles')
         .select('user_status').eq('user_id', userId).single();
 
-    // Strict Status Check
     if (profile?.user_status !== 'Active' && profile?.user_status !== undefined) {
         return alert(`Submission blocked. Status: ${profile.user_status}`);
     }
@@ -788,7 +786,6 @@ window.rollupToRequirement = async (reqId = window.selectedReqId, steps = null) 
         ? parseFloat(assignedUser.hourly_cost) : (window.projectBlendedRate || 0);
     const calculatedCost = hours * effectiveRate;
 
-    // 3. RBAC Guard
     if (!['admin', 'project_manager', 'team_leader'].includes(window.sessionData?.role)) {
         return alert("Access Denied.");
     }
@@ -798,10 +795,9 @@ window.rollupToRequirement = async (reqId = window.selectedReqId, steps = null) 
     if (editingStepId) {
         if (!changeReason) return alert("Please provide a reason for this change.");
         
-        // FIX 2: Corrected Nested Join Path (Steps -> Requirements -> Projects)
         const { data: currentStep, error: fetchStepError } = await supabase.from('steps')
             .select(`
-                version_number, 
+                version_number, estimated_hours,
                 cost, 
                 requirements!inner(
                     project_id,
@@ -810,24 +806,22 @@ window.rollupToRequirement = async (reqId = window.selectedReqId, steps = null) 
             `)
             .eq('step_id', editingStepId).single();
         
-        if (fetchStepError) {
-            console.error("Step Fetch Error:", fetchStepError);
-            return alert("Could not verify project thresholds. Check console.");
-        }
+        if (fetchStepError) return alert("Could not verify project thresholds.");
         
-        // Correct path to project data based on the nested query above
         const proj = currentStep?.requirements?.projects || {};
         
-        // --- CIRCUIT BREAKER (via Project Engine) ---
         if (proj.status?.toLowerCase() === 'active' && proj.id) {
+            // Enhanced Delta with Hours for the Engine
             const delta = projectEngine.calculateGovernanceDelta(
                 parseFloat(currentStep.cost) || 0, 
                 calculatedCost, 
-                parseFloat(proj.threshold_pm_limit) || 10
+                parseFloat(proj.threshold_pm_limit) || 10,
+                parseFloat(currentStep.estimated_hours) || 0,
+                hours
             );
 
             if (delta.isBreached) {
-                if (!confirm(`${delta.percentChange}% task cost increase requires approval. Start Change Request workflow?`)) return;
+                if (!confirm(`${delta.percentChange}% cost increase requires approval. Generate Change Request?`)) return;
                 
                 const newCR = await projectEngine.createAutomatedCR(
                     proj.id, window.selectedReqId, title, delta, changeReason
@@ -844,7 +838,6 @@ window.rollupToRequirement = async (reqId = window.selectedReqId, steps = null) 
         
         resultStep = data; error = updateError;
     } else {
-        // --- INSERT NEW STEP ---
         const { data: existing } = await supabase.from('steps').select('sequence_order')
             .eq('requirement_id', window.selectedReqId).order('sequence_order', { descending: false });
         
@@ -861,19 +854,23 @@ window.rollupToRequirement = async (reqId = window.selectedReqId, steps = null) 
 
     if (error) return alert("Save failed: " + error.message);
 
-    // 4. AUDIT LOG (Triggers the Virtual Path)
+    // 3. AUDIT LOG (Triggers the Virtual Path)
     const label = isCR ? "CHANGE REQUEST" : "Baseline Adjustment";
-    const note = `${label} (v${resultStep.version_number}): $${calculatedCost.toLocaleString()} (${hours}h). Reason: ${changeReason} ${isCR ? `[CR_ID: ${crId}]` : ''}`;
-    await appendNoteToActivity(resultStep.step_id, note);
+    const currentProjectId = localStorage.getItem('selected_project_id');
+    const note = `${label} (v${resultStep.version_number}): $${calculatedCost.toLocaleString()} (${hours}h). Reason: ${changeReason} ${isCR ? `[CR_ID: ${crId}] View: changes.html?id=${currentProjectId}&cr=${crId}` : ''}`;
+    
+    // Ensure we call appendNoteToActivity or your equivalent note saver
+    if (typeof appendNoteToActivity === 'function') {
+        await appendNoteToActivity(resultStep.step_id, note);
+    }
 
-    // 5. SYNC & REFRESH
+    // 4. SYNC & REFRESH
     window.closeTaskSlider();
     if (window.rollupToRequirement) await window.rollupToRequirement(window.selectedReqId);
     if (typeof window.refreshSteps === 'function') await window.refreshSteps();
-    else if (typeof window.loadSteps === 'function') await window.loadSteps(window.selectedReqId);
     if (typeof window.loadRequirements === 'function') window.loadRequirements();
     
-    if (isCR) alert("Governance record created. See Changes tab.");
+    if (isCR) alert("Governance record created. Deep link added to task history.");
 };
 		//-----Added 1/30 @ 2:00 re-tested at 2:28
 		
@@ -1050,6 +1047,7 @@ async function loadRequirementHistory(reqId) {
         }
 
         // 5. Merge and Sort All Three Streams
+        const currentProjectId = localStorage.getItem('selected_project_id');
         const unifiedHistory = [
             ...(govHist || []).map(h => ({
                 date: h.created_at,
@@ -1073,12 +1071,17 @@ async function loadRequirementHistory(reqId) {
                 owner: cr.user_profiles?.full_name || 'System',
                 by: 'Engine Detection',
                 color: 'border-amber-400',
-                badge: 'bg-amber-50 text-amber-700 animate-pulse'
+                badge: 'bg-amber-50 text-amber-700 animate-pulse',
+                deepLink: `changes.html?id=${currentProjectId}&cr=${cr.change_id}`
             })),
             ...taskAuditNotes.map(n => {
                 const step = steps.find(s => s.step_id === n.task_id);
                 const reasonParts = n.content.split('Reason:');
                 const displayReason = reasonParts.length > 1 ? reasonParts[1].trim() : n.content;
+
+                // Extract CR ID if present in note content for deep linking
+                const crIdMatch = n.content.match(/\[CR_ID: (.*?)\]/);
+                const crId = crIdMatch ? crIdMatch[1] : null;
 
                 return {
                     date: n.created_at,
@@ -1090,7 +1093,8 @@ async function loadRequirementHistory(reqId) {
                     owner: null,
                     by: n.author_name || 'System',
                     color: 'border-blue-400',
-                    badge: 'bg-blue-50 text-blue-700'
+                    badge: 'bg-blue-50 text-blue-700',
+                    deepLink: crId ? `changes.html?id=${currentProjectId}&cr=${crId}` : null
                 };
             })
         ].sort((a, b) => new Date(b.date) - new Date(a.date));
@@ -1111,6 +1115,13 @@ async function loadRequirementHistory(reqId) {
                 </div>
                 <p class="text-[11px] text-gray-800 font-black leading-tight mt-1">${h.title}</p>
                 <p class="text-[10px] text-gray-500 italic mt-1 font-medium leading-relaxed line-clamp-2">"${h.reason}"</p>
+                
+                ${h.deepLink ? `
+                    <a href="${h.deepLink}" class="text-[9px] text-indigo-600 font-bold underline hover:text-indigo-800 mt-2 block">
+                        View Change Details ?
+                    </a>
+                ` : ''}
+
                 <div class="flex justify-between items-center mt-2 pt-1 border-t border-gray-50">
                     <span class="text-[8px] text-gray-400 uppercase font-bold">${h.owner ? `Accountable: ${h.owner}` : 'Project Execution'}</span>
                     <span class="text-[8px] text-gray-400">Auth: ${h.by}</span>

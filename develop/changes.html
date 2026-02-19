@@ -114,20 +114,28 @@
 
     // 2. INITIALIZATION
     document.addEventListener('DOMContentLoaded', async () => {
-        const session = await checkAccess();
-        window.sessionData = session;
+    const session = await checkAccess();
+    window.sessionData = session;
 
-        if (!currentProjectId || currentProjectId === "undefined") {
-            console.error("No Project ID found. Redirecting...");
-            window.location.href = 'index.html';
-            return;
-        }
+    if (!currentProjectId || currentProjectId === "undefined") {
+        console.error("No Project ID found. Redirecting...");
+        window.location.href = 'index.html';
+        return;
+    }
 
-        const projectName = localStorage.getItem('selected_project_name') || "Project Details";
-        renderProjectHeader(session, 'changes', projectName);
+    const projectName = localStorage.getItem('selected_project_name') || "Project Details";
+    renderProjectHeader(session, 'changes', projectName);
 
-        await loadCRList();
-    });
+    await loadCRList();
+
+    // NEW: Check for Deep Link
+    const urlParams = new URLSearchParams(window.location.search);
+    const targetCR = urlParams.get('cr');
+    if (targetCR && typeof window.openCRSlider === 'function') {
+        // Delay slightly to ensure list is rendered if necessary
+        setTimeout(() => window.openCRSlider(targetCR), 300);
+    }
+});
 
     // 3. CORE LOGIC FUNCTIONS
     window.loadCRList = async () => {

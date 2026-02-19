@@ -1,8 +1,7 @@
 import { supabase } from './config.js';
 
 /**
- * Feb 18 1:25 PM
- * 1. rollupToRequirement
+ * rollupToRequirement
  * Sums cost of active steps and updates the requirement baseline.
  */
 export async function rollupToRequirement(requirementId, manualSteps = null) {
@@ -57,59 +56,80 @@ export async function rollupToRequirement(requirementId, manualSteps = null) {
             .eq('req_id', requirementId);
 
         if (updateError) throw updateError;
-        console.log(`?? Engine: Req ${requirementId} updated to v${maxVersion}. Budget: $${totalBudget}`);
+        console.log(`Engine: Req ${requirementId} updated to v${maxVersion}. Budget: $${totalBudget}`);
         return { totalBudget, totalHours, healthScore, maxVersion };
     } catch (err) {
-        console.error("? Engine Rollup Error:", err.message);
+        console.error("Engine Rollup Error:", err.message);
         return null;
     }
 }
 
 /**
- * 2. Hierarchy & Governance Methods
- * Combined into the projectEngine object for unified import.
+ * Hierarchy & Governance Methods
  */
 export const projectEngine = {
-    calculateGovernanceDelta: (oldCost, newCost, threshold) => {
-        const diff = newCost - oldCost;
-        const percentChange = oldCost === 0 ? (newCost > 0 ? 100 : 0) : (diff / oldCost) * 100;
+    calculateGovernanceDelta: (oldCost, newCost, threshold, oldHours = 0, newHours = 0) => {
+        const diffCost = newCost - oldCost;
+        const diffHours = newHours - oldHours;
+        const percentChange = oldCost === 0 ? (newCost > 0 ? 100 : 0) : (diffCost / oldCost) * 100;
+        
         return {
             percentChange: percentChange.toFixed(1),
-            diff: diff,
+            diffCost: diffCost,
+            diffHours: diffHours,
+            oldCost: oldCost,
+            oldHours: oldHours,
+            newCost: newCost,
+            newHours: newHours,
             isBreached: percentChange > threshold
         };
     },
 
     createAutomatedCR: async (projectId, reqId, stepTitle, deltaObj, reason) => {
-        const { data: latest } = await supabase
-            .from('change_items')
-            .select('change_number')
-            .eq('project_id', projectId)
-            .order('change_number', { ascending: false })
-            .limit(1)
-            .single();
+        try {
+            // 1. Get the latest sequence number for this project
+            const { data: latest } = await supabase
+                .from('change_items')
+                .select('change_number')
+                .eq('project_id', projectId)
+                .order('change_number', { ascending: false })
+                .limit(1)
+                .single();
 
-        const newNumber = (latest?.change_number || 0) + 1;
+            const newNumber = (latest?.change_number || 0) + 1;
 
-        const { data: cr, error } = await supabase.from('change_items').insert([{
-            project_id: projectId,
-            requirement_id: reqId,
-            change_number: newNumber,
-            title: `Breach: ${stepTitle}`,
-            change_reason: reason,
-            impact_analysis: `Automated CR: Cost increased by ${deltaObj.percentChange}% ($${deltaObj.diff.toLocaleString()}).`,
-            change_status: 'Pending',
-            total_cost_rollup: deltaObj.diff,
-            created_at: new Date().toISOString()
-        }]).select().single();
+            // 2. Insert the CR with full delta details
+            const { data: cr, error } = await supabase.from('change_items').insert([{
+                project_id: projectId,
+                requirement_id: reqId,
+                change_number: newNumber,
+                title: `Breach: ${stepTitle}`,
+                change_type: 'Threshold Violation',
+                change_reason: reason,
+                impact_analysis: `Automated CR generated due to budget breach. 
+                                  Cost increased by ${deltaObj.percentChange}% 
+                                  (+$${deltaObj.diffCost.toLocaleString()}). 
+                                  Original Hours: ${deltaObj.oldHours} -> New Hours: ${deltaObj.newHours}`,
+                change_status: 'Pending',
+                requested_hours: deltaObj.diffHours, // The Delta
+                original_hours: deltaObj.oldHours,   // The Baseline
+                total_cost_rollup: deltaObj.diffCost, // The Dollar Delta
+                change_accountable: (await supabase.auth.getUser()).data.user?.id,
+                created_at: new Date().toISOString()
+            }]).select().single();
 
-        if (error) throw error;
-        return cr;
+            if (error) throw error;
+            console.log(`Governance: Automated CR-${newNumber} created for Req ${reqId}`);
+            return cr;
+        } catch (err) {
+            console.error("Governance Error: Failed to create automated CR", err.message);
+            return null;
+        }
     }
 };
 
 /**
- * 3. Additional Support Functions (Sync, History, Listeners)
+ * Additional Support Functions
  */
 export async function syncHierarchyStatus(requirementId, projectId) {
     try {
@@ -117,12 +137,12 @@ export async function syncHierarchyStatus(requirementId, projectId) {
         if (steps?.length > 0 && steps.every(s => s.status === 'Complete')) {
             await supabase.from('requirements').update({ status: 'Complete' }).eq('req_id', requirementId);
         }
-    } catch (err) { console.error("? Status Sync Error:", err.message); }
+    } catch (err) { console.error("Status Sync Error:", err.message); }
 }
 
 // REAL-TIME LISTENER
 export const initializeProjectEngine = () => {
-    console.log("??? Project Engine: Initializing Real-Time Governance...");
+    console.log("Project Engine: Initializing Real-Time Governance...");
     supabase.channel('project-automation-channel')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'steps' }, async (payload) => {
             const reqId = payload.new?.requirement_id || payload.old?.requirement_id;
@@ -138,6 +158,6 @@ export const initializeProjectEngine = () => {
 // Start the listener
 initializeProjectEngine();
 
-// Legacy Window Mappings
+// Window Mappings
 window.engineRollup = rollupToRequirement;
 window.projectEngine = projectEngine;

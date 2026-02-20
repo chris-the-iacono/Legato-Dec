@@ -129,6 +129,7 @@ export const projectEngine = {
         return null;
     }
 }
+};
 
 /**
  * Additional Support Functions

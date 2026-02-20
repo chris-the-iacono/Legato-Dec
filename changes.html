@@ -117,7 +117,14 @@
     const session = await checkAccess();
     window.sessionData = session;
 
-    if (!currentProjectId || currentProjectId === "undefined") {
+    // Ensure we are pulling the Project ID from the URL as the primary source
+    const urlParams = new URLSearchParams(window.location.search);
+    const urlProjectId = urlParams.get('id');
+    
+    // Use URL ID if present, otherwise fallback to global/localStorage
+    const activeProjectId = urlProjectId || currentProjectId;
+
+    if (!activeProjectId || activeProjectId === "undefined") {
         console.error("No Project ID found. Redirecting...");
         window.location.href = 'index.html';
         return;
@@ -126,14 +133,27 @@
     const projectName = localStorage.getItem('selected_project_name') || "Project Details";
     renderProjectHeader(session, 'changes', projectName);
 
+    // 1. Load the list and WAIT for it to finish
     await loadCRList();
 
-    // NEW: Check for Deep Link
-    const urlParams = new URLSearchParams(window.location.search);
+    // 2. Handle the Deep Link
     const targetCR = urlParams.get('cr');
-    if (targetCR && typeof window.openCRSlider === 'function') {
-        // Delay slightly to ensure list is rendered if necessary
-        setTimeout(() => window.openCRSlider(targetCR), 300);
+    
+    if (targetCR) {
+        console.log("Deep Link detected for CR:", targetCR);
+        
+        // Use loadCRDetail (the function you provided earlier)
+        if (typeof window.loadCRDetail === 'function') {
+            await window.loadCRDetail(targetCR);
+            
+            // UI Polish: Scroll the detail container into view for mobile users
+            const detailView = document.getElementById('cr-form-container');
+            if (detailView) {
+                detailView.scrollIntoView({ behavior: 'smooth' });
+            }
+        } else {
+            console.warn("Deep Link failed: window.loadCRDetail is not defined.");
+        }
     }
 });
 
@@ -182,20 +202,24 @@
         }
     };
 
-    function renderCRCard(cr) {
-        let statusColor = 'bg-yellow-100 text-yellow-700';
-        if (cr.change_status === 'Approved') statusColor = 'bg-green-100 text-green-700';
-        if (cr.change_status === 'Rejected') statusColor = 'bg-red-100 text-red-700';
+    function renderCRCard(cr, isActive = false) {
+    let statusColor = 'bg-yellow-100 text-yellow-700';
+    if (cr.change_status === 'Approved') statusColor = 'bg-green-100 text-green-700';
+    if (cr.change_status === 'Rejected') statusColor = 'bg-red-100 text-red-700';
 
-        return `
-            <div onclick="loadCRDetail('${cr.change_id}')" class="p-4 mb-2 bg-white border border-gray-200 rounded-xl hover:border-indigo-500 cursor-pointer shadow-sm group transition-all">
-                <div class="flex justify-between items-start mb-2">
-                    <span class="text-[10px] font-black text-indigo-600 uppercase">CR-${cr.change_number || 'X'}</span>
-                    <span class="text-[8px] font-black px-1.5 py-0.5 rounded ${statusColor} uppercase">${cr.change_status || 'Draft'}</span>
-                </div>
-                <h3 class="text-xs font-black text-gray-900 truncate">${cr.title}</h3>
-            </div>`;
-    }
+    // Add a ring if it's the active/selected CR
+    const activeClass = isActive ? 'ring-2 ring-indigo-500 border-indigo-500 bg-indigo-50' : 'bg-white border-gray-200';
+
+    return `
+        <div id="card-${cr.change_id}" onclick="loadCRDetail('${cr.change_id}')" 
+             class="p-4 mb-2 border rounded-xl hover:border-indigo-500 cursor-pointer shadow-sm group transition-all ${activeClass}">
+            <div class="flex justify-between items-start mb-2">
+                <span class="text-[10px] font-black text-indigo-600 uppercase">CR-${cr.change_number || 'X'}</span>
+                <span class="text-[8px] font-black px-1.5 py-0.5 rounded ${statusColor} uppercase">${cr.change_status || 'Draft'}</span>
+            </div>
+            <h3 class="text-xs font-black text-gray-900 truncate">${cr.title}</h3>
+        </div>`;
+}
 
     window.loadCRDetail = async (id) => {
         // FIXED: Added !requirement_id to disambiguate the join

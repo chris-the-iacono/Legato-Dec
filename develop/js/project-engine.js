@@ -86,47 +86,49 @@ export const projectEngine = {
     },
 
     createAutomatedCR: async (projectId, reqId, stepTitle, deltaObj, reason) => {
-        try {
-            // 1. Get the latest sequence number for this project
-            const { data: latest } = await supabase
-                .from('change_items')
-                .select('change_number')
-                .eq('project_id', projectId)
-                .order('change_number', { ascending: false })
-                .limit(1)
-                .single();
+    try {
+        // 1. Get the latest sequence number for this project
+        // Note: Using limit(1) without .single() to avoid errors on first-time CRs
+        const { data: latest } = await supabase
+            .from('change_items')
+            .select('change_number')
+            .eq('project_id', projectId)
+            .order('change_number', { ascending: false })
+            .limit(1);
 
-            const newNumber = (latest?.change_number || 0) + 1;
+        const newNumber = (latest && latest.length > 0 ? latest[0].change_number : 0) + 1;
 
-            // 2. Insert the CR with full delta details
-            const { data: cr, error } = await supabase.from('change_items').insert([{
-                project_id: projectId,
-                requirement_id: reqId,
-                change_number: newNumber,
-                title: `Breach: ${stepTitle}`,
-                change_type: 'Threshold Violation',
-                change_reason: reason,
-                impact_analysis: `Automated CR generated due to budget breach. 
-                                  Cost increased by ${deltaObj.percentChange}% 
-                                  (+$${deltaObj.diffCost.toLocaleString()}). 
-                                  Original Hours: ${deltaObj.oldHours} -> New Hours: ${deltaObj.newHours}`,
-                change_status: 'Pending',
-                requested_hours: deltaObj.diffHours, // The Delta
-                original_hours: deltaObj.oldHours,   // The Baseline
-                total_cost_rollup: deltaObj.diffCost, // The Dollar Delta
-                change_accountable: (await supabase.auth.getUser()).data.user?.id,
-                created_at: new Date().toISOString()
-            }]).select().single();
+        // 2. Insert the CR with full delta details
+        // FIX: Ensuring change_accountable uses window session or auth fallback
+        const activeUserId = window.sessionData?.user_id || (await supabase.auth.getUser()).data.user?.id;
 
-            if (error) throw error;
-            console.log(`Governance: Automated CR-${newNumber} created for Req ${reqId}`);
-            return cr;
-        } catch (err) {
-            console.error("Governance Error: Failed to create automated CR", err.message);
-            return null;
-        }
+        const { data: cr, error } = await supabase.from('change_items').insert([{
+            project_id: projectId,
+            requirement_id: reqId,
+            change_number: newNumber,
+            title: `Breach: ${stepTitle}`,
+            change_type: 'Threshold Violation',
+            change_reason: reason,
+            impact_analysis: `Automated CR generated due to budget breach. 
+                              Cost increased by ${deltaObj.percentChange}% 
+                              (+$${deltaObj.diffCost.toLocaleString()}). 
+                              Original Hours: ${deltaObj.oldHours} -> New Hours: ${deltaObj.newHours}`,
+            change_status: 'Pending',
+            requested_hours: deltaObj.diffHours, // The Delta
+            original_hours: deltaObj.oldHours,   // The Baseline
+            total_cost_rollup: deltaObj.diffCost, // The Dollar Delta
+            change_accountable: activeUserId,
+            created_at: new Date().toISOString()
+        }]).select().single();
+
+        if (error) throw error;
+        console.log(`Governance: Automated CR-${newNumber} created for Req ${reqId}`);
+        return cr;
+    } catch (err) {
+        console.error("Governance Error: Failed to create automated CR", err.message);
+        return null;
     }
-};
+}
 
 /**
  * Additional Support Functions

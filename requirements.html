@@ -811,7 +811,6 @@ window.rollupToRequirement = async (reqId = window.selectedReqId, steps = null) 
         const proj = currentStep?.requirements?.projects || {};
         
         if (proj.status?.toLowerCase() === 'active' && proj.id) {
-            // Enhanced Delta with Hours for the Engine
             const delta = projectEngine.calculateGovernanceDelta(
                 parseFloat(currentStep.cost) || 0, 
                 calculatedCost, 
@@ -838,39 +837,31 @@ window.rollupToRequirement = async (reqId = window.selectedReqId, steps = null) 
         
         resultStep = data; error = updateError;
     } else {
-        // FIXED: Order by sequence_order DESCENDING to get the highest current number
-        const { data: existing } = await supabase.from('steps')
-            .select('sequence_order')
-            .eq('requirement_id', window.selectedReqId)
-            .order('sequence_order', { descending: true })
-            .limit(1);
-        
-        // Use the highest existing order + 10, or start at 10 if none exist
-        const nextOrder = (existing?.[0]?.sequence_order || 0) + 10;
+        // NEW LOGIC: Use Database RPC to handle atomic sequence generation
+        const { data: rpcData, error: rpcError } = await supabase.rpc('safe_insert_step', {
+            p_requirement_id: window.selectedReqId,
+            p_tenant_id: window.sessionData?.tenantId,
+            p_title: title,
+            p_assigned_to: assignedId,
+            p_hours: hours,
+            p_cost: calculatedCost,
+            p_status: 'pending',
+            p_version_number: 1
+        });
 
-        const { data, error: insertError } = await supabase.from('steps').insert([{
-            requirement_id: window.selectedReqId, 
-            tenant_id: window.sessionData?.tenantId,
-            title, 
-            assigned_to: assignedId, 
-            estimated_hours: hours, 
-            cost: calculatedCost,
-            sequence_order: nextOrder, 
-            status: 'pending', 
-            version_number: 1 
-        }]).select().single();
-
-        resultStep = data; error = insertError;
+        // The RPC returns a list of rows; we need the first (and only) result
+        resultStep = rpcData ? rpcData[0] : null; 
+        error = rpcError;
     }
 
     if (error) return alert("Save failed: " + error.message);
+    if (!resultStep) return alert("Save failed: No data returned from server.");
 
     // 3. AUDIT LOG (Triggers the Virtual Path)
     const label = isCR ? "CHANGE REQUEST" : "Baseline Adjustment";
     const currentProjectId = localStorage.getItem('selected_project_id');
     const note = `${label} (v${resultStep.version_number}): $${calculatedCost.toLocaleString()} (${hours}h). Reason: ${changeReason || 'No reason provided'} ${isCR ? `[CR_ID: ${crId}] View: changes.html?id=${currentProjectId}&cr=${crId}` : ''}`;
     
-    // Ensure we call appendNoteToActivity or your equivalent note saver
     if (typeof appendNoteToActivity === 'function') {
         await appendNoteToActivity(resultStep.step_id, note);
     }

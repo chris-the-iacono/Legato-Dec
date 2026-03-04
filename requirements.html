@@ -838,15 +838,26 @@ window.rollupToRequirement = async (reqId = window.selectedReqId, steps = null) 
         
         resultStep = data; error = updateError;
     } else {
-        const { data: existing } = await supabase.from('steps').select('sequence_order')
-            .eq('requirement_id', window.selectedReqId).order('sequence_order', { descending: false });
+        // FIXED: Order by sequence_order DESCENDING to get the highest current number
+        const { data: existing } = await supabase.from('steps')
+            .select('sequence_order')
+            .eq('requirement_id', window.selectedReqId)
+            .order('sequence_order', { descending: true })
+            .limit(1);
         
+        // Use the highest existing order + 10, or start at 10 if none exist
         const nextOrder = (existing?.[0]?.sequence_order || 0) + 10;
 
         const { data, error: insertError } = await supabase.from('steps').insert([{
-            requirement_id: window.selectedReqId, tenant_id: window.sessionData?.tenantId,
-            title, assigned_to: assignedId, estimated_hours: hours, cost: calculatedCost,
-            sequence_order: nextOrder, status: 'pending', version_number: 1 
+            requirement_id: window.selectedReqId, 
+            tenant_id: window.sessionData?.tenantId,
+            title, 
+            assigned_to: assignedId, 
+            estimated_hours: hours, 
+            cost: calculatedCost,
+            sequence_order: nextOrder, 
+            status: 'pending', 
+            version_number: 1 
         }]).select().single();
 
         resultStep = data; error = insertError;
@@ -857,12 +868,18 @@ window.rollupToRequirement = async (reqId = window.selectedReqId, steps = null) 
     // 3. AUDIT LOG (Triggers the Virtual Path)
     const label = isCR ? "CHANGE REQUEST" : "Baseline Adjustment";
     const currentProjectId = localStorage.getItem('selected_project_id');
-    const note = `${label} (v${resultStep.version_number}): $${calculatedCost.toLocaleString()} (${hours}h). Reason: ${changeReason} ${isCR ? `[CR_ID: ${crId}] View: changes.html?id=${currentProjectId}&cr=${crId}` : ''}`;
+    const note = `${label} (v${resultStep.version_number}): $${calculatedCost.toLocaleString()} (${hours}h). Reason: ${changeReason || 'No reason provided'} ${isCR ? `[CR_ID: ${crId}] View: changes.html?id=${currentProjectId}&cr=${crId}` : ''}`;
     
     // Ensure we call appendNoteToActivity or your equivalent note saver
     if (typeof appendNoteToActivity === 'function') {
         await appendNoteToActivity(resultStep.step_id, note);
     }
+
+    // Refresh the UI to show the new step
+    if (typeof window.loadSteps === 'function') {
+        window.loadSteps(window.selectedReqId);
+    }
+}
 
     // 4. SYNC & REFRESH
     window.closeTaskSlider();

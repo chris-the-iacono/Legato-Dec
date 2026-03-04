@@ -792,6 +792,7 @@ window.rollupToRequirement = async (reqId = window.selectedReqId, steps = null) 
 
     let resultStep, error, isCR = false, crId = null;
 
+    // --- EXECUTION BRANCH: UPDATE ---
     if (editingStepId) {
         if (!changeReason) return alert("Please provide a reason for this change.");
         
@@ -836,8 +837,9 @@ window.rollupToRequirement = async (reqId = window.selectedReqId, steps = null) 
         }).eq('step_id', editingStepId).select().single();
         
         resultStep = data; error = updateError;
+
+    // --- EXECUTION BRANCH: INSERT (Atomic RPC) ---
     } else {
-        // NEW LOGIC: Use Database RPC to handle atomic sequence generation
         const { data: rpcData, error: rpcError } = await supabase.rpc('safe_insert_step', {
             p_requirement_id: window.selectedReqId,
             p_tenant_id: window.sessionData?.tenantId,
@@ -849,13 +851,12 @@ window.rollupToRequirement = async (reqId = window.selectedReqId, steps = null) 
             p_version_number: 1
         });
 
-        // The RPC returns a list of rows; we need the first (and only) result
         resultStep = rpcData ? rpcData[0] : null; 
         error = rpcError;
     }
 
     if (error) return alert("Save failed: " + error.message);
-    if (!resultStep) return alert("Save failed: No data returned from server.");
+    if (!resultStep) return alert("Save failed: Server returned no data.");
 
     // 3. AUDIT LOG (Triggers the Virtual Path)
     const label = isCR ? "CHANGE REQUEST" : "Baseline Adjustment";
@@ -866,15 +867,16 @@ window.rollupToRequirement = async (reqId = window.selectedReqId, steps = null) 
         await appendNoteToActivity(resultStep.step_id, note);
     }
 
-    // Refresh the UI to show the new step
-    if (typeof window.loadSteps === 'function') {
-        window.loadSteps(window.selectedReqId);
-    }
-}
-
-    // 4. SYNC & REFRESH
-    window.closeTaskSlider();
+    // 4. SYNC & REFRESH (Audited for proper sequence)
+    if (typeof window.closeTaskSlider === 'function') window.closeTaskSlider();
+    
+    // Rollup updates requirement totals (Budget/Cost)
     if (window.rollupToRequirement) await window.rollupToRequirement(window.selectedReqId);
+    
+    // Refresh task list within the slider view
+    if (typeof window.loadSteps === 'function') window.loadSteps(window.selectedReqId);
+    
+    // Global list refreshes
     if (typeof window.refreshSteps === 'function') await window.refreshSteps();
     if (typeof window.loadRequirements === 'function') window.loadRequirements();
     
